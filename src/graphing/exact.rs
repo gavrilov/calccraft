@@ -68,7 +68,12 @@ pub fn recognize(v: f64, tolerance: f64) -> Exact {
     if v.abs() > 1000.0 {
         return Exact::Decimal(v);
     }
-    if let Some((p, q)) = rational(v / PI, 12, tolerance) {
+    if let Some((p, q)) = rational(v / PI, 12, tolerance)
+        && (p != 0 || tolerance > TIGHT)
+    {
+        // 0·π is 0 only within the tolerance of 0 itself for values found to a few ulps
+        // (3·10⁻⁹ isn't 0). Limits, estimated within LOOSE, keep the wider margin: the two
+        // sides of 1/x + 10⁻⁶ at ±∞, 9.99999e-7 and 1.000001e-6, both still come out as 0.
         return Exact::Pi(p, q);
     }
     // (p/q)√c + r/s: try each radicand and coefficient, and see whether the rest is a
@@ -230,6 +235,10 @@ mod tests {
         assert_eq!(format(PI / 2.0), "π/2");
         assert_eq!(format(3.0 * PI / 2.0), "3π/2");
         assert_eq!(format(-PI / 4.0), "−π/4");
+        // Within the tolerance of 0·π but not of 0: not 0, but for a limit.
+        assert_eq!(format(3e-9), "0.000000003");
+        assert_eq!(snap(-2e-9, TIGHT), -2e-9);
+        assert_eq!(snap(2e-6, LOOSE), 0.0);
     }
 
     #[test]

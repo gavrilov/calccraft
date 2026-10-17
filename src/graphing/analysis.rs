@@ -697,6 +697,73 @@ fn set_text(v: char, intervals: &[Interval]) -> String {
     format!("{{{body}}}")
 }
 
+/// What `e` divides by: denominators, cos of tan's and sec's argument, sin of cot's and
+/// csc's, the argument of coth, csch and acsch, ln of a logarithm's base (log(b, x) is
+/// ln x/ln b), and the base of a negative power.
+fn divisors(e: &Expr, env: &Env, out: &mut Vec<Expr>) {
+    use Expr::*;
+    match e {
+        Bin(op, a, b) => {
+            match op {
+                BinOp::Div => out.push((**b).clone()),
+                BinOp::Pow if !b.has_x() && b.eval(0.0, 0.0, env) < 0.0 => out.push((**a).clone()),
+                _ => {}
+            }
+            divisors(a, env, out);
+            divisors(b, env, out);
+        }
+        Call(f, a) => {
+            match f {
+                Func::Tan | Func::Sec => out.push(Call(Func::Cos, a.clone())),
+                Func::Cot | Func::Csc => out.push(Call(Func::Sin, a.clone())),
+                Func::Coth | Func::Csch | Func::Acsch => out.push((**a).clone()),
+                _ => {}
+            }
+            divisors(a, env, out);
+        }
+        Root(a, n) | LogBase(n, a) => {
+            if matches!(e, LogBase(..)) {
+                out.push(Call(Func::Ln, n.clone()));
+            }
+            divisors(a, env, out);
+            divisors(n, env, out);
+        }
+        Neg(a) | Factorial(a) => divisors(a, env, out),
+        _ => {}
+    }
+}
+
+/// Whether `fun` divides by 0 at `x`, though it may evaluate to a number there by rounding:
+/// (x² − 2)/∛(x² − 2)² is ∛(x² − 2) but for holes at ±√2, and its divisor is 5.8e-11 at
+/// the double closest to √2. A divisor is 0 at x, or tends to 0 there: |d| ≈ L + C·hᵖ at
+/// h = 10⁻⁴, 10⁻⁶, 10⁻⁸ and 10⁻¹⁰ of max(1, |x|), with the same p from both ratios of
+/// successive differences, and L, extrapolated from the last two values, is 0 to within
+/// three times its change from the two before, plus what an ulp or so of x + h makes of
+/// C·hᵖ (rounding). x² + 10⁻¹⁴ tends to 10⁻¹⁴ at 0, and 1 + 10000·root(|x − 1|, 32) to 1
+/// at 1, though it is 5234 a billionth away.
+fn divides_by_zero(fun: &Fun, x: f64) -> bool {
+    let mut found = Vec::new();
+    divisors(fun.e, &fun.env, &mut found);
+    let h = |k: i32| x.abs().max(1.0) * 10f64.powi(-2 * k);
+    found.iter().filter(|d| d.has_x()).any(|d| {
+        let size = |x: f64| d.eval(x, 0.0, &fun.env).abs();
+        size(x) == 0.0
+            || [1.0, -1.0].iter().any(|&side| {
+                let v: Vec<f64> = (2..6).map(|k| size(x + side * h(k))).collect();
+                let steps: Vec<f64> = v.windows(2).map(|w| w[0] - w[1]).collect();
+                let power = |i: usize| fraction((steps[i + 1] / steps[i]).ln() / 0.01f64.ln());
+                let Some(p) = power(0).filter(|&p| power(1) == Some(p)) else {
+                    return false;
+                };
+                let q = 0.01f64.powf(p);
+                let limit = |i: usize| v[i + 1] - steps[i] * q / (1.0 - q);
+                let ulps = 8.0 * ((x + side * h(5)).abs() * f64::EPSILON).max(f64::MIN_POSITIVE);
+                let rounding = p * v[3] * ulps / h(5) / (1.0 - q);
+                limit(2).abs() <= 3.0 * (limit(2) - limit(1)).abs() + rounding
+            })
+    })
+}
+
 // ------------------------------------------------------------------ limits
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -705,6 +772,58 @@ enum Limit {
     PlusInfinity,
     MinusInfinity,
     Unknown,
+}
+
+/// The limit of `f` at `x` from the side of `side`, and its error, where f has a vertical
+/// tangent there. Next to one, f at the double closest to x is far from it: ∛(x² − 2) + 1
+/// is 1.0000076 at √2, from a radicand of 4.4e-16.
+///
+/// Inside, f ≈ L + C·hᵖ + D·h + E·hᵖ⁺¹ at h = 2⁻⁴, 2⁻⁶, … 2⁻²⁴ of max(1, |x|) (rounded up
+/// to a power of 2, so that x + h is exact), from the first h where f is defined all the
+/// way in. The ratios of successive differences tell p, the exponent of a root: a fraction
+/// with a denominator up to 32, below 1 at a vertical tangent. Richardson's extrapolation
+/// then removes hᵖ, h and hᵖ⁺¹. Further in, rounding noise grows, so the two successive
+/// estimates of L that agree best give it, and their difference its error, grown by how
+/// slowly the estimates settle (another power left over, as in ∛x + 3·10⁻⁸·x^(1/16) at 0,
+/// keeps them drifting). And f(x) has to be L but for what C·hᵖ makes of an ulp of x (of
+/// 1, at least): the tangent of √(x + 10⁻¹⁴) + 1 isn't at 0 but at −10⁻¹⁴, and f is
+/// 1.0000001 at 0. `None` where f doesn't settle on such a power.
+fn vertical_limit(f: &dyn Fn(f64) -> f64, x: f64, side: f64) -> Option<(f64, f64)> {
+    let scale = side * x.abs().max(1.0).log2().ceil().exp2();
+    let r: f64 = 0.25;
+    let all: Vec<f64> = (2..13).map(|k| f(x + scale * r.powi(k))).collect();
+    let start = all
+        .iter()
+        .rposition(|y| !y.is_finite())
+        .map_or(0, |i| i + 1);
+    let v = &all[start..];
+    if v.len() < 7 {
+        return None;
+    }
+    let steps: Vec<f64> = v.windows(2).map(|w| w[1] - w[0]).collect();
+    let exponent = |j: usize| fraction((steps[j + 1] / steps[j]).ln() / r.ln());
+    let p = (0..steps.len() - 2).find_map(|j| {
+        let p = exponent(j)?;
+        (exponent(j + 1) == Some(p) && p < 1.0).then_some(p)
+    })?;
+    let richardson = |s: &[f64], q: f64| -> Vec<f64> {
+        s.windows(2)
+            .map(|w| (w[1] - q * w[0]) / (1.0 - q))
+            .collect()
+    };
+    let q = r.powf(p);
+    let estimates = richardson(&richardson(&richardson(v, q), r), q * r);
+    let changes: Vec<f64> = estimates.windows(2).map(|w| (w[1] - w[0]).abs()).collect();
+    let i = (0..changes.len()).min_by(|&a, &b| changes[a].total_cmp(&changes[b]))?;
+    let settle = if i > 0 {
+        changes[i] / changes[i - 1]
+    } else {
+        1.0
+    };
+    let (limit, error) = (estimates[i], changes[i] / (1.0 - settle.min(0.99)));
+    let c = (v[0] - limit).abs() / (scale.abs() * r.powi(2 + start as i32)).powf(p);
+    let rounding = c * (f64::EPSILON * x.abs().max(1.0)).powf(p);
+    ((f(x) - limit).abs() <= rounding + 3.0 * error).then_some((limit, error))
 }
 
 /// The limit of the values `v`, taken ever closer to the point (or ever further out).
@@ -744,6 +863,18 @@ fn limit_of(v: &[f64]) -> Limit {
     Limit::Unknown
 }
 
+/// The fraction k/n with n ≤ 32 that `p` is within 0.2% of, preferring small n.
+fn fraction(p: f64) -> Option<f64> {
+    if p.is_nan() || p <= 0.0 {
+        return None;
+    }
+    (1..=32).find_map(|n| {
+        let k = (p * n as f64).round();
+        let near = k / n as f64;
+        (k >= 1.0 && (near - p).abs() <= 2e-3 * p).then_some(near)
+    })
+}
+
 /// The limit at x → ±∞ of `g`.
 fn limit_at_infinity(g: &dyn Fn(f64) -> f64, sign: f64) -> Limit {
     let v: Vec<f64> = (1..=6).map(|k| g(sign * 10f64.powi(2 * k))).collect();
@@ -763,6 +894,39 @@ fn limit_at(fun: &Fun, p: f64, side: f64) -> Limit {
 
 fn point_text(x: f64, y: f64) -> String {
     format!("({}, {})", exact::format(x), exact::format(y))
+}
+
+/// The value of `fun` at a point: its limit there where f has a vertical tangent
+/// (`vertical_limit`), if the limit is known to 10⁻⁹ and differs from f; f itself elsewhere,
+/// as at the ends of √(x − 1) + √(3 − x), where x − 1 and 3 − x are exactly 0. Limits from
+/// both sides have to agree, and one from a single side holds where f is undefined on the
+/// other or tends to it there too, not at a jump ((x² − 2)/|x² − 2| + root(x² − 2, 11) at √2).
+/// Nor where f divides by 0: root(x² − 2, 4)³/root(x² − 2, 4)² has holes at ±√2, not 0.
+fn value_at(fun: &Fun, x: f64) -> f64 {
+    let f = |x: f64| fun.f(x);
+    let at = f(x);
+    let continues = |side: f64, limit: f64| {
+        let y = f(x + side * 2f64.powi(-24) * x.abs().max(1.0));
+        !y.is_finite() || (y - limit).abs() <= (at - limit).abs()
+    };
+    let (limit, error) = match [1.0, -1.0].map(|side| vertical_limit(&f, x, side)) {
+        [Some((a, ea)), Some((b, eb))]
+            if (a - b).abs() <= 3.0 * (ea + eb) + 1e-12 * a.abs().max(1.0) =>
+        {
+            ((a + b) / 2.0, ea.max(eb))
+        }
+        [Some(right), None] if continues(-1.0, right.0) => right,
+        [None, Some(left)] if continues(1.0, left.0) => left,
+        _ => return at,
+    };
+    if error <= 1e-9 * limit.abs().max(1.0)
+        && (at - limit).abs() > 3.0 * error
+        && !divides_by_zero(fun, x)
+    {
+        limit
+    } else {
+        at
+    }
 }
 
 /// The value of a limit, written for a range end.
@@ -869,6 +1033,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
         let parts: Vec<String> = roots.iter().map(|x| exact::format(*x)).collect();
         features.x_intercepts = Some(parts.join(", "));
     }
+    let y = |x: f64| value_at(fun, x);
 
     // Turning points, where f′ changes sign (through ∞ at a cusp).
     let mut turns: Vec<(f64, bool)> = sign_changes(&d1, &xs, true)
@@ -891,7 +1056,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
         ]);
     } else {
         for &(c, minimum) in &turns {
-            let text = point_text(c, fun.f(c));
+            let text = point_text(c, y(c));
             if minimum {
                 features.minima.push(text);
             } else {
@@ -908,7 +1073,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
                 if slope == 0.0 || slope.is_nan() {
                     continue;
                 }
-                let text = point_text(end, fun.f(end));
+                let text = point_text(end, y(end));
                 if (slope > 0.0) == (side > 0.0) {
                     features.minima.push(text);
                 } else {
@@ -931,7 +1096,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
             .iter()
             .map(|&c| {
                 let c = exact::snap(c, TIGHT);
-                point_text(c, fun.f(c))
+                point_text(c, y(c))
             })
             .collect();
     }
@@ -949,14 +1114,14 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
             .iter()
             .filter(|(c, _)| *c > i.lo && *c < i.hi)
             .map(|&(c, _)| End {
-                value: exact::snap(fun.f(c), TIGHT),
+                value: exact::snap(y(c), TIGHT),
                 attained: true,
             })
             .collect();
         for (x, closed, side) in [(i.lo, i.lo_closed, 1.0), (i.hi, i.hi_closed, -1.0)] {
             if closed {
                 ends.push(End {
-                    value: exact::snap(fun.f(x), TIGHT),
+                    value: exact::snap(y(x), TIGHT),
                     attained: true,
                 });
                 continue;
@@ -1256,6 +1421,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
             .collect();
         features.x_intercepts = Some(format!("{{{}, n₁ ∈ ℤ}}", parts.join(", ")));
     }
+    let y = |x: f64| value_at(fun, x);
 
     // Turning points and their kind, in one period.
     let positions = in_period(
@@ -1279,10 +1445,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
         if points.is_empty() {
             continue;
         }
-        let values: Vec<f64> = points
-            .iter()
-            .map(|&x| exact::snap(fun.f(x), TIGHT))
-            .collect();
+        let values: Vec<f64> = points.iter().map(|&x| exact::snap(y(x), TIGHT)).collect();
         let (step, firsts) = families(&points, p, &|a, b| (values[a] - values[b]).abs() < 1e-9);
         let texts: Vec<String> = firsts
             .iter()
@@ -1314,10 +1477,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     if fun.d2.is_none() {
         features.too_complex.push(Feature::InflectionPoints);
     } else if !bends.is_empty() {
-        let values: Vec<f64> = bends
-            .iter()
-            .map(|&x| exact::snap(fun.f(x), TIGHT))
-            .collect();
+        let values: Vec<f64> = bends.iter().map(|&x| exact::snap(y(x), TIGHT)).collect();
         let (step, firsts) = families(&bends, p, &|a, b| (values[a] - values[b]).abs() < 1e-9);
         features.inflection_points = firsts
             .iter()
@@ -1335,7 +1495,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let mut ends: Vec<End> = turns
         .iter()
         .map(|t| End {
-            value: exact::snap(fun.f(t.0), TIGHT),
+            value: exact::snap(y(t.0), TIGHT),
             attained: true,
         })
         .collect();
@@ -1708,6 +1868,83 @@ mod tests {
         let f = analyze_text("y=cos(2x)+sin(x)");
         assert_eq!(f.x_intercepts.as_deref(), Some("{2πn₁/3 + π/2, n₁ ∈ ℤ}"));
         assert_eq!(f.range.as_deref(), Some("{y ∈ [−2, 9/8]}"));
+    }
+
+    #[test]
+    fn vertical_tangent_values() {
+        // At the double closest to √2, x² − 2 is a rounding error of 4.4e-16, and its cube
+        // root 7.6e-6: a point there takes f's limit, not f at that double.
+        let f = analyze_text("y=cbrt(x^2-2)+1");
+        assert_eq!(f.inflection_points, vec!["(−√2, 1)", "(√2, 1)"]);
+        let f = analyze_text("y=cbrt(x^3-2x)+2");
+        assert_eq!(f.inflection_points, vec!["(−√2, 2)", "(0, 2)", "(√2, 2)"]);
+        // Extrema and the range, at cusps and at the ends of a domain (root(x² − 2, 4) is
+        // 1.5e-4 at the double closest to √2).
+        let f = analyze_text("y=cbrt(abs(x^2-2))+1");
+        assert_eq!(f.minima, vec!["(−√2, 1)", "(√2, 1)"]);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [1, ∞)}"));
+        let f = analyze_text("y=root(x^2-2,4)+1/3");
+        assert_eq!(f.minima, vec!["(−√2, 1/3)", "(√2, 1/3)"]);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [1/3, ∞)}"));
+        // In the periodic analysis: cos(π/2) is 6.1e-17 and cos(3π/2) −1.8e-16.
+        let f = analyze_text("y=cbrt(cos(x))+1");
+        assert_eq!(f.inflection_points, vec!["{(πn₁ + π/2, 1), n₁ ∈ ℤ}"]);
+        // A point where f has no such rounding keeps its value.
+        let f = analyze_text("y=x^(1/3)+10^(-8)");
+        assert_eq!(f.inflection_points, vec!["(0, 0.00000001)"]);
+        let f = analyze_text("y=sqrt(x-1)+sqrt(3-x)");
+        assert_eq!(f.minima, vec!["(1, √2)", "(3, √2)"]);
+        // Nor where another power keeps the estimates drifting, or the tangent is 10⁻¹⁵ off.
+        let f = analyze_text("y=cbrt(x)+3*10^(-8)*root(x,16)");
+        assert_eq!(f.minima, vec!["(0, 0)"]);
+        let f = analyze_text("y=cbrt(x-10^(-15))+7*10^(-6)*sqrt(x)");
+        assert_eq!(f.minima, vec!["(0, −0.00001)"]);
+        // Nor at a jump, where the limit from the right is 1 and from the left −1.
+        let f = analyze_text("y=(x^2-2)/abs(x^2-2)+root(x^2-2,11)");
+        assert_eq!(f.inflection_points, vec!["(−√2, 1.04021)", "(√2, 1.04021)"]);
+        // A limit of 3·10⁻⁹ isn't 0, though it is within 10⁻⁹ of 0·π. (It comes out as
+        // 3.008e-9: rounding in x² − 2 next to √2 leaves it known to about 10⁻¹¹.)
+        let f = analyze_text("y=root(x^2-2,4)+3*10^(-9)");
+        let near = |y: &str| (y.parse::<f64>().unwrap() - 3e-9).abs() < 1e-10;
+        assert!(f.minima[0].starts_with("(−√2, ") && f.minima[1].starts_with("(√2, "));
+        assert!(
+            f.minima.len() == 2
+                && f.minima
+                    .iter()
+                    .all(|m| near(m.split(", ").nth(1).unwrap().trim_end_matches(')'))),
+            "{:?}",
+            f.minima
+        );
+        let range = f.range.unwrap();
+        assert!(
+            near(
+                range
+                    .trim_start_matches("{y ∈ [")
+                    .split(',')
+                    .next()
+                    .unwrap()
+            ),
+            "{range}"
+        );
+        // At a hole the limit isn't attained: root(x² − 2, 4)³/root(x² − 2, 4)² divides by 0
+        // at ±√2.
+        let f = analyze_text("y=root(x^2-2,4)^3/root(x^2-2,4)^2");
+        assert!(
+            f.minima.iter().all(|m| !m.ends_with(", 0)")),
+            "{:?}",
+            f.minima
+        );
+        assert_ne!(f.range.as_deref(), Some("{y ∈ [0, ∞)}"));
+        // Not a hole: 1 + 10000·root(|x² − 2|, 32) tends to 1 at √2.
+        let f = analyze_text("y=cbrt(x^2-2)+1+(x-x)/(1+10000*root(abs(x^2-2),32))");
+        assert_eq!(f.inflection_points, vec!["(−√2, 1)", "(√2, 1)"]);
+        // A hole where a logarithm's base is 1: log(x² − 1, x² − 1) divides by ln 1 at ±√2.
+        let f = analyze_text("y=cbrt(x^2-2)*log(x^2-1,x^2-1)");
+        assert!(
+            f.inflection_points.iter().all(|p| !p.ends_with(", 0)")),
+            "{:?}",
+            f.inflection_points
+        );
     }
 
     #[test]
