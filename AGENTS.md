@@ -439,6 +439,10 @@ These follow from the Windows source and are pinned by tests too:
   16 digits per operand (32 in the Scientific mode), exponents of up to 4 digits (`1.5e-3`).
   Invalid text shows `Invalid input`. Valid text is typed in after a `CE`, so `12 + 5 =` gives
   `17`; `e` is `exp`, and a sign after it goes to the exponent.
+- A sum or difference smaller than 10^-precision of its larger operand is `0` (Windows' `_snaprat` in
+  `addrat` and `subrat`, also for the memory's `M+` and `M−`): `1e18 + 100 − 1e18` is `0` with the
+  Standard mode's 16 digits, `1e33 + 9 − 1e33` with the Scientific mode's 32. `lograt` snaps the same way
+  against its argument, so `ln` and `log` of 1e34 and more are `0` (`snap_sum`, `ln_snapped`).
 
 When you change or add behavior, check it against the real calculator (`calc.exe`) or its
 source first, then add or update a test in `engine.rs`.

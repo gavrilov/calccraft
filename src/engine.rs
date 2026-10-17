@@ -289,7 +289,7 @@ impl Func {
             )
     }
 
-    fn apply(self, v: &Number, angle: Angle) -> Result<Number, CalcError> {
+    fn apply(self, v: &Number, angle: Angle, digits: i64) -> Result<Number, CalcError> {
         let ten = || Number::from_integer(10.into());
         let two = || Number::from_integer(2.into());
         let result = match self {
@@ -302,8 +302,9 @@ impl Func {
             Func::TenToX => math::power(&ten(), v)?,
             Func::TwoToX => math::power(&two(), v)?,
             Func::EToX => math::exp(v)?,
+            Func::Log if ln_snapped(v, digits)?.is_zero() => Number::zero(),
             Func::Log => math::log10(v)?,
-            Func::Ln => math::ln(v)?,
+            Func::Ln => ln_snapped(v, digits)?,
             Func::Factorial => math::factorial(v)?,
             Func::Abs => v.abs(),
             Func::Floor => math::floor(v),
@@ -1434,7 +1435,7 @@ impl Calculator {
             (Some(mode), Func::RotateRight) => Ok(mode.rotate(&self.current, false, false)),
             (Some(mode), Func::RotateLeftCarry) => Ok(mode.rotate(&self.current, true, true)),
             (Some(mode), Func::RotateRightCarry) => Ok(mode.rotate(&self.current, false, true)),
-            _ => func.apply(&self.current, self.angle),
+            _ => func.apply(&self.current, self.angle, self.digits),
         };
         match result {
             Ok(result) => {
@@ -1682,7 +1683,7 @@ impl Calculator {
         };
         let result = match &self.integer {
             Some(mode) => mode.apply(&self.last, op, &self.current),
-            None => apply(&self.last, op, &self.current),
+            None => apply(&self.last, op, &self.current, self.digits),
         };
         match result {
             Ok(result) => result,
@@ -1832,6 +1833,13 @@ impl Calculator {
                 cell - &self.current
             } else {
                 cell + &self.current
+            };
+            // The Programmer mode's memory holds integers: its precision is 64 digits, so
+            // nothing is small enough to snap.
+            let sum = if self.integer.is_some() {
+                sum
+            } else {
+                snap_sum(sum, cell, &self.current, self.digits)
             };
             if let Ok(sum) = normalize(sum) {
                 self.memory[index] = self.for_memory(sum);
@@ -2268,11 +2276,33 @@ fn operand_length(operand: &str) -> usize {
 
 // ------------------------------------------------------------- arithmetic
 
+/// Windows' `_snaprat` (`Ratpack/rat.cpp`): a result under `10^-digits` of the number it was
+/// computed from is 0 (`rat_smallest`, `digits` being the engine's precision). `addrat` and
+/// `subrat` snap against the larger operand, `lograt` against its argument, so
+/// `1e18 + 100 - 1e18` is 0 in the Standard mode and `ln(1e34)` in the Scientific mode.
+fn snap(result: Number, source: &Number, digits: i64) -> Number {
+    if result.abs() * Number::from_integer(pow10(digits)) < source.abs() {
+        Number::zero()
+    } else {
+        result
+    }
+}
+
+/// `a + b` or `a - b` as `addrat` and `subrat` return it.
+fn snap_sum(sum: Number, a: &Number, b: &Number, digits: i64) -> Number {
+    snap(sum, &a.abs().max(b.abs()), digits)
+}
+
+/// ln x as `lograt` returns it.
+fn ln_snapped(x: &Number, digits: i64) -> Result<Number, CalcError> {
+    Ok(snap(math::ln(x)?, x, digits))
+}
+
 /// `left op right`, with Windows' division errors.
-fn apply(left: &Number, op: Op, right: &Number) -> Result<Number, CalcError> {
+fn apply(left: &Number, op: Op, right: &Number, digits: i64) -> Result<Number, CalcError> {
     let result = match op {
-        Op::Add => left + right,
-        Op::Subtract => left - right,
+        Op::Add => snap_sum(left + right, left, right, digits),
+        Op::Subtract => snap_sum(left - right, left, right, digits),
         Op::Multiply => left * right,
         Op::Divide if right.is_zero() && left.is_zero() => return Err(CalcError::Undefined),
         Op::Divide if right.is_zero() => return Err(CalcError::DivideByZero),
@@ -2280,7 +2310,21 @@ fn apply(left: &Number, op: Op, right: &Number) -> Result<Number, CalcError> {
         Op::Mod => math::modulo(left, right),
         Op::Power => math::power(left, right)?,
         Op::Root => math::root(left, right)?,
-        Op::LogBase => math::log_base(left, right)?,
+        // `Log(rhs) / Log(lhs)` with both logarithms snapped.
+        Op::LogBase => match (
+            ln_snapped(left, digits)?.is_zero(),
+            ln_snapped(right, digits)?.is_zero(),
+        ) {
+            (false, false) => math::log_base(left, right)?,
+            (true, false) => Number::zero(),
+            (zero_x, true) => {
+                return Err(if zero_x {
+                    CalcError::Undefined
+                } else {
+                    CalcError::DivideByZero
+                });
+            }
+        },
         // The Programmer mode's operators run in `IntegerMode::apply`.
         _ => return Err(CalcError::InvalidInput),
     };
@@ -3164,6 +3208,95 @@ mod tests {
         // Functions nest and apply to the operand after an operator.
         assert_eq!(run_scientific("2 + 9 sqrt ="), pair("5", "2 + √(9) ="));
         assert_eq!(run_scientific("90 sin sqr"), pair("1", "sqr(sin₀(90))"));
+    }
+
+    #[test]
+    fn sums_below_the_precision_snap_to_zero() {
+        // Source: microsoft/calculator, CalcManager/Ratpack/rat.cpp: `addrat` and `subrat` end
+        // with `_snaprat`, which makes a result smaller than `rat_smallest` (10^-precision) of
+        // the larger operand 0. The same keys give the same results on a build of Microsoft's
+        // CalcManager (d125246) and on the Windows Calculator 11.2607 (read through UI Automation):
+        // Standard, `1000000000000000 × 1000 = MS + 100 − MR =` is 0 and with `+ 101` it is 101;
+        // Scientific, `1.e+33 + 9 − 1.e+33 =` is 0 and with `+ 11` it is 11.
+        for (extra, shown) in [("1", "0"), ("100", "0"), ("101", "101")] {
+            let mut calc = Calculator::default();
+            press(&mut calc, "1000000000000000*1000=");
+            calc.execute(Command::MemoryStore);
+            press(&mut calc, &format!("+{extra}-"));
+            calc.execute(Command::MemoryRecall);
+            press(&mut calc, "=");
+            assert_eq!(calc.display(), shown, "1e18 + {extra} - 1e18");
+        }
+        assert_eq!(
+            run_scientific("1 exp 33 + 1 - 1 exp 33 =").0,
+            "0",
+            "1e33 + 1 - 1e33"
+        );
+        assert_eq!(run_scientific("1 exp 33 + 9 - 1 exp 33 =").0, "0");
+        assert_eq!(run_scientific("1 exp 33 + 1 1 - 1 exp 33 =").0, "11");
+        // The memory adds with `addrat` too: the memory holds 1e33 + 9, M+ adds −1e33, and
+        // MR shows 0 (the build of CalcManager gives the same; with + 11 it shows 11).
+        for (extra, shown) in [("9", "0"), ("11", "11")] {
+            let mut calc = Calculator::with_precedence();
+            press_scientific(&mut calc, &format!("1 exp 33 + {extra} ="));
+            calc.execute(Command::MemoryStore);
+            press_scientific(&mut calc, "1 neg exp 33");
+            calc.execute(Command::MemoryAdd);
+            calc.execute(Command::MemoryRecall);
+            assert_eq!(calc.display(), shown, "memory 1e33 + {extra}, M+ -1e33");
+        }
+    }
+
+    #[test]
+    fn programmer_sums_are_not_snapped() {
+        // The Programmer mode's precision is 64 digits, so `rat_smallest` is 10^-64 and no
+        // difference of integers of a 64-bit word is small enough to snap. A build of
+        // Microsoft's CalcManager (d125246) gives the same results.
+        assert_eq!(
+            run_programmer("hex 7FFFFFFFFFFFFFFF - 7FFFFFFFFFFFFFFE =").0,
+            "1"
+        );
+        let mut calc = Calculator::programmer();
+        press_programmer(&mut calc, "hex 7FFFFFFFFFFFFFFF");
+        calc.execute(Command::MemoryStore);
+        press_programmer(&mut calc, "7FFFFFFFFFFFFFFE");
+        calc.execute(Command::MemorySubtract);
+        calc.execute(Command::MemoryRecall);
+        assert_eq!(calc.display(), "1");
+    }
+
+    #[test]
+    fn logarithms_below_the_precision_snap_to_zero() {
+        // Source: microsoft/calculator, CalcManager/Ratpack/exp.cpp: `lograt` ends with
+        // `_snaprat(px, a, ...)` against its argument, so ln x is 0 where |ln x| < x · 10^-32,
+        // from 1e34 up. The Windows Calculator 11.2607 (read through UI Automation) shows 0 for
+        // `1.e+34 ln`, `1.e+50 ln` and `1.e+50 log`, and a build of Microsoft's CalcManager
+        // (d125246) gives the rest.
+        assert_eq!(
+            run_scientific("1 exp 33 ln").0,
+            "75.985308068803507572593718004584"
+        );
+        assert_eq!(run_scientific("1 exp 34 ln").0, "0");
+        assert_eq!(run_scientific("1 exp 50 ln").0, "0");
+        assert_eq!(run_scientific("1 exp 33 log").0, "33");
+        assert_eq!(run_scientific("1 exp 34 log").0, "0");
+        assert_eq!(run_scientific("1 exp 50 log").0, "0");
+        // Below 1 the argument is small, so nothing snaps.
+        assert_eq!(
+            run_scientific("1 exp 34 neg ln").0,
+            "-78.287893161797553256611709459268"
+        );
+        // `logᵧx` is `Log(x) / Log(y)` with both logarithms snapped.
+        assert_eq!(run_scientific("1 exp 33 logy 10 =").0, "33");
+        assert_eq!(run_scientific("1 exp 34 logy 10 =").0, "0");
+        assert_eq!(
+            run_scientific("10 logy 1 exp 34 =").0,
+            "Cannot divide by zero"
+        );
+        assert_eq!(
+            run_scientific("1 exp 34 logy 1 exp 34 =").0,
+            "Result is undefined"
+        );
     }
 
     #[test]
