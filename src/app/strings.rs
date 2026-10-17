@@ -253,20 +253,35 @@ pub(super) fn unit_abbreviation(key: &str) -> &'static str {
 }
 
 /// The translation that best matches a language tag, like Windows' resource lookup:
-/// the same tag, or the same language in another region. Chinese goes by script, and
-/// Spanish, Portuguese, French and English pick the regional variant that fits best.
+/// the same tag, or the same language in another region, but never in another script.
+/// Chinese goes by script, then by region, and Spanish, Portuguese, French and English pick
+/// the regional variant that fits best.
 fn match_language(tag: &str) -> Option<&'static str> {
     let tag = tag.to_ascii_lowercase();
     let mut parts = tag.split(['-', '_']);
     let language = parts.next()?;
     let rest: Vec<&str> = parts.collect();
     let has = |part: &str| rest.contains(&part);
+    // Windows scores a script mismatch as no match, and takes a tag without a script subtag to
+    // be in its language's usual script (`suppress_script`): `ms-Arab-MY` doesn't get the Latin
+    // `ms-MY`.
+    let script = script_subtag(&rest).or_else(|| suppress_script(language));
+    let in_script = |candidate: &str| {
+        let candidate = candidate.to_ascii_lowercase();
+        let subtags: Vec<&str> = candidate.split('-').collect();
+        let other = script_subtag(&subtags[1..]).or_else(|| suppress_script(subtags[0]));
+        other.zip(script).is_none_or(|(a, b)| a == b)
+    };
     let tags = || LOCALES.iter().map(|(tag, _)| *tag);
     let chosen = match language {
-        "zh" if has("hant") || has("tw") || has("hk") || has("mo") => "zh-TW",
-        "zh" => "zh-CN",
-        "sr" if has("cyrl") => return None,
-        "sr" => "sr-Latn-RS",
+        // The script decides before the region: zh-Hans-HK is Simplified Chinese.
+        "zh" => match script {
+            Some("hans") => "zh-CN",
+            Some("hant") => "zh-TW",
+            Some(_) => return None,
+            None if has("tw") || has("hk") || has("mo") => "zh-TW",
+            None => "zh-CN",
+        },
         "no" | "nn" => "nb-NO",
         "es" if rest.is_empty() || has("es") => "es-ES",
         "es" => "es-MX",
@@ -278,9 +293,58 @@ fn match_language(tag: &str) -> Option<&'static str> {
         "en" => "en-GB",
         _ => tags()
             .find(|candidate| candidate.to_ascii_lowercase() == tag)
-            .or_else(|| tags().find(|candidate| candidate.split('-').next() == Some(language)))?,
+            .or_else(|| {
+                tags().find(|candidate| {
+                    candidate.split('-').next() == Some(language) && in_script(candidate)
+                })
+            })?,
     };
+    if !in_script(chosen) {
+        return None;
+    }
     (!UNSUPPORTED.contains(&chosen)).then_some(chosen)
+}
+
+/// The script subtag of a lowercase language tag (`hans` in `zh-hans-hk`), from its subtags
+/// after the language: four letters, right after it.
+fn script_subtag<'a>(subtags: &[&'a str]) -> Option<&'a str> {
+    let first = subtags.first().copied()?;
+    (first.len() == 4 && first.bytes().all(|b| b.is_ascii_alphabetic())).then_some(first)
+}
+
+/// The script of a tag in `language` without a script subtag, for the languages with a
+/// translation: the IANA language subtag registry's Suppress-Script (File-Date 2026-09-17),
+/// which Windows' resource lookup fills in. Azerbaijani, Filipino, Serbian and Chinese have none.
+fn suppress_script(language: &str) -> Option<&'static str> {
+    const SCRIPTS: &[(&str, &[&str])] = &[
+        (
+            "latn",
+            &[
+                "af", "ca", "cs", "da", "de", "en", "es", "et", "eu", "fi", "fr", "gl", "hr", "hu",
+                "id", "is", "it", "lt", "lv", "ms", "nb", "nl", "pl", "pt", "ro", "sk", "sl", "sq",
+                "sv", "tr", "vi",
+            ],
+        ),
+        ("cyrl", &["bg", "kk", "mk", "ru", "uk"]),
+        ("arab", &["ar", "fa"]),
+        ("deva", &["hi"]),
+        ("ethi", &["am"]),
+        ("grek", &["el"]),
+        ("hebr", &["he"]),
+        ("jpan", &["ja"]),
+        ("khmr", &["km"]),
+        ("knda", &["kn"]),
+        ("kore", &["ko"]),
+        ("laoo", &["lo"]),
+        ("mlym", &["ml"]),
+        ("taml", &["ta"]),
+        ("telu", &["te"]),
+        ("thai", &["th"]),
+    ];
+    SCRIPTS
+        .iter()
+        .find(|(_, languages)| languages.contains(&language))
+        .map(|(script, _)| *script)
 }
 
 /// The user's preferred display languages, most preferred first. The environment
@@ -379,6 +443,53 @@ mod tests {
                 assert!(table.contains_key(key), "{language} has no {key}");
             }
         }
+    }
+
+    #[test]
+    fn scripts_implied_by_the_registry_match_too() {
+        // ms-MY and kk-KZ are in Latin and Cyrillic, the scripts the IANA registry suppresses
+        // for Malay and Kazakh: Windows doesn't take them for Malay in Arabic (Jawi, Malaysia
+        // and Brunei) or Kazakh in Latin.
+        assert_eq!(match_language("ms-Arab-MY"), None);
+        assert_eq!(match_language("ms-Arab-BN"), None);
+        assert_eq!(match_language("kk-Latn-KZ"), None);
+        // Script subtags on both sides are compared too.
+        assert_eq!(match_language("az-Cyrl-AZ"), None);
+        // The same script, written out or not, still matches.
+        assert_eq!(match_language("ms-Latn-MY"), Some("ms-MY"));
+        assert_eq!(match_language("ms-BN"), Some("ms-MY"));
+        assert_eq!(match_language("kk-Cyrl-KZ"), Some("kk-KZ"));
+        assert_eq!(match_language("de-Latn-DE"), Some("de-DE"));
+        assert_eq!(match_language("az-AZ"), Some("az-Latn-AZ"));
+        // Also for the regional variants of English, Spanish and the others.
+        assert_eq!(match_language("en-Dsrt-US"), None);
+        assert_eq!(match_language("es-Latn-419"), Some("es-MX"));
+        // Every translation has a script: a script subtag or the one the registry suppresses
+        // for its language. The registry has none for Filipino and Chinese.
+        for (tag, _) in LOCALES {
+            let tag = tag.to_ascii_lowercase();
+            let subtags: Vec<&str> = tag.split('-').collect();
+            let script = script_subtag(&subtags[1..]).or_else(|| suppress_script(subtags[0]));
+            assert!(
+                script.is_some() || ["fil", "zh"].contains(&subtags[0]),
+                "{tag} has no script"
+            );
+        }
+    }
+
+    #[test]
+    fn chinese_scripts_match_before_regions() {
+        // Chinese (Simplified, Hong Kong SAR) and (Simplified, Macao SAR) in Windows.
+        assert_eq!(match_language("zh-Hans-HK"), Some("zh-CN"));
+        assert_eq!(match_language("zh-Hans-MO"), Some("zh-CN"));
+        assert_eq!(match_language("zh-Hant-SG"), Some("zh-TW"));
+        // Without a script the region decides, and no translation is in another script.
+        assert_eq!(match_language("zh-HK"), Some("zh-TW"));
+        assert_eq!(match_language("zh-SG"), Some("zh-CN"));
+        assert_eq!(match_language("zh-Latn"), None);
+        // Serbian needs no rule of its own: the script decides.
+        assert_eq!(match_language("sr"), Some("sr-Latn-RS"));
+        assert_eq!(match_language("sr-Cyrl"), None);
     }
 
     #[test]
