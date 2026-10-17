@@ -638,7 +638,10 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
   sections don't map to characters; look a character's format up by byte range.
 - The graphing math is `f64` and the calculator engine's `BigRational`: don't mix them. `tan(π/2)`
   is 1.6e16 in doubles, not infinite, so the analysis treats values above 1e14 as poles
-  (`Fun::defined`).
+  (`Fun::defined`). Likewise sin(2x)/cos(x) is 2 at π/2 (1.2e-16 / 6.1e-17), so the zeros of
+  denominators (where they cross or reach 0) are never in the domain, whatever f evaluates to
+  there (`boundary_functions`); next to such a hole, where 0/0 cancels, f′, f″ and the closest
+  values are rounding noise.
 - `arboard` reads the clipboard for the equation boxes' Paste menu item (keyboard pastes arrive
   as egui events); egui writes it, images included, through its own `arboard`.
 - `f32::clamp(min, max)` panics when `min > max`. Placing a popup with

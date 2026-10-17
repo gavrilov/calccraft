@@ -455,6 +455,13 @@ fn dedupe(mut v: Vec<f64>) -> Vec<f64> {
     v
 }
 
+/// Whether `x` is one of `points`, as `dedupe` tells them apart.
+fn among(points: &[f64], x: f64) -> bool {
+    points
+        .iter()
+        .any(|&p| (p - x).abs() <= 1e-9 * x.abs().max(1.0))
+}
+
 /// The key points for the best fit: zeros of f, f′ and f″ from `lo` to `hi`.
 pub fn key_points(
     f: &dyn Fn(f64) -> f64,
@@ -486,15 +493,17 @@ pub fn key_points(
 
 /// Where the expression is undefined: the zeros of these functions bound or punch the
 /// domain (denominators, radicands, logarithms' arguments, cos of tan's argument …).
-fn boundary_functions(e: &Expr, out: &mut Vec<Expr>) {
+/// Each comes with whether f divides by it: its zeros are never in the domain, even where
+/// f evaluates to a number by rounding (sin(2x)/cos(x) at π/2 is 1.2e-16 / 6.1e-17 = 2).
+fn boundary_functions(e: &Expr, out: &mut Vec<(Expr, bool)>) {
     use Expr::*;
     let sub = |a: &Expr, b: f64| Bin(BinOp::Sub, Box::new(a.clone()), Box::new(Num(b)));
     let square = |a: &Expr| Bin(BinOp::Pow, Box::new(a.clone()), Box::new(Num(2.0)));
     match e {
         Bin(op, a, b) => {
             match op {
-                BinOp::Div => out.push((**b).clone()),
-                BinOp::Pow => out.push((**a).clone()),
+                BinOp::Div => out.push(((**b).clone(), true)),
+                BinOp::Pow => out.push(((**a).clone(), false)),
                 _ => {}
             }
             boundary_functions(a, out);
@@ -502,27 +511,26 @@ fn boundary_functions(e: &Expr, out: &mut Vec<Expr>) {
         }
         Call(f, a) => {
             match f {
-                Func::Tan | Func::Sec => out.push(Call(Func::Cos, a.clone())),
-                Func::Cot | Func::Csc => out.push(Call(Func::Sin, a.clone())),
+                Func::Tan | Func::Sec => out.push((Call(Func::Cos, a.clone()), true)),
+                Func::Cot | Func::Csc => out.push((Call(Func::Sin, a.clone()), true)),
                 Func::Asin | Func::Acos | Func::Atanh | Func::Acoth | Func::Asec | Func::Acsc => {
-                    out.push(sub(&square(a), 1.0))
+                    out.push((sub(&square(a), 1.0), false))
                 }
                 Func::Acosh | Func::Asech => {
-                    out.push(sub(a, 1.0));
-                    out.push((**a).clone());
+                    out.push((sub(a, 1.0), false));
+                    out.push(((**a).clone(), false));
                 }
-                Func::Sqrt | Func::Ln | Func::Log | Func::Coth | Func::Csch | Func::Acsch => {
-                    out.push((**a).clone())
-                }
+                Func::Coth | Func::Csch | Func::Acsch => out.push(((**a).clone(), true)),
+                Func::Sqrt | Func::Ln | Func::Log => out.push(((**a).clone(), false)),
                 _ => {}
             }
             boundary_functions(a, out);
         }
         Root(a, n) | LogBase(n, a) => {
-            out.push((**a).clone());
+            out.push(((**a).clone(), false));
             if matches!(e, LogBase(..)) {
-                out.push((**n).clone());
-                out.push(sub(n, 1.0));
+                out.push(((**n).clone(), false));
+                out.push((sub(n, 1.0), false));
             }
             boundary_functions(a, out);
             boundary_functions(n, out);
@@ -541,23 +549,53 @@ struct Interval {
     hi_closed: bool,
 }
 
-/// The points where `fun` may start, stop or be punched out.
-fn domain_candidates(fun: &Fun, xs: &[f64]) -> Vec<f64> {
-    let mut functions = Vec::new();
-    boundary_functions(fun.e, &mut functions);
-    let mut candidates = Vec::new();
-    for (i, g) in functions.iter().enumerate() {
+/// The points where `fun` may start, stop or be punched out, and those of them where
+/// it divides by 0.
+fn domain_candidates(fun: &Fun, xs: &[f64]) -> (Vec<f64>, Vec<f64>) {
+    let mut functions: Vec<(Expr, bool)> = Vec::new();
+    let mut found = Vec::new();
+    boundary_functions(fun.e, &mut found);
+    for (g, divides) in found {
         // A polynomial lists x once for each power.
-        if !g.has_x() || functions[..i].contains(g) {
-            continue;
+        match functions.iter_mut().find(|(h, _)| *h == g) {
+            Some(known) => known.1 |= divides,
+            None => functions.push((g, divides)),
         }
+    }
+    let (mut candidates, mut divisions) = (Vec::new(), Vec::new());
+    for (g, divides) in functions.iter().filter(|(g, _)| g.has_x()) {
         let dg = g.derivative(fun.env.angle);
         let gf = |x: f64| g.eval(x, 0.0, &fun.env);
         let dgf = |x: f64| dg.as_ref().map_or(f64::NAN, |d| d.eval(x, 0.0, &fun.env));
         let dgf: &dyn Fn(f64) -> f64 = &dgf;
-        candidates.extend(zeros(&gf, dg.as_ref().map(|_| dgf), xs));
+        let zeros = zeros(&gf, dg.as_ref().map(|_| dgf), xs);
+        if *divides {
+            // Where g crosses 0 or is 0: x² + 2·10⁻¹⁴ only comes close at 0. A crossing
+            // with a vertical tangent counts too, though g isn't small there (∛(x² − 2) is
+            // 7.6e-6 at the double closest to √2): |g| dips there all the way in, a
+            // millionth of a sample away to below 0.8 of what it is a sample away, and to
+            // less still at the crossing. At a pole or a jump of g it doesn't, even where g
+            // at the jump lies between its sides ((⌊x⌋ + ⌈x⌉)/2 + 0.1 is 0.1 at 0, −0.4 and
+            // 0.6 next to it).
+            let crossings: Vec<f64> = sign_changes(&gf, xs, true)
+                .into_iter()
+                .filter(|&(c, a, b)| {
+                    let (at, span) = (gf(c).abs(), b - a);
+                    let dips = |side: f64| {
+                        let near = gf(c + side * span * 1e-6).abs();
+                        near < 0.8 * gf(c + side * span).abs() && at < near
+                    };
+                    at <= 1e-6 * (gf(a).abs() + gf(b).abs()) + 1e-12 || (dips(-1.0) && dips(1.0))
+                })
+                .map(|c| c.0)
+                .collect();
+            divisions.extend(&crossings);
+            divisions.extend(zeros.iter().filter(|&&x| gf(x) == 0.0));
+            candidates.extend(crossings);
+        }
+        candidates.extend(zeros);
     }
-    dedupe(candidates)
+    (dedupe(candidates), dedupe(divisions))
 }
 
 /// Points snapped to the exact values they are near, without repeats. `recognize` is
@@ -566,14 +604,25 @@ fn snapped(points: Vec<f64>) -> Vec<f64> {
     dedupe(points.into_iter().map(|c| exact::snap(c, TIGHT)).collect())
 }
 
+/// The zeros of divisors that are exact values to rounding, snapped to them: f is left out
+/// there even if it evaluates to a number. 1/(x + 10⁻¹⁰) divides by 0 at −10⁻¹⁰, which
+/// snaps to 0, where f is 10¹⁰.
+fn exact_zeros(divisions: Vec<f64>) -> Vec<f64> {
+    let exact = divisions.into_iter().filter_map(|c| {
+        let x = exact::snap(c, TIGHT);
+        ((x - c).abs() <= 8.0 * f64::EPSILON * c.abs().max(1.0)).then_some(x)
+    });
+    dedupe(exact.collect())
+}
+
 /// The domain of an aperiodic function, as intervals, or `None` if it has too many
 /// pieces to tell.
 fn domain(fun: &Fun, xs: &[f64]) -> Option<Vec<Interval>> {
-    let points = domain_candidates(fun, xs);
+    let (points, divisions) = domain_candidates(fun, xs);
     if points.len() > 40 {
         return None;
     }
-    let points = snapped(points);
+    let (points, divisions) = (snapped(points), exact_zeros(divisions));
     let defined_between = |a: f64, b: f64| {
         let probes: Vec<f64> = match (a.is_finite(), b.is_finite()) {
             (true, true) => vec![a + (b - a) * 0.25, (a + b) / 2.0, a + (b - a) * 0.75],
@@ -592,7 +641,7 @@ fn domain(fun: &Fun, xs: &[f64]) -> Option<Vec<Interval>> {
         if !defined_between(a, b) {
             continue;
         }
-        let closed = |x: f64| x.is_finite() && fun.defined(x);
+        let closed = |x: f64| x.is_finite() && fun.defined(x) && !among(&divisions, x);
         let piece = Interval {
             lo: a,
             hi: b,
@@ -750,13 +799,77 @@ fn limit_at_infinity(g: &dyn Fn(f64) -> f64, sign: f64) -> Limit {
     limit_of(&v)
 }
 
-/// The one-sided limit at `p` from the side of `side` (−1 left, 1 right).
-fn limit_at(fun: &Fun, p: f64, side: f64) -> Limit {
+/// The values of `fun` at 10⁻², 10⁻⁴, … 10⁻¹² of max(1, |p|) from `p` towards `side`.
+fn approach(fun: &Fun, p: f64, side: f64) -> Vec<f64> {
     let scale = p.abs().max(1.0);
-    let v: Vec<f64> = (1..=6)
+    (1..=6)
         .map(|k| fun.f(p + side * scale * 10f64.powi(-2 * k)))
-        .collect();
-    limit_of(&v)
+        .collect()
+}
+
+/// The one-sided limit at `p` from the side of `side` (−1 left, 1 right). Next to a
+/// hole, the closest values can be rounding noise (0/0 cancels there: (x² − 9)/(x + 3)
+/// at −3 + 3e-12 is off by 3e-4); then the four furthest tell its value. Not at a pole,
+/// where f is ±∞ but a small term can hide until the closest values (x + 10⁻¹⁴/x is
+/// 1.01e-6 at 10⁻⁶ and 10⁻⁸, then 10⁻⁴ and 0.01), nor if those run off further than noise
+/// or aren't numbers (√(x − 10⁻¹⁰) at 0, the end of its domain to rounding).
+fn limit_at(fun: &Fun, p: f64, side: f64) -> Limit {
+    let v = approach(fun, p, side);
+    match limit_of(&v) {
+        Limit::Unknown if !huge_at(fun, p) && !v.iter().any(|y| y.is_nan()) && !diverges(&v) => {
+            match limit_of(&v[..4]) {
+                Limit::Value(value) => Limit::Value(value),
+                _ => Limit::Unknown,
+            }
+        }
+        limit => limit,
+    }
+}
+
+/// Whether the closest three of `approach`'s values run off to ±∞, by more than rounding
+/// noise next to a hole does (a ten-thousandth of (2x² + 3x + 1)/(x + 1) at −1): next to a
+/// pole whose term is small, or dominated further out by another one (1/sin x + 10⁶ sin x
+/// is −31442, −3497 and −318313 at 10⁻², 10⁻⁴ and 10⁻⁶ of π past π). Their steps don't
+/// shrink then, or shrink ever more slowly, like ln(−ln|sin x|)'s at 0 (by 0.78, then
+/// 0.81). Next to a high root they shrink by the same ratio: root(x, 11) is 0.28, 0.19, 0.12
+/// and 0.08 at 10⁻⁶ … 10⁻¹², on its way to 0.
+fn diverges(v: &[f64]) -> bool {
+    let step = |i: usize| (v[i + 1] - v[i]).abs();
+    matches!(
+        limit_of(&v[3..]),
+        Limit::PlusInfinity | Limit::MinusInfinity
+    ) && (v[5] - v[3]).abs() > 1e-3 * (1.0 + v[3].abs())
+        && (v[5].is_infinite()
+            || step(4) >= 0.95 * step(3)
+            || step(4) / step(3) > step(3) / step(2) + 0.01)
+}
+
+/// Whether f is ±∞ at `x`, or too large for the domain (`Fun::defined`), as at a pole or
+/// next to one (1/(x² + 10⁻¹⁴) is 10¹⁴ at 0).
+fn huge_at(fun: &Fun, x: f64) -> bool {
+    fun.f(x).abs() >= 1e14
+}
+
+/// Whether `x`, left out of the domain, is a hole: f tends to the same value there from
+/// both sides, and is 0/0 or a rounded value at x itself. Not at a jump, where the limits
+/// differ ((x − 500)/|x − 500| + (x − 500.04)² tends to −0.9984 and 1.0016 at 500). The
+/// same to 2·10⁻⁵ of f: `limit_of` stops at a step of 10⁻⁷ of f, and the steps it leaves
+/// out add up to a hundred times that where they shrink slowly (root(|x|, 99) at 0).
+fn hole(fun: &Fun, x: f64) -> bool {
+    !huge_at(fun, x)
+        && matches!(
+            [1.0, -1.0].map(|side| limit_at(fun, x, side)),
+            [Limit::Value(a), Limit::Value(b)] if (a - b).abs() <= 2e-5 * (1.0 + a.abs().max(b.abs()))
+        )
+}
+
+/// Whether `fun` tends to ±∞ at `x` from a side, by all six values of `approach` or by
+/// the closest three.
+fn pole(fun: &Fun, x: f64) -> bool {
+    [1.0, -1.0].iter().any(|&side| {
+        let v = approach(fun, x, side);
+        matches!(limit_of(&v), Limit::PlusInfinity | Limit::MinusInfinity) || diverges(&v)
+    })
 }
 
 // ------------------------------------------------------------------ text
@@ -841,9 +954,14 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
         ]);
         return Some(features);
     }
-    asymptotes(fun, &intervals, &mut features);
+    let gaps = domain_gaps(&intervals);
+    asymptotes(fun, &intervals, &xs, &gaps, &mut features);
+    let holes: Vec<f64> = gaps.iter().copied().filter(|&x| hole(fun, x)).collect();
 
     let inside = |x: f64| intervals.iter().any(|i| x > i.lo && x < i.hi);
+    // No turning or inflection points in the noise next to a hole, nor where the domain
+    // leaves a point out (f″ of 1/∛(x² − 2) changes sign at its poles).
+    let clear = |x: f64| inside(x) && fun.defined(x) && !next_to(&holes, x) && !among(&gaps, x);
     let f = |x: f64| fun.f(x);
     let d1 = |x: f64| fun.d1(x);
     let d2 = |x: f64| fun.d2(x);
@@ -853,7 +971,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
     // looked for only when there are few (sin(x)/x has hundreds).
     let mut roots: Vec<f64> = zeros(&f, Some(slope), &xs)
         .into_iter()
-        .filter(|&x| inside(x) && fun.defined(x))
+        .filter(|&x| inside(x) && fun.defined(x) && !among(&holes, x))
         .collect();
     for i in &intervals {
         for (end, closed) in [(i.lo, i.lo_closed), (i.hi, i.hi_closed)] {
@@ -874,13 +992,14 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
     let mut turns: Vec<(f64, bool)> = sign_changes(&d1, &xs, true)
         .into_iter()
         .map(|(c, _, _)| (c, falls_before(&d1, c)))
-        .filter(|&(c, _)| inside(c) && fun.defined(c))
+        .filter(|&(c, _)| clear(c))
         .collect();
     let too_many_turns = turns.len() > 20;
     if !too_many_turns {
         for turn in &mut turns {
             turn.0 = exact::snap(turn.0, TIGHT);
         }
+        turns.dedup_by(|a, b| (a.0 - b.0).abs() <= 1e-9 * a.0.abs().max(1.0));
     }
     if too_many_turns {
         features.too_complex.extend([
@@ -921,18 +1040,15 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
     let bends: Vec<f64> = sign_changes(&d2, &xs, true)
         .into_iter()
         .map(|c| c.0)
-        .filter(|&c| inside(c) && fun.defined(c))
+        .filter(|&c| clear(c))
         .collect();
     // Without f″ (too large to use), the bends can't be told.
     if bends.len() > 20 || fun.d2.is_none() {
         features.too_complex.push(Feature::InflectionPoints);
     } else {
-        features.inflection_points = bends
+        features.inflection_points = snapped(bends)
             .iter()
-            .map(|&c| {
-                let c = exact::snap(c, TIGHT);
-                point_text(c, fun.f(c))
-            })
+            .map(|&c| point_text(c, fun.f(c)))
             .collect();
     }
 
@@ -1012,6 +1128,23 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
     Some(features)
 }
 
+/// The finite ends that the pieces of a domain leave out: its holes, poles and open edges.
+fn domain_gaps(intervals: &[Interval]) -> Vec<f64> {
+    intervals
+        .iter()
+        .flat_map(|i| [(i.lo, i.lo_closed), (i.hi, i.hi_closed)])
+        .filter_map(|(x, closed)| (x.is_finite() && !closed).then_some(x))
+        .collect()
+}
+
+/// Whether `x` is within 1e-4 (relative) of one of the `holes`. Next to a hole, f′ and f″
+/// are rounding noise, and so is f closer still (0/0 cancels there).
+fn next_to(holes: &[f64], x: f64) -> bool {
+    holes
+        .iter()
+        .any(|&h| (x - h).abs() <= 1e-4 * h.abs().max(1.0))
+}
+
 fn contains(i: &Interval, x: f64) -> bool {
     (x > i.lo || (x == i.lo && i.lo_closed)) && (x < i.hi || (x == i.hi && i.hi_closed))
 }
@@ -1038,8 +1171,15 @@ fn direction_between(fun: &Fun, a: f64, b: f64) -> Direction {
     }
 }
 
-/// The vertical, horizontal and oblique asymptotes.
-fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
+/// The vertical, horizontal and oblique asymptotes, with the samples `xs` and the `gaps`
+/// of the domain.
+fn asymptotes(
+    fun: &Fun,
+    intervals: &[Interval],
+    xs: &[f64],
+    gaps: &[f64],
+    features: &mut Features,
+) {
     let f = |x: f64| fun.f(x);
     let infinite = |l: Limit| matches!(l, Limit::PlusInfinity | Limit::MinusInfinity);
     let mut vertical = Vec::new();
@@ -1058,6 +1198,36 @@ fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
 
     let mut horizontal = Vec::new();
     let mut oblique = Vec::new();
+    // A line isn't its own asymptote, nor is a line with holes (x − 2 with one at 3), but
+    // nothing with a pole is a line (5 + 10⁻¹⁶/(x − 1000) has y = 5, though it's 5 to the
+    // last bits further than 10 from 1000). On a line, f(x) − mx is c and f′(x) is m at
+    // every sample of the domain, apart from the rounding noise within 1% of its gaps.
+    // Fewer samples could miss a bump (1 + e^(−(x − 10)²) has y = 1 both ways), and the
+    // values alone one that is small next to the line (10⁹ + e^(−x²) is within a billionth
+    // of 10⁹, but its slope isn't 0). A constant (x/x) comes out to the last bits, while
+    // 1/(x² + 10⁹), which has y = 0, is never more than 10⁻⁹ from 0.
+    let no_poles = gaps.iter().all(|&g| !huge_at(fun, g) && !pole(fun, g));
+    let is_line = |m: f64, c: f64| {
+        no_poles
+            && xs
+                .iter()
+                .filter(|&&x| {
+                    fun.defined(x)
+                        && gaps
+                            .iter()
+                            .all(|&g| (x - g).abs() > 1e-2 * g.abs().max(1.0))
+                })
+                .all(|&x| {
+                    let (value, slope) = (fun.f(x), fun.d1(x));
+                    let off = if m == 0.0 {
+                        4.0 * f64::EPSILON * c.abs()
+                    } else {
+                        1e-9 * (1.0 + c.abs() + (m * x).abs())
+                    };
+                    (value - m * x - c).abs() <= off
+                        && (!slope.is_finite() || (slope - m).abs() <= 1e-6 * (1.0 + m.abs()))
+                })
+    };
     let reaches = |sign: f64| {
         intervals.iter().any(|i| {
             if sign > 0.0 {
@@ -1072,7 +1242,7 @@ fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
             continue;
         }
         match limit_at_infinity(&f, sign) {
-            Limit::Value(v) => horizontal.push(v),
+            Limit::Value(v) if !is_line(0.0, v) => horizontal.push(v),
             Limit::PlusInfinity | Limit::MinusInfinity => {
                 let slope = |x: f64| fun.f(x) / x;
                 let Limit::Value(m) = limit_at_infinity(&slope, sign) else {
@@ -1087,15 +1257,11 @@ fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
                 let Limit::Value(c) = limit_of(&v) else {
                     continue;
                 };
-                // A line isn't its own asymptote.
-                let is_line = [-2.5, -0.5, 0.75, 3.0]
-                    .iter()
-                    .all(|&x| (rest(x) - c).abs() <= 1e-9 * (1.0 + c.abs()));
-                if !is_line {
+                if !is_line(m, c) {
                     oblique.push((m, c));
                 }
             }
-            Limit::Unknown => {}
+            Limit::Value(_) | Limit::Unknown => {}
         }
     }
     features.horizontal_asymptotes = dedupe(horizontal)
@@ -1195,18 +1361,29 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let d1 = |x: f64| fun.d1(x);
     let d2 = |x: f64| fun.d2(x);
 
-    // The domain: ℝ but for poles (tan's π/2 + πn). Gaps can't be written here.
-    let candidates = in_period(snapped(domain_candidates(fun, &xs)), p);
-    let excluded: Vec<f64> = candidates
-        .iter()
-        .copied()
-        .filter(|&x| !fun.defined(x))
+    // The domain: ℝ but for poles (tan's π/2 + πn) and the zeros of denominators (the
+    // holes of sin(2x)/cos(x)). Gaps can't be written here.
+    let (candidates, divisions) = domain_candidates(fun, &xs);
+    let divisions = in_period(exact_zeros(divisions), p);
+    let excluded: Vec<f64> = in_period(snapped(candidates), p)
+        .into_iter()
+        .filter(|&x| !fun.defined(x) || among(&divisions, x))
         .collect();
     if (0..400).any(|i| !fun.f(p * (i as f64 + 0.5) / 400.0).is_finite()) {
         features.too_complex.extend(SMOOTH_FEATURES);
         return features;
     }
-    if fun.defined(0.0) {
+    let holes: Vec<f64> = excluded.iter().copied().filter(|&x| hole(fun, x)).collect();
+    let defined = |x: f64| fun.defined(x) && !among(&excluded, x);
+    // Next to a hole, f′ and f″ are rounding noise, as in `aperiodic`.
+    let clear = |x: f64| {
+        defined(x)
+            && holes.iter().all(|&e| {
+                let d = (x - e).abs();
+                d.min(p - d) > 1e-4 * e.abs().max(1.0)
+            })
+    };
+    if defined(0.0) {
         features.y_intercept = Some(exact::format(fun.f(0.0)));
     }
     if excluded.is_empty() {
@@ -1218,35 +1395,30 @@ fn periodic(fun: &Fun, p: f64) -> Features {
             .map(|&i| format!("x ≠ {}", family_term(step, excluded[i])))
             .collect();
         features.domain = Some(format!("{{{}, ∀n₁ ∈ ℤ}}", parts.join(", ")));
-        let vertical: Vec<usize> = firsts
+        // The poles, told apart from the holes before they're grouped: sin(x)/sin(2x) has
+        // holes at πn and poles at πn + π/2, all in the family πn/2.
+        let poles: Vec<f64> = excluded
             .iter()
             .copied()
-            .filter(|&i| {
-                let x = excluded[i];
-                matches!(
-                    limit_at(fun, x, 1.0),
-                    Limit::PlusInfinity | Limit::MinusInfinity
-                ) || matches!(
-                    limit_at(fun, x, -1.0),
-                    Limit::PlusInfinity | Limit::MinusInfinity
-                )
-            })
+            .filter(|&x| !among(&holes, x) && pole(fun, x))
             .collect();
-        features.vertical_asymptotes = vertical
-            .iter()
-            .map(|&i| format!("x = {}, n₁ ∈ ℤ", family_term(step, excluded[i])))
-            .collect();
+        if !poles.is_empty() {
+            let (step, firsts) = families(&poles, p, &|_, _| true);
+            features.vertical_asymptotes = firsts
+                .iter()
+                .map(|&i| format!("x = {}, n₁ ∈ ℤ", family_term(step, poles[i])))
+                .collect();
+        }
     }
     if fun.rough || fun.d1.is_none() {
         features.too_complex.extend(SMOOTH_FEATURES);
         return features;
     }
-    let defined = |x: f64| fun.defined(x);
     let slope: &dyn Fn(f64) -> f64 = &d1;
 
     let roots: Vec<f64> = in_period(zeros(&f, Some(slope), &xs), p)
         .into_iter()
-        .filter(|&x| defined(x))
+        .filter(|&x| fun.defined(x) && !among(&holes, x))
         .collect();
     if !roots.is_empty() {
         let (step, firsts) = families(&roots, p, &|_, _| true);
@@ -1268,7 +1440,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let turns: Vec<(f64, bool)> = positions
         .iter()
         .map(|&x| (x, falls_before(&d1, x)))
-        .filter(|&(x, _)| defined(x))
+        .filter(|&(x, _)| clear(x))
         .collect();
     for minimum in [true, false] {
         let points: Vec<f64> = turns
@@ -1309,7 +1481,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
         p,
     )
     .into_iter()
-    .filter(|&x| defined(x))
+    .filter(|&x| clear(x))
     .collect();
     if fun.d2.is_none() {
         features.too_complex.push(Feature::InflectionPoints);
@@ -1647,6 +1819,101 @@ mod tests {
                 ("(√3/3 + 1, ∞)", Direction::Decreasing),
             ]
         );
+    }
+
+    #[test]
+    fn removable_holes() {
+        // 2x + 1 but at −1, where 0/0 leaves f′ to rounding noise: no turning points.
+        let f = analyze_text("y=(2x^2+3x+1)/(x+1)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ −1}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ∖{−1}}"));
+        assert!(f.minima.is_empty() && f.maxima.is_empty());
+        // x² + x + 1 but at 1: no inflection point there.
+        let f = analyze_text("y=(x^3-1)/(x-1)");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [3/4, ∞)}"));
+        assert_eq!(f.minima, vec!["(−1/2, 3/4)"]);
+        assert!(f.inflection_points.is_empty());
+        // x − 2 but at 3: a line with a hole isn't its own asymptote either.
+        let f = analyze_text("y=(x^2-5x+6)/(x-3)");
+        assert!(f.oblique_asymptotes.is_empty());
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ∖{1}}"));
+        // The values next to the hole at −3 cancel to noise: the range is still found.
+        let f = analyze_text("y=(x^2-9)/(x+3)");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ∖{−6}}"));
+        // 2 sin x but where cos x is 0, though f evaluates to ±2 there by rounding: the
+        // extrema of 2 sin x are holes.
+        let f = analyze_text("y=sin(2x)/cos(x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ πn₁ + π/2, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−2, 2)}"));
+        assert!(f.minima.is_empty() && f.maxima.is_empty());
+        assert!(f.vertical_asymptotes.is_empty());
+        assert_eq!(f.inflection_points, vec!["{(πn₁, 0), n₁ ∈ ℤ}"]);
+        // sin x but where sin x is 0: every zero is a hole.
+        let f = analyze_text("y=sin(x)^2/sin(x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ πn₁, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.x_intercepts, None);
+        // Holes at πn and poles at πn + π/2, all in the family πn/2.
+        let f = analyze_text("y=sin(x)/sin(2x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ πn₁/2, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.vertical_asymptotes, vec!["x = πn₁ + π/2, n₁ ∈ ℤ"]);
+        // 1 but at 0: a constant isn't its own asymptote.
+        let f = analyze_text("y=x/x");
+        assert!(f.horizontal_asymptotes.is_empty());
+        // 1 but for a bump at 10, which a few probes around 0 don't see: y = 1 is its
+        // asymptote both ways.
+        let f = analyze_text("y=1+e^(-(x-10)^2)");
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 1"]);
+        // A bump that is small next to its line: 10⁹ + e^(−x²) is within a billionth of 10⁹.
+        let f = analyze_text("y=10^9+e^(-x^2)");
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 1000000000"]);
+        // A line far from the origin is still a line.
+        let f = analyze_text("y=x+10^9");
+        assert!(f.oblique_asymptotes.is_empty());
+        let f = analyze_text("y=10^9 x/x");
+        assert!(f.horizontal_asymptotes.is_empty());
+        // A divisor that only comes close to 0 (2·10⁻¹⁴ at 0) leaves the domain whole.
+        let f = analyze_text("y=1/(x^2+0.00000000000002)");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        assert_eq!(f.maxima, vec!["(0, 50000000000000)"]);
+        // Nothing with a pole is a line, though 5 + 10⁻¹⁶/(x − 1000) is 5 to the last bits
+        // away from 1000; and 1/(x² + 10⁹), within 10⁻⁹ of 0, is no constant.
+        let f = analyze_text("y=5+10^(-16)/(x-1000)");
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 5"]);
+        let f = analyze_text("y=1/(x^2+10^9)");
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 0"]);
+        // 1/(x + 10⁻¹⁰) divides by 0 at −10⁻¹⁰, not at 0, the exact value next to it.
+        let f = analyze_text("y=1/(x+10^(-10))");
+        assert_eq!(f.y_intercept.as_deref(), Some("10000000000"));
+        // Next to a pole, f′ isn't noise: 3x + 1 + 10⁻⁸/(x − 2) turns at 2 ± 5.8e-5.
+        let f = analyze_text("y=3x+1+10^(-8)/(x-2)");
+        assert_eq!(f.minima, vec!["(2.00006, 7.00035)"]);
+        assert_eq!(f.maxima, vec!["(1.99994, 6.99965)"]);
+        // Poles at πn, though 10⁶ sin x dominates 1/sin x until 10⁻⁶ of π past π.
+        let f = analyze_text("y=1/sin(x)+10^6 sin(x)");
+        assert_eq!(f.vertical_asymptotes, vec!["x = πn₁, n₁ ∈ ℤ"]);
+        // A jump isn't a hole: f tends to −0.9984 and 1.0016 at 500, and keeps the minimum
+        // next to it.
+        let f = analyze_text("y=(x-500)/abs(x-500)+(x-500.04)^2");
+        assert_eq!(f.minima, vec!["(500.04, 1)"]);
+        // A divisor crossing 0 with a vertical tangent divides by 0 there, though it is
+        // 7.6e-6 at the double closest to √2.
+        let f = analyze_text("y=1/cbrt(x^2-2)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ −√2, x ≠ √2}"));
+        assert_eq!(f.vertical_asymptotes, vec!["x = −√2", "x = √2"]);
+        assert!(f.inflection_points.is_empty());
+        let f = analyze_text("y=1/cbrt(sin(x))");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ πn₁, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.vertical_asymptotes, vec!["x = πn₁, n₁ ∈ ℤ"]);
+        // root(sin x, 11) tends to 0 at 0, slowly: no pole.
+        let f = analyze_text("y=root(sin(x),11)^3/root(sin(x),11)^2");
+        assert!(f.vertical_asymptotes.is_empty());
+        // ln(−ln|sin x|) runs off to ∞ at πn ever more slowly: a pole all the same.
+        let f = analyze_text("y=ln(-ln(abs(sin(x))))");
+        assert_eq!(f.vertical_asymptotes, vec!["x = πn₁/2, n₁ ∈ ℤ"]);
+        // A divisor that jumps past 0 doesn't divide by it, though at the jump it lies
+        // between its sides: (⌊x − 1⌋ + ⌈x − 1⌉)/2 + 0.1 is 0.1 at 1.
+        let f = analyze_text("y=1/((floor(x-1)+ceil(x-1))/2+0.1)");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
     }
 
     #[test]
