@@ -258,6 +258,15 @@ impl<'a> Fun<'a> {
     /// `p`, or the smallest part of it that is a period too (|sin x| has π).
     fn verified_period(&self, p: f64) -> Option<f64> {
         let tests: Vec<f64> = (0..23).map(|k| -7.3 + 0.731 * k as f64).collect();
+        // f repeats if its values differ by no more than a billionth of how much f varies
+        // (not of f itself: 10¹² + sin x would repeat at every shift), or by rounding.
+        let values: Vec<f64> = tests
+            .iter()
+            .map(|&t| self.f(t))
+            .filter(|v| v.is_finite())
+            .collect();
+        let spread = values.iter().fold(f64::NEG_INFINITY, |m: f64, &v| m.max(v))
+            - values.iter().fold(f64::INFINITY, |m: f64, &v| m.min(v));
         let repeats = |q: f64| {
             let mut compared = 0;
             for &t in &tests {
@@ -267,7 +276,9 @@ impl<'a> Fun<'a> {
                 }
                 if a.is_finite() {
                     compared += 1;
-                    if (a - b).abs() > 1e-9 * (1.0 + a.abs()) {
+                    let rounding = self.rounding(t).max(self.rounding(t + q));
+                    let tolerance = 1e-9 * spread.min(1.0 + a.abs()) + rounding;
+                    if (a - b).abs() > tolerance {
                         return false;
                     }
                 }
@@ -277,7 +288,94 @@ impl<'a> Fun<'a> {
         if !repeats(p) {
             return None;
         }
+        // A constant repeats at every shift, so p/12 would pass as well as p: keep p, with
+        // which the holes of its domain repeat (tan x · cot x). So does a function whose
+        // values change too little next to their rounding to tell: 6·10¹³ + sin x changes by
+        // at most 0.52 over p/12, and 64 units in the last place of 6·10¹³ are 0.85.
+        let rounding = tests.iter().fold(0.0, |m: f64, &t| m.max(self.rounding(t)));
+        if self.constant_over(p).is_some() || 20.0 * rounding > spread {
+            return Some(p);
+        }
         (1..=12).rev().map(|k| p / k as f64).find(|&q| repeats(q))
+    }
+
+    /// The value of f if it's the same at the `golden_points` of the period `p` but for
+    /// rounding: sin²x + cos²x, or tan x · cot x (whose holes the points miss), but not
+    /// 10¹² + sin x or 1 + 10⁻¹⁰ sin x. The value is snapped within that rounding. A function
+    /// that jumps (sign, floor …) is none: sign(sin x)² is 1 at all the points, but 0 at πn.
+    /// Nor is one whose derivative isn't `level` at the points: 10¹⁵ + sin x − 10¹⁵ moves
+    /// within the rounding of 10¹⁵, but its derivative is cos x.
+    fn constant_over(&self, p: f64) -> Option<f64> {
+        if self.rough {
+            return None;
+        }
+        let (mut lo, mut hi, mut most) = (f64::INFINITY, f64::NEG_INFINITY, 0.0f64);
+        for x in golden_points(p) {
+            let v = self.f(x);
+            if !v.is_finite() || self.level(x) != Some(true) {
+                return None;
+            }
+            (lo, hi, most) = (lo.min(v), hi.max(v), most.max(self.rounding(x)));
+        }
+        // Halves first: lo + hi overflows next to 10³⁰⁸. Only the rounding snaps: within
+        // `TIGHT`, 10⁻¹⁴(sin²x + cos²x) would be 0, which has no x-intercepts to list.
+        let c = lo / 2.0 + hi / 2.0;
+        (hi - lo <= most && c.is_finite()).then(|| exact::snap(c, most / c.abs().max(1.0)))
+    }
+
+    /// Whether rounding hides how f varies over the period `p`: its values at the
+    /// `golden_points` are all within a unit in the last place of its largest term, though
+    /// its derivative isn't `level` there (10¹⁶ + sin x − 10¹⁶ is 0 at all of them).
+    fn hidden(&self, p: f64) -> bool {
+        let (mut lo, mut hi, mut unit) = (f64::INFINITY, f64::NEG_INFINITY, 0.0f64);
+        let mut moves = false;
+        for x in golden_points(p) {
+            let v = self.f(x);
+            if !v.is_finite() {
+                return false;
+            }
+            moves |= self.level(x) == Some(false);
+            (lo, hi, unit) = (lo.min(v), hi.max(v), unit.max(self.rounding(x) / 64.0));
+        }
+        moves && hi - lo <= unit
+    }
+
+    /// Whether f′(x) is 0 but for its own rounding (64 units in the last place of its
+    /// `magnitude`), or `None` if f′ isn't a number there.
+    fn level(&self, x: f64) -> Option<bool> {
+        let d1 = self.d1.as_ref()?;
+        let slope = d1.eval(x, 0.0, &self.env);
+        let rounding = 64.0 * f64::EPSILON * d1.magnitude(x, 0.0, &self.env);
+        slope.is_finite().then_some(slope.abs() <= rounding)
+    }
+
+    /// How far rounding may set two values of f apart near x: 64 units in the last place of
+    /// f's largest term there (10¹² for 10¹² + sin x, 1 for sin²x + cos²x).
+    fn rounding(&self, x: f64) -> f64 {
+        let size = summands(self.e)
+            .iter()
+            .fold(0.0, |m: f64, t| m.max(t.eval(x, 0.0, &self.env).abs()));
+        64.0 * f64::EPSILON * size
+    }
+}
+
+/// 400 points across the period `p`: p times the fractional parts of the multiples of the
+/// golden ratio, not evenly spaced (at multiples of p/400 + p/800, sin x · sin 400x is 0
+/// everywhere).
+fn golden_points(p: f64) -> impl Iterator<Item = f64> {
+    (1..=400).map(move |i| p * (i as f64 * 0.618_033_988_749_895).fract())
+}
+
+/// The terms of a sum, without their signs: sin²x and cos²x for sin²x + cos²x.
+fn summands(e: &Expr) -> Vec<&Expr> {
+    match e {
+        Expr::Bin(BinOp::Add | BinOp::Sub, a, b) => {
+            let mut terms = summands(a);
+            terms.extend(summands(b));
+            terms
+        }
+        Expr::Neg(a) => summands(a),
+        _ => vec![e],
     }
 }
 
@@ -1195,8 +1293,44 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let d1 = |x: f64| fun.d1(x);
     let d2 = |x: f64| fun.d2(x);
 
-    // The domain: ℝ but for poles (tan's π/2 + πn). Gaps can't be written here.
-    let candidates = in_period(snapped(domain_candidates(fun, &xs)), p);
+    // The domain: ℝ but for poles (tan's π/2 + πn). Gaps can't be written here. As on the
+    // grid of `aperiodic`, more points in a period than it writes (40 families of points out
+    // of the domain, 20 zeros, turning points or inflection points) are too complex. Only
+    // candidates out of the domain count: the 42 zeros of sin(21x)² are no gaps in
+    // √(sin(21x)²) + sin x. So do poles that rounding keeps below `defined`'s bound, where f
+    // is far larger than right beside them (tan 45x reaches 3·10¹³ at some). Regularly
+    // spaced ones are one family, as `families` writes them: tan 45x + tan x has 45 poles a
+    // period but one family, and tan 50x + tan x 51 that aren't one. They're counted before
+    // `in_period` looks for their exact values: `recognize` is slow, and more than 400 are
+    // too many to look up.
+    let pole = |x: f64| {
+        let h = 1e-6 * x.abs().max(1.0);
+        let beside = fun.f(x - h).abs() + fun.f(x + h).abs();
+        !fun.defined(x) || fun.f(x).abs() > 1e6 * beside
+    };
+    let candidates: Vec<f64> = domain_candidates(fun, &xs)
+        .into_iter()
+        .filter(|&x| pole(x))
+        .collect();
+    let rough_period: Vec<f64> = dedupe(
+        candidates
+            .iter()
+            .map(|&x| {
+                let v = x.rem_euclid(p);
+                if (p - v).abs() <= 1e-9 * p { 0.0 } else { v }
+            })
+            .collect(),
+    );
+    if families(&rough_period, p, &|_, _| true).1.len() > 40 || rough_period.len() > 400 {
+        // Nor are the poles among them: no vertical asymptotes would be wrong.
+        features.too_complex.extend(SMOOTH_FEATURES);
+        features.too_complex.push(Feature::VerticalAsymptotes);
+        if fun.defined(0.0) {
+            features.y_intercept = Some(exact::format(fun.f(0.0)));
+        }
+        return features;
+    }
+    let candidates = in_period(snapped(candidates), p);
     let excluded: Vec<f64> = candidates
         .iter()
         .copied()
@@ -1237,17 +1371,39 @@ fn periodic(fun: &Fun, p: f64) -> Features {
             .map(|&i| format!("x = {}, n₁ ∈ ℤ", family_term(step, excluded[i])))
             .collect();
     }
-    if fun.rough || fun.d1.is_none() {
+    // A constant (sin²x + cos²x, tan x · cot x) has no smallest period, and its derivatives
+    // are only rounding noise, whose sign changes would be taken for hundreds of extrema:
+    // it's analyzed like y = c, between the holes of its domain.
+    if let Some(c) = fun.constant_over(p) {
+        features.period = Period::None;
+        features.range = Some(format!("{{y = {}}}", exact::format(c)));
+        if features.y_intercept.is_some() {
+            features.y_intercept = Some(exact::format(c));
+        }
+        if c == 0.0 {
+            features.too_complex.push(Feature::XIntercept);
+        }
+        features.monotonicity = monotonicity(excluded, p, &|_, _| Direction::Constant);
+        return features;
+    }
+    // Nor do derivatives help where rounding hides f's values (10¹⁶ + sin x − 10¹⁶ is 0).
+    if fun.rough || fun.d1.is_none() || fun.hidden(p) {
         features.too_complex.extend(SMOOTH_FEATURES);
         return features;
     }
     let defined = |x: f64| fun.defined(x);
     let slope: &dyn Fn(f64) -> f64 = &d1;
 
-    let roots: Vec<f64> = in_period(zeros(&f, Some(slope), &xs), p)
-        .into_iter()
-        .filter(|&x| defined(x))
-        .collect();
+    let roots = zeros(&f, Some(slope), &xs);
+    let roots: Vec<f64> = if count_in_period(&roots, p) > 20 {
+        features.too_complex.push(Feature::XIntercept);
+        Vec::new()
+    } else {
+        in_period(roots, p)
+            .into_iter()
+            .filter(|&x| defined(x))
+            .collect()
+    };
     if !roots.is_empty() {
         let (step, firsts) = families(&roots, p, &|_, _| true);
         let parts: Vec<String> = firsts
@@ -1258,13 +1414,22 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     }
 
     // Turning points and their kind, in one period.
-    let positions = in_period(
-        sign_changes(&d1, &xs, true)
-            .into_iter()
-            .map(|c| c.0)
-            .collect(),
-        p,
-    );
+    let positions: Vec<f64> = sign_changes(&d1, &xs, true)
+        .into_iter()
+        .map(|c| c.0)
+        .collect();
+    let too_many_turns = count_in_period(&positions, p) > 20;
+    let positions = if too_many_turns {
+        features.too_complex.extend([
+            Feature::Range,
+            Feature::Minima,
+            Feature::Maxima,
+            Feature::Monotonicity,
+        ]);
+        Vec::new()
+    } else {
+        in_period(positions, p)
+    };
     let turns: Vec<(f64, bool)> = positions
         .iter()
         .map(|&x| (x, falls_before(&d1, x)))
@@ -1301,17 +1466,20 @@ fn periodic(fun: &Fun, p: f64) -> Features {
         }
     }
 
-    let bends: Vec<f64> = in_period(
-        sign_changes(&d2, &xs, true)
+    let bends: Vec<f64> = sign_changes(&d2, &xs, true)
+        .into_iter()
+        .map(|c| c.0)
+        .collect();
+    let too_many_bends = count_in_period(&bends, p) > 20;
+    let bends: Vec<f64> = if too_many_bends {
+        Vec::new()
+    } else {
+        in_period(bends, p)
             .into_iter()
-            .map(|c| c.0)
-            .collect(),
-        p,
-    )
-    .into_iter()
-    .filter(|&x| defined(x))
-    .collect();
-    if fun.d2.is_none() {
+            .filter(|&x| defined(x))
+            .collect()
+    };
+    if fun.d2.is_none() || too_many_bends {
         features.too_complex.push(Feature::InflectionPoints);
     } else if !bends.is_empty() {
         let values: Vec<f64> = bends
@@ -1329,6 +1497,10 @@ fn periodic(fun: &Fun, p: f64) -> Features {
                 )
             })
             .collect();
+    }
+
+    if too_many_turns {
+        return features;
     }
 
     // The range over a period: the turning values, or ±∞ next to a pole.
@@ -1351,12 +1523,16 @@ fn periodic(fun: &Fun, p: f64) -> Features {
             }
         }
     }
-    if known && !ends.is_empty() {
-        let lo = ends.iter().map(|e| e.value).fold(f64::INFINITY, f64::min);
-        let hi = ends
-            .iter()
-            .map(|e| e.value)
-            .fold(f64::NEG_INFINITY, f64::max);
+    // A function with turning points takes more than one value: one means the others were
+    // lost (1 + 10⁻¹⁴ sin x's extremes snap to 1; 10¹⁴ + sin x's maximum is too large for
+    // `defined`). Without turning points, it's a constant between holes.
+    let lo = ends.iter().map(|e| e.value).fold(f64::INFINITY, f64::min);
+    let hi = ends
+        .iter()
+        .map(|e| e.value)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let lost = lo == hi && ends.iter().any(|e| e.attained);
+    if known && lo <= hi && !lost {
         let attained = |v: f64| ends.iter().any(|e| e.value == v && e.attained);
         let range = Interval {
             lo,
@@ -1369,40 +1545,55 @@ fn periodic(fun: &Fun, p: f64) -> Features {
         features.too_complex.push(Feature::Range);
     }
 
-    // Monotonicity between the turning points and poles, from the first one at or
-    // after 0, around one period.
-    let mut cuts: Vec<f64> = turns
+    // Monotonicity between the turning points and poles.
+    let cuts: Vec<f64> = turns
         .iter()
         .map(|t| t.0)
         .chain(excluded.iter().copied())
         .collect();
-    cuts = dedupe(cuts);
+    features.monotonicity = monotonicity(cuts, p, &|a, b| direction_between(fun, a, b));
+    features
+}
+
+/// Monotonicity between `cuts` (turning points and poles of one period [0, p)), from the
+/// first one at or after 0, around one period, as families; `direction` tells how f goes
+/// between two cuts.
+fn monotonicity(
+    cuts: Vec<f64>,
+    p: f64,
+    direction: &dyn Fn(f64, f64) -> Direction,
+) -> Vec<(String, Direction)> {
+    let cuts = dedupe(cuts);
     if cuts.is_empty() {
-        let direction = direction_between(fun, 0.0, p);
-        features
-            .monotonicity
-            .push(("(−∞, ∞)".to_string(), direction));
-        return features;
+        return vec![("(−∞, ∞)".to_string(), direction(0.0, p))];
     }
     let n = cuts.len();
     let pieces: Vec<(f64, f64, Direction)> = (0..n)
         .map(|i| {
             let a = cuts[i];
             let b = if i + 1 < n { cuts[i + 1] } else { cuts[0] + p };
-            (a, b, direction_between(fun, a, b))
+            (a, b, direction(a, b))
         })
         .collect();
     let (step, firsts) = families(&cuts, p, &|a, b| pieces[a].2 == pieces[b].2);
-    for &i in &firsts {
-        let (a, b, direction) = pieces[i];
-        let text = format!(
-            "{{({}, {}), n₁ ∈ ℤ}}",
-            family_term(step, a),
-            family_term(step, b)
-        );
-        features.monotonicity.push((text, direction));
-    }
-    features
+    firsts
+        .iter()
+        .map(|&i| {
+            let (a, b, direction) = pieces[i];
+            let text = format!(
+                "{{({}, {}), n₁ ∈ ℤ}}",
+                family_term(step, a),
+                family_term(step, b)
+            );
+            (text, direction)
+        })
+        .collect()
+}
+
+/// How many of `points`, found on a window a little larger than one period, lie in the
+/// period [0, p).
+fn count_in_period(points: &[f64], p: f64) -> usize {
+    points.iter().filter(|&&x| (0.0..p).contains(&x)).count()
 }
 
 // ------------------------------------------------------------------ parity
@@ -1761,6 +1952,132 @@ mod tests {
         let f = analyze_text(&product);
         assert!(f.too_complex.contains(&Feature::InflectionPoints), "{f:?}");
         assert!(f.inflection_points.is_empty());
+    }
+
+    #[test]
+    fn trigonometric_identities_are_constants() {
+        // Every shift repeats them, and their derivatives are only rounding noise: they
+        // have no period, extrema or inflection points, like y = 1 and y = 0.
+        assert_eq!(analyze_text("y=sin(x)^2+cos(x)^2"), analyze_text("y=1"));
+        assert_eq!(
+            analyze_text("y=cos(x)^2-sin(x)^2-cos(2x)"),
+            analyze_text("y=0")
+        );
+        // 1 where both are defined.
+        let f = analyze_text("y=tan(x)cot(x)");
+        assert_eq!(f.range.as_deref(), Some("{y = 1}"));
+        assert_eq!(f.period, Period::None);
+        assert!(f.minima.is_empty() && f.maxima.is_empty() && f.inflection_points.is_empty());
+        // 0 at every multiple of 2π/400 + 2π/800, but no constant.
+        let f = analyze_text("y=sin(x)sin(400x)");
+        assert_eq!(f.period, Period::Periodic("2π".to_string()));
+        // Rounding is measured on the terms: next to 10¹², sin x is far above it, and
+        // 10⁻¹⁰ sin x is far above the rounding of 1.
+        for text in [
+            "y=1000000000000+sin(x)",
+            "y=60000000000000+sin(x)",
+            "y=1+0.0000000001sin(x)",
+        ] {
+            let f = analyze_text(text);
+            assert_eq!(f.period, Period::Periodic("2π".to_string()), "{text}");
+            assert_eq!((f.minima.len(), f.maxima.len()), (1, 1), "{text}");
+        }
+        // 1 but at πn, where it's 0: no constant, but too complex as other jumps are.
+        let f = analyze_text("y=sign(sin(x))^2");
+        assert_eq!(f.y_intercept.as_deref(), Some("0"));
+        assert!(f.too_complex.contains(&Feature::Range), "{f:?}");
+        // A constant is only snapped within its rounding: 10⁻¹⁴ isn't 0.
+        assert_eq!(
+            analyze_text("y=10^(-14)*(sin(x)^2+cos(x)^2)"),
+            analyze_text("y=10^(-14)")
+        );
+        // Next to 10³⁰⁸: the range of y = 10³⁰⁸, not ∞. (Written out: the derivative of
+        // 10^308 overflows to NaN.)
+        let f = analyze_text(&format!("y=1{}(sin(x)^2+cos(x)^2)", "0".repeat(308)));
+        assert_eq!(f.range, analyze_text("y=10^308").range);
+        assert_eq!(f.period, Period::None);
+        // A constant's derivative is 0 too: 10¹⁵ + sin x − 10¹⁵ takes values an eighth
+        // apart, within the rounding of 10¹⁵, but its derivative is cos x.
+        let f = analyze_text("y=10^15+sin(x)-10^15");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [−1, 1]}"));
+        assert_eq!(f.period, Period::Periodic("2π".to_string()));
+        // 10¹⁶ + sin x − 10¹⁶ is 0 in doubles, but its derivative is cos x: rounding hides
+        // its values, and features read from them would be wrong.
+        let f = analyze_text("y=10^16+sin(x)-10^16");
+        assert_eq!(f.period, Period::Periodic("2π".to_string()));
+        for feature in SMOOTH_FEATURES {
+            assert!(f.too_complex.contains(&feature), "{feature:?}: {f:?}");
+        }
+        assert!(f.x_intercepts.is_none() && f.minima.is_empty() && f.maxima.is_empty());
+        // One value is no range of a function that isn't constant: 1 ± 10⁻¹⁴ snap to 1, and
+        // 10¹⁴ + 1 is too large for `defined`, so only the minimum is left.
+        for text in ["y=1+10^(-14)*sin(x)", "y=100000000000000+sin(x)"] {
+            let f = analyze_text(text);
+            assert_eq!(f.period, Period::Periodic("2π".to_string()), "{text}");
+            assert_eq!(f.range, None, "{text}");
+            assert!(f.too_complex.contains(&Feature::Range), "{text}: {f:?}");
+        }
+    }
+
+    #[test]
+    fn many_features_in_a_period_are_too_complex() {
+        // 50 zeros, turning points and inflection points in each period: too many to
+        // write, as on the grid of a function that isn't periodic.
+        let f = analyze_text("y=sin(25x)+sin(x)");
+        assert_eq!(f.period, Period::Periodic("2π".to_string()));
+        for feature in [
+            Feature::XIntercept,
+            Feature::Minima,
+            Feature::Maxima,
+            Feature::InflectionPoints,
+            Feature::Range,
+            Feature::Monotonicity,
+        ] {
+            assert!(
+                f.too_complex.contains(&feature),
+                "{feature:?} isn't too complex: {:?}",
+                f.too_complex
+            );
+        }
+        assert_eq!(f.x_intercepts, None);
+        assert!(f.minima.is_empty() && f.maxima.is_empty() && f.inflection_points.is_empty());
+        assert!(f.monotonicity.is_empty());
+        // More than 40 families of poles in a period (tan 50x + tan x has 51 poles, not
+        // evenly spaced): its domain and vertical asymptotes are too complex to write, not
+        // missing.
+        let f = analyze_text("y=tan(50x)+tan(x)");
+        assert!(f.vertical_asymptotes.is_empty());
+        for feature in [Feature::Domain, Feature::VerticalAsymptotes] {
+            assert!(
+                f.too_complex.contains(&feature),
+                "{feature:?}: {:?}",
+                f.too_complex
+            );
+        }
+        assert_eq!(f.y_intercept.as_deref(), Some("0"));
+        // 45 poles in a period, evenly spaced, are one family: they're written out, in every
+        // unit.
+        for angle in [Angle::Radians, Angle::Degrees, Angle::Gradians] {
+            let equation = Equation::parse("y=tan(45x)+tan(x)", Syntax::default()).unwrap();
+            let f = analyze(&equation, angle).unwrap();
+            assert!(f.domain.is_some(), "{angle:?}: {f:?}");
+            assert!(!f.vertical_asymptotes.is_empty(), "{angle:?}");
+            assert!(
+                !f.too_complex.contains(&Feature::VerticalAsymptotes),
+                "{angle:?}"
+            );
+        }
+        let f = analyze_text("y=tan(45x)+tan(x)");
+        assert_eq!(
+            f.vertical_asymptotes.first().map(String::as_str),
+            Some("x = πn₁ + 0.0349066, n₁ ∈ ℤ")
+        );
+        // But points where f has a value are no gaps, however many: sin(21x)² has 42 zeros
+        // in a period, and √(sin(21x)²) + sin x the domain ℝ.
+        let f = analyze_text("y=sqrt(sin(21x)^2)+sin(x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        assert_eq!(f.period, Period::Periodic("2π".to_string()));
+        assert!(!f.too_complex.contains(&Feature::VerticalAsymptotes));
     }
 
     #[test]
