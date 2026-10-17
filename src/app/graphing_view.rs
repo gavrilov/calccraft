@@ -46,6 +46,16 @@ const COLOR_ORDER: [usize; 14] = [0, 3, 7, 10, 1, 4, 8, 11, 2, 5, 9, 12, 6, 13];
 const ROW_HEIGHT: f32 = 44.0;
 const ROW_BUTTON: f32 = 38.0;
 
+/// The keys a window box of the graph options keeps while it has the focus: the arrows
+/// move its cursor, and Esc doesn't take the focus away first. A key typed in the same
+/// frame as Esc then still reaches the box before the flyout closes (`escape_closes`).
+const RANGE_KEYS: egui::EventFilter = egui::EventFilter {
+    tab: false,
+    horizontal_arrows: true,
+    vertical_arrows: true,
+    escape: true,
+};
+
 /// The stored "Graph theme" choice (`IsGraphThemeMatchApp`, Windows' own setting name).
 pub(super) const THEME_KEY: &str = "IsGraphThemeMatchApp";
 
@@ -510,6 +520,25 @@ impl GraphingState {
         self.manual = false;
         self.fitted = None;
     }
+
+    /// One frame of the graph options' window box `k`: without the focus it shows the
+    /// view's `value`, `edit` (its text box) takes this frame's typing, and then what it
+    /// holds is read (`range_value`). Read before the typing, the view would lag a key
+    /// behind, and the last key would be lost: Esc closes the flyout before it's drawn
+    /// again (Windows reads a box when it loses the focus, which closing does).
+    fn edit_range<R>(
+        &mut self,
+        k: usize,
+        value: f64,
+        focused: bool,
+        edit: impl FnOnce(&mut String) -> R,
+    ) -> (Option<f64>, R) {
+        if !focused {
+            self.range_texts[k] = numbers().localize_plain(&g6(value));
+        }
+        let edited = edit(&mut self.range_texts[k]);
+        (range_value(&self.range_texts[k], value, focused), edited)
+    }
 }
 
 /// The syntax of the user's region: a decimal comma takes `;` between arguments.
@@ -761,6 +790,10 @@ impl CalculatorApp {
             let handled = if self.flyout != super::Flyout::None {
                 self.flyout = super::Flyout::None;
                 true
+            } else if matches!(self.graphing.popup, Some(Popup::Settings { .. })) {
+                // The graph options close on this Esc themselves, once their boxes have
+                // taken this frame's typing (`escape_closes`).
+                false
             } else if self.graphing.close_popup() {
                 true
             } else if self.graphing.tracing {
@@ -2110,7 +2143,7 @@ impl CalculatorApp {
                 widths_open: open_widths,
             });
         }
-        false
+        escape_closes(ui.ctx())
     }
 
     /// One of the window boxes. Returns its number while it holds one.
@@ -2125,11 +2158,24 @@ impl CalculatorApp {
         let p = self.palette;
         let id = Id::new("graph-range-box").with(k);
         let focused = ui.ctx().memory(|m| m.has_focus(id));
-        if !focused {
-            self.graphing.range_texts[k] = numbers().localize_plain(&g6(value));
-        }
-        let parsed = range_value(&self.graphing.range_texts[k], value, focused);
         let painter = ui.painter().clone();
+        // The box goes under its text, in the colors of what the text holds after this
+        // frame's typing.
+        let background = painter.add(Shape::Noop);
+        let mut child = text_ui(ui, rect.shrink2(vec2(10.0, 0.0)), p);
+        let (parsed, output) = self.graphing.edit_range(k, value, focused, |text| {
+            TextEdit::singleline(text)
+                .id(id)
+                .event_filter(RANGE_KEYS)
+                .frame(Frame::NONE)
+                .margin(Margin::ZERO)
+                .font(FontId::proportional(14.0))
+                .text_color(p.text)
+                .vertical_align(Align::Center)
+                .desired_width(rect.width() - 20.0)
+                .min_size(vec2(rect.width() - 20.0, rect.height()))
+                .show(&mut child)
+        });
         let error = parsed.is_none();
         let fill = if error {
             p.error_fill
@@ -2138,32 +2184,23 @@ impl CalculatorApp {
         } else {
             p.control
         };
-        painter.rect_filled(rect, RADIUS, fill);
         let border = if error {
             p.error_border
         } else {
             p.control_border
         };
-        painter.rect_stroke(rect, RADIUS, Stroke::new(1.0, border), StrokeKind::Inside);
+        let mut shapes = vec![
+            Shape::rect_filled(rect, RADIUS, fill),
+            Shape::rect_stroke(rect, RADIUS, Stroke::new(1.0, border), StrokeKind::Inside),
+        ];
         if focused {
-            painter.hline(
+            shapes.push(Shape::hline(
                 (rect.left() + 1.0)..=(rect.right() - 1.0),
                 rect.bottom() - 1.0,
                 Stroke::new(2.0, p.accent),
-            );
+            ));
         }
-        let text = &mut self.graphing.range_texts[k];
-        let mut child = text_ui(ui, rect.shrink2(vec2(10.0, 0.0)), p);
-        let output = TextEdit::singleline(text)
-            .id(id)
-            .frame(Frame::NONE)
-            .margin(Margin::ZERO)
-            .font(FontId::proportional(14.0))
-            .text_color(p.text)
-            .vertical_align(Align::Center)
-            .desired_width(rect.width() - 20.0)
-            .min_size(vec2(rect.width() - 20.0, rect.height()))
-            .show(&mut child);
+        painter.set(background, Shape::Vec(shapes));
         output
             .response
             .response
@@ -2663,6 +2700,11 @@ pub(super) fn edit_id(row: u64) -> Id {
     Id::new("graph-equation").with(row)
 }
 
+/// The id of a window box of the graph options: 0 is X-Min, then X-Max, Y-Min, Y-Max.
+fn range_id(k: usize) -> Id {
+    Id::new("graph-range-box").with(k)
+}
+
 /// A child `Ui` for a text box at `rect`, with the selection and caret in the app's
 /// colors. Unlike `scope_builder`, it doesn't move the parent's layout cursor, which
 /// matters in the scrolling lists.
@@ -2698,6 +2740,18 @@ fn drop_down_rect(combo: Rect, items: usize, full: Rect) -> Rect {
         top = (combo.top() - 2.0 - size.y).max(full.top() + 4.0);
     }
     Rect::from_min_size(pos2(combo.left(), top), size)
+}
+
+/// Whether Esc closes the graph options this frame. It's read after their window boxes
+/// were drawn (`handle_graphing_keyboard` leaves it), and the boxes give up the focus
+/// they kept through Esc (`RANGE_KEYS`) as the flyout goes. In Windows, closing the
+/// flyout takes the focus from its box, which commits what was typed.
+fn escape_closes(ctx: &Context) -> bool {
+    let escape = ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape));
+    if escape {
+        ctx.memory_mut(|m| (0..4).for_each(|k| m.surrender_focus(range_id(k))));
+    }
+    escape
 }
 
 /// A tooltip for a control drawn by hand.
@@ -2986,6 +3040,62 @@ mod tests {
         assert_eq!(range_value(&shown(-20.0), x, true), Some(-20.0));
         assert_eq!(range_value("", x, true), None);
         assert_eq!(range_value("", x, false), Some(x));
+    }
+
+    #[test]
+    fn range_boxes_read_the_last_key() {
+        // X-Max (10) shows 3, and this frame types 0. Esc on the next frame closes the
+        // flyout before it's drawn again, so this frame has to read 30.
+        let mut g = GraphingState::new();
+        g.range_texts[1] = "3".into();
+        let (value, ()) = g.edit_range(1, 10.0, true, |text| text.push('0'));
+        assert_eq!(value, Some(30.0));
+    }
+
+    #[test]
+    fn range_boxes_take_a_key_typed_with_esc() {
+        // X-Max shows 3 and has the focus, and the 0 and Esc arrive in the same frame:
+        // the box takes the 0, then the flyout closes.
+        let ctx = Context::default();
+        let mut g = GraphingState::new();
+        g.range_texts[1] = "3".into();
+        let (mut value, mut closed) = (None, false);
+        let mut frame = |events: Vec<egui::Event>| {
+            let input = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 400.0))),
+                events,
+                ..Default::default()
+            };
+            // The font atlas has no renderer to go to.
+            ctx.run_ui(input, |ui| {
+                let focused = ui.ctx().memory(|m| m.has_focus(range_id(1)));
+                value = g
+                    .edit_range(1, 10.0, focused, |text| {
+                        TextEdit::singleline(text)
+                            .id(range_id(1))
+                            .event_filter(RANGE_KEYS)
+                            .show(ui)
+                    })
+                    .0;
+                closed = escape_closes(ui.ctx());
+            })
+            .textures_delta
+            .clear();
+        };
+        ctx.memory_mut(|m| m.request_focus(range_id(1)));
+        frame(vec![]);
+        frame(vec![]);
+        let escape = egui::Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        };
+        frame(vec![egui::Event::Text("0".into()), escape]);
+        assert_eq!(value, Some(30.0));
+        assert!(closed);
+        assert!(!ctx.memory(|m| m.has_focus(range_id(1))));
     }
 
     #[test]
