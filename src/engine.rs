@@ -2274,34 +2274,26 @@ fn operand_length(operand: &str) -> usize {
 
 // ------------------------------------------------------------- arithmetic
 
-/// Windows' `_snaprat` (`Ratpack/rat.cpp`): a result smaller than `10^-digits` of the number it
-/// was computed from is 0 (`rat_smallest`, `digits` being the engine's precision), so that the
-/// tiny residue of an approximation doesn't show. `addrat` and `subrat` snap against the larger
-/// operand, `lograt` against its argument. It applies to what is left when big numbers cancel
-/// too: `1e18 + 100 - 1e18` is 0 in the Standard mode and `1e33 + 9 - 1e33` in the Scientific
-/// mode.
-fn negligible(result: &Number, source: &Number, digits: i64) -> bool {
-    result.abs() * Number::from_integer(pow10(digits)) < source.abs()
+/// Windows' `_snaprat` (`Ratpack/rat.cpp`): a result under `10^-digits` of the number it was
+/// computed from is 0 (`rat_smallest`, `digits` being the engine's precision). `addrat` and
+/// `subrat` snap against the larger operand, `lograt` against its argument, so
+/// `1e18 + 100 - 1e18` is 0 in the Standard mode and `ln(1e34)` in the Scientific mode.
+fn snap(result: Number, source: &Number, digits: i64) -> Number {
+    if result.abs() * Number::from_integer(pow10(digits)) < source.abs() {
+        Number::zero()
+    } else {
+        result
+    }
 }
 
 /// `a + b` or `a - b` as `addrat` and `subrat` return it.
 fn snap_sum(sum: Number, a: &Number, b: &Number, digits: i64) -> Number {
-    if negligible(&sum, &a.abs().max(b.abs()), digits) {
-        Number::zero()
-    } else {
-        sum
-    }
+    snap(sum, &a.abs().max(b.abs()), digits)
 }
 
-/// ln x as `lograt` returns it: 0 where it is smaller than `10^-digits` of x, so the
-/// logarithm of anything from about 1e34 up is 0 in the Scientific mode, as in Windows.
+/// ln x as `lograt` returns it.
 fn ln_snapped(x: &Number, digits: i64) -> Result<Number, CalcError> {
-    let ln = math::ln(x)?;
-    Ok(if negligible(&ln, x, digits) {
-        Number::zero()
-    } else {
-        ln
-    })
+    Ok(snap(math::ln(x)?, x, digits))
 }
 
 /// `left op right`, with Windows' division errors.
