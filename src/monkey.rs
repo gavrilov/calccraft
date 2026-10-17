@@ -954,3 +954,45 @@ fn monkey_dates_seed_6() {
         }
     }
 }
+
+/// Replays date queries (`D y m d y m d`, `A y m d years months days`, `S ...`) of
+/// `CALCCRAFT_DATES_IN` into `CALCCRAFT_DATES_OUT`, in the format of a Python port of
+/// Microsoft's `DateCalculationEngine` that is used as the oracle.
+#[test]
+#[ignore = "tool for the oracle comparison: needs CALCCRAFT_DATES_IN and CALCCRAFT_DATES_OUT"]
+fn replay_dates() {
+    let input = std::env::var("CALCCRAFT_DATES_IN").expect("CALCCRAFT_DATES_IN");
+    let output = std::env::var("CALCCRAFT_DATES_OUT").expect("CALCCRAFT_DATES_OUT");
+    let text = std::fs::read_to_string(input).expect("read input");
+    let date = |y: &str, m: &str, d: &str| {
+        NaiveDate::from_ymd_opt(y.parse().unwrap(), m.parse().unwrap(), d.parse().unwrap()).unwrap()
+    };
+    let show = |d: Option<NaiveDate>| match d {
+        Some(d) => format!("{} {} {}", d.year(), d.month(), d.day()),
+        None => "none".to_string(),
+    };
+    let mut out = String::new();
+    for line in text.lines() {
+        let w: Vec<&str> = line.split_whitespace().collect();
+        match w[0] {
+            "D" => {
+                let d = dates::difference(date(w[1], w[2], w[3]), date(w[4], w[5], w[6]));
+                out.push_str(&format!(
+                    "D {} {} {} {}\n",
+                    d.years, d.months, d.weeks, d.days
+                ));
+            }
+            kind => {
+                let start = date(w[1], w[2], w[3]);
+                let n: Vec<u32> = w[4..7].iter().map(|x| x.parse().unwrap()).collect();
+                let result = if kind == "A" {
+                    dates::add(start, n[0], n[1], n[2])
+                } else {
+                    dates::subtract(start, n[0], n[1], n[2])
+                };
+                out.push_str(&format!("{kind} {}\n", show(result)));
+            }
+        }
+    }
+    std::fs::write(output, out).expect("write output");
+}

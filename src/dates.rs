@@ -7,6 +7,9 @@
 
 use chrono::{Datelike, Days, Months, NaiveDate, Weekday};
 
+#[cfg(test)]
+mod ms_cases;
+
 /// Earliest supported date: the start of the Windows `FILETIME` epoch.
 pub const MIN_DATE: NaiveDate = NaiveDate::from_ymd_opt(1601, 1, 1).unwrap();
 /// Latest supported date.
