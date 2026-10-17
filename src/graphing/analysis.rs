@@ -1090,7 +1090,8 @@ fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
                 // A line isn't its own asymptote.
                 let is_line = [-2.5, -0.5, 0.75, 3.0]
                     .iter()
-                    .all(|&x| (rest(x) - c).abs() <= 1e-9 * (1.0 + c.abs()));
+                    .all(|&x| (rest(x) - c).abs() <= 1e-9 * (1.0 + c.abs()))
+                    || matches_line(fun, m, c, sign * 1e8);
                 if !is_line {
                     oblique.push((m, c));
                 }
@@ -1114,6 +1115,58 @@ fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
             s
         })
         .collect();
+}
+
+/// Whether f is the line mx + c: its derivative is m at points near the origin, up to its
+/// rounding (4 units in the last place of its `magnitude`), and so are its terms that
+/// depend on x, up to theirs: added to 10⁹, the 6.4e-8 that 10⁻⁷/(x² + 1) adds at −0.5 is
+/// lost, but on its own it's no rounding. And f(x) − mx there is c, up to how c was found.
+/// c comes from values as far out as `far`, where f(x) − mx loses digits (4e-9 at 10⁸ for
+/// x − 0.123), and was snapped within `LOOSE` (to 9√17/11 − 13/4 for x − 0.12345): both
+/// more than the billionth of c that `asymptotes` also allows.
+fn matches_line(fun: &Fun, m: f64, c: f64, far: f64) -> bool {
+    let Some(d1) = fun.d1.as_ref() else {
+        return false;
+    };
+    let near = [-2.5, -0.5, 0.75, 3.0];
+    let level = |x: f64| {
+        let rounding = 4.0 * f64::EPSILON * d1.magnitude(x, 0.0, &fun.env);
+        (d1.eval(x, 0.0, &fun.env) - m).abs() <= rounding
+    };
+    let parts: Vec<(f64, f64)> = near.iter().map(|&x| varying(d1, x, &fun.env)).collect();
+    let spread = |v: &[f64]| {
+        v.iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), &v| {
+                (lo.min(v), hi.max(v))
+            })
+    };
+    let (low, high) = spread(&parts.iter().map(|p| p.0).collect::<Vec<f64>>());
+    let size = parts.iter().fold(0.0, |s: f64, p| s.max(p.1));
+    let values: Vec<f64> = near.iter().map(|&x| fun.f(x) - m * x).collect();
+    let (lo, hi) = spread(&values);
+    let rounding = 64.0 * f64::EPSILON * fun.f(far).abs().max((m * far).abs());
+    near.iter().all(|&x| level(x))
+        && high - low <= 4.0 * f64::EPSILON * size
+        && values.iter().all(|v| v.is_finite())
+        && (lo / 2.0 + hi / 2.0 - c).abs() <= LOOSE * c.abs().max(1.0) + rounding
+}
+
+/// The terms of the sum `e` that depend on x, at x: their total, and the size of the
+/// numbers they go through (`magnitude`).
+fn varying(e: &Expr, x: f64, env: &Env) -> (f64, f64) {
+    match e {
+        Expr::Bin(op @ (BinOp::Add | BinOp::Sub), a, b) => {
+            let ((va, ma), (vb, mb)) = (varying(a, x, env), varying(b, x, env));
+            let vb = if matches!(op, BinOp::Sub) { -vb } else { vb };
+            (va + vb, ma + mb)
+        }
+        Expr::Neg(a) => {
+            let (v, m) = varying(a, x, env);
+            (-v, m)
+        }
+        _ if e.has_x() => (e.eval(x, 0.0, env), e.magnitude(x, 0.0, env)),
+        _ => (0.0, 0.0),
+    }
 }
 
 // ------------------------------------------------------------------ periodic
@@ -1647,6 +1700,45 @@ mod tests {
                 ("(√3/3 + 1, ∞)", Direction::Decreasing),
             ]
         );
+    }
+
+    #[test]
+    fn a_line_is_not_its_own_asymptote() {
+        // f(x) − mx far out loses digits (4e-9 at 10⁸ for x − 0.123), and its limit is
+        // snapped within `LOOSE` (to 9√17/11 − 13/4 for x − 0.12345): neither makes a line
+        // its own asymptote.
+        for text in [
+            "y=x-0.123",
+            "y=x+0.001",
+            "y=x-0.789",
+            "y=x+0.999",
+            "y=x-0.12345",
+            "y=3x+2.718",
+            "y=3x-0.123",
+            "y=-x+0.001",
+            "y=-x-0.777",
+            "y=2(x-0.123)",
+            "y=(x^3-1)/(x^2+x+1)+0.123",
+        ] {
+            let f = analyze_text(text);
+            assert_eq!(f.oblique_asymptotes, Vec::<String>::new(), "{text}");
+        }
+        // What only comes close to a line keeps its asymptote, however steep: the slope
+        // of 10⁻⁷/(x² + 1) is lost next to 10⁹, but not on its own.
+        for (text, asymptote) in [
+            ("y=x+1/x", "y = x"),
+            ("y=x+e^(-x^2)", "y = x"),
+            ("y=x+1000000000e^(-x^2)", "y = x"),
+            ("y=1000000000x+0.00001/(x^2+1)", "y = 1000000000x"),
+            ("y=1000000000x+0.0000001/(x^2+1)", "y = 1000000000x"),
+            ("y=1000000x+0.00000001/(x^2+1)", "y = 1000000x"),
+        ] {
+            assert_eq!(
+                analyze_text(text).oblique_asymptotes,
+                vec![asymptote],
+                "{text}"
+            );
+        }
     }
 
     #[test]
