@@ -503,7 +503,8 @@ functions, after `ratpak`) and `src/engine.rs` (`Calculator::with_precedence()`)
   - `2nd` swaps the first column (`x³`, `∛x`, `ʸ√x`, `2ˣ`, `logᵧx`, `eˣ`) with the accent
     hover, and using one turns it off.
   - Its own history, memory shared with the other modes; the history and memory flyouts cover
-    the keys only, and the lists wrap 32-digit results like Windows'.
+    the keys only (a click anywhere above them, header included, closes them), and the lists
+    wrap 32-digit results like Windows'.
   - Windows' keyboard shortcuts, screen reader names in 60 languages (59 new strings), both
     themes.
 - **Differences:** the key labels and the menus' icons are Segoe UI text and drawings, since

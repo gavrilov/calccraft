@@ -2614,7 +2614,14 @@ impl CalculatorApp {
 
         if matches!(self.mode, Mode::Programmer | Mode::Scientific) {
             let header = Rect::from_min_size(main.min, vec2(main.width(), HEADER_HEIGHT));
-            self.draw_header(ui, header);
+            // The Scientific mode's flyout lies over the header too (see `draw_scientific`).
+            if self.mode == Mode::Scientific
+                && matches!(self.flyout, Flyout::History | Flyout::Memory)
+            {
+                access::draw_covered(ui, || self.draw_header(ui, header));
+            } else {
+                self.draw_header(ui, header);
+            }
             let below = main.with_min_y(header.bottom());
             if self.mode == Mode::Programmer {
                 self.draw_programmer(ui, below, now);
@@ -3305,5 +3312,163 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    /// What eframe saves in `app.ron`, in memory.
+    #[derive(Default)]
+    struct MemoryStorage(std::collections::BTreeMap<String, String>);
+
+    impl eframe::Storage for MemoryStorage {
+        fn get_string(&self, key: &str) -> Option<String> {
+            self.0.get(key).cloned()
+        }
+
+        fn set_string(&mut self, key: &str, value: String) {
+            self.0.insert(key.to_owned(), value);
+        }
+
+        fn remove_string(&mut self, key: &str) {
+            self.0.remove(key);
+        }
+
+        fn flush(&mut self) {}
+    }
+
+    /// The app as eframe starts it in `ctx`. In English, which other tests expect of `tr`,
+    /// whatever the Windows display language.
+    fn start_in(ctx: &Context) -> CalculatorApp {
+        let mut storage = MemoryStorage::default();
+        storage.0.insert(LANGUAGE_KEY.into(), "en-US".into());
+        let mut cc = eframe::CreationContext::_new_kittest(ctx.clone());
+        cc.storage = Some(&storage);
+        CalculatorApp::new(&cc)
+    }
+
+    /// Runs a frame of `app` in a window of `size` with `events`, as eframe does.
+    fn run(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, events: Vec<Event>) {
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            events,
+            ..Default::default()
+        };
+        let mut frame = eframe::Frame::_new_kittest();
+        let mut output = ctx.run_ui(input, |ui| eframe::App::ui(app, ui, &mut frame));
+        // There's no renderer to take the textures.
+        output.textures_delta.clear();
+    }
+
+    /// Clicks at `pos`: the pointer moves there, presses and releases, a frame each.
+    fn click(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, pos: Pos2) {
+        let button = |pressed| Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        for event in [Event::PointerMoved(pos), button(true), button(false)] {
+            run(ctx, app, size, vec![event]);
+        }
+    }
+
+    /// A screen reader's click on the control `id`, as Narrator sends it (AccessKit's
+    /// `Click` action), which egui takes for a real click.
+    fn screen_reader_click(id: Id) -> Event {
+        Event::AccessKitActionRequest(egui::accesskit::ActionRequest {
+            action: egui::accesskit::Action::Click,
+            target_node: id.accesskit_id(),
+            target_tree: egui::accesskit::TreeId::ROOT,
+            data: None,
+        })
+    }
+
+    #[test]
+    fn scientific_flyouts_lie_over_the_window() {
+        // The header's menu and History buttons, and the unit, F-E, MS and M˅ buttons above
+        // the list.
+        let controls = [
+            ("menu", Id::new("menu")),
+            ("History", Id::new("history")),
+            ("DEG", Id::new("scientific-angle")),
+            ("F-E", Id::new("scientific-fe")),
+            ("MS", Id::new("memory").with(4)),
+            ("M˅", Id::new("memory-list")),
+        ];
+        for flyout in [Flyout::History, Flyout::Memory] {
+            let label = if flyout == Flyout::History {
+                "history"
+            } else {
+                "memory"
+            };
+            // With a calculation in the history and in memory.
+            let ctx = Context::default();
+            let mut app = start_in(&ctx);
+            app.set_mode(Mode::Scientific);
+            for command in [
+                Command::Digit(2),
+                Command::Operator(Op::Add),
+                Command::Digit(3),
+                Command::Equals,
+                Command::MemoryStore,
+            ] {
+                app.engine_mut().execute(command);
+            }
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let rect = |id| ctx.read_response(id).map(|response| response.rect);
+            let rects: Vec<_> = controls.iter().map(|&(_, id)| rect(id).unwrap()).collect();
+            // Nothing but the flyout changes.
+            let unchanged = |app: &CalculatorApp| {
+                let calc = &app.scientific.calc;
+                calc.angle() == Angle::Degrees && !calc.notation() && calc.memory().len() == 1
+            };
+            // A click anywhere above the list only closes the flyout (`OnHistoryFlyOutTapped`).
+            for (&(name, _), button) in controls.iter().zip(&rects) {
+                app.flyout = flyout;
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                click(&ctx, &mut app, MIN_SIZE, button.center());
+                assert!(
+                    app.flyout == Flyout::None && unchanged(&app),
+                    "{label} flyout: a click on {name} did more than close it"
+                );
+            }
+            app.flyout = flyout;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            // The rows stay in view, out of the Tab order, and nothing there can be clicked,
+            // not even by a screen reader: egui takes AccessKit's `Click` for a real click.
+            for (&(name, id), &before) in controls.iter().zip(&rects) {
+                let covered = id.with("covered");
+                run(&ctx, &mut app, MIN_SIZE, vec![screen_reader_click(covered)]);
+                assert!(
+                    app.flyout == flyout && unchanged(&app),
+                    "{label} flyout: a screen reader's click on {name} went through"
+                );
+                let response = ctx.read_response(covered).unwrap();
+                assert_eq!(response.rect, before, "{label} flyout: {name}");
+                assert!(!response.sense.senses_click(), "{label} flyout: {name}");
+            }
+            // Tab only reaches the list.
+            let list = rect(Id::new("flyout")).unwrap();
+            let tab = key(Key::Tab, Modifiers::NONE);
+            for _ in 0..6 {
+                run(&ctx, &mut app, MIN_SIZE, vec![tab.clone()]);
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                let focused = access::focused(&ctx).unwrap();
+                let rect = ctx.read_response(focused).unwrap().rect;
+                assert!(
+                    rect.top() >= list.top(),
+                    "{label} flyout: Tab reached {focused:?}"
+                );
+            }
+        }
+
+        // Docked there's no flyout, and the header works.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        app.set_mode(Mode::Scientific);
+        let docked = vec2(DOCK_WIDTH, 600.0);
+        app.flyout = Flyout::Memory;
+        run(&ctx, &mut app, docked, vec![]);
+        let menu = ctx.read_response(Id::new("menu")).unwrap().rect;
+        click(&ctx, &mut app, docked, menu.center());
+        assert!(app.flyout == Flyout::Navigation);
     }
 }

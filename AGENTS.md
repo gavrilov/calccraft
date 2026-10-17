@@ -244,8 +244,10 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
 - Windows draws most key labels from the Calculator's own font; here they are Segoe UI text
   with an italic x (`function_label`, `superscript`), with Segoe UI Symbol for `⌊ ⌋ ⌈ ⌉ ∛`.
 - The history and memory flyouts cover only the keys, as tall as Windows' `NumpadPanel`: the
-  unit, F-E and memory rows stay in view, the memory buttons disabled, and a click there closes
-  the flyout.
+  unit, F-E and memory rows stay in view, the memory buttons disabled. The flyout lies over the
+  whole window, as Windows' does (`Placement="Full"`): the header and these rows are drawn
+  covered (`access::draw_covered`), out of the Tab order and not clickable, not even by a screen
+  reader, and a click anywhere above the list closes the flyout.
 
 ### `app/programmer_view.rs`
 
