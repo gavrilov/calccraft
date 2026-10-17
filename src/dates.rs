@@ -206,6 +206,16 @@ mod tests {
     }
 
     #[test]
+    fn clamp_keeps_dates_inside_the_supported_range() {
+        let inside = NaiveDate::from_ymd_opt(2026, 10, 17).unwrap();
+        assert_eq!(clamp(inside), inside);
+        assert_eq!(clamp(MIN_DATE), MIN_DATE);
+        assert_eq!(clamp(MAX_DATE), MAX_DATE);
+        assert_eq!(clamp(MIN_DATE.pred_opt().unwrap()), MIN_DATE);
+        assert_eq!(clamp(MAX_DATE.succ_opt().unwrap()), MAX_DATE);
+    }
+
+    #[test]
     fn same_dates() {
         assert_eq!(
             describe("2026-10-15", "2026-10-15"),

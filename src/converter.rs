@@ -1471,6 +1471,9 @@ mod tests {
         assert_eq!(c.value1(), "1");
         press(&mut c, ".5");
         assert_eq!(c.value1(), "1.5");
+        // The last digit leaves a 0 to type on, so a point after it follows a 0.
+        press(&mut c, "c7<.5");
+        assert_eq!(c.value1(), "0.5");
     }
 
     #[test]
