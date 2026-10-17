@@ -183,12 +183,19 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   `handle_date_keyboard` and `handle_converter_keyboard`, so calculator keys do nothing there, and
   the Graphing mode `handle_graphing_keyboard` (its text boxes take the typing).
   `handle_mode_keys` (`Alt+1` … `Alt+5`, `Ctrl+E`, from Windows' `NavCategory`) runs first in
-  every mode, and takes the text of every `Alt` chord (Windows types nothing for them). With the
+  every mode, and takes the text of every `Alt` chord (Windows types nothing for them; on a Mac
+  only the mode keys' text, since Option types characters there, like `@` on German keyboards).
+  With the
   menu or a context menu open, only `Esc` reaches the calculator (the converters too); an open
   history or memory flyout disables the keypad and memory keys (`keypad_disabled`, Windows'
   `EnableControls(false)`), and keep-on-top turns the `Ctrl` shortcuts off. egui's own
   `Ctrl` + plus, minus and 0 zoom is off (`zoom_with_keyboard`): Windows has none, and the graph
-  zooms with those keys.
+  zooms with those keys. A letter key pressed with `AltGr` is no key press for the calculator,
+  only the character it typed is (`remove_alt_gr_keys`; `@` on the Q key of a German keyboard):
+  Windows sees `AltGr` as `Ctrl+Alt`, which has no shortcuts, but winit reports it without
+  modifiers. The right `Alt` key's own events tell when it's down, in order with the other
+  keys; a letter key that typed only other characters than its letter (diacritics aside, so a
+  dead key's `é` and `´q` stay `E` and `Q`) counts as pressed with `AltGr` too.
 - Every interactive control goes through `access::control`, which makes it clickable and
   focusable (`Tab`, `Shift+Tab`, arrow keys: egui's own focus handling), gives it a screen
   reader description (`access::button`, `item`, `combo_box`), draws WinUI's focus visual and
@@ -218,6 +225,9 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   short. `App::ui` hands the Graphing mode, the date mode and the converters over to
   `draw_graphing_mode`, `draw_date_mode` and `draw_converter_mode` and returns early.
   `Page::Settings` replaces any mode, and going back returns to the mode that was open.
+  Like Windows, the app opens in the mode it was closed in: `save` stores it under Windows' key
+  `Mode` as Windows' id (`Mode::serialization_id`, `NavCategory`'s `SerializationId`), and `new`
+  switches to it with `set_mode`. Settings is a page, not a mode: the mode under it is saved.
 - The Standard, Scientific and Programmer modes each have their engine (`calc`,
   `scientific.calc`, `programmer.calc`). `engine()` / `engine_mut()` return the one of
   `last_calculator`, and the shared code (display, keyboard, memory row and list, history)
@@ -230,6 +240,14 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   `draw_list`, the same list the flyouts use; the Programmer mode has only the Memory tab). The
   header's history button and `M˅` disappear, and `Ctrl+H` does nothing then. The lists wrap
   long expressions and numbers (`layout_wrapped_right`), as Windows' `TextWrapping="Wrap"` does.
+- Narrower, history and memory open as flyouts over the keys only, as tall as Windows'
+  `NumpadPanel` (`RowHeight = NumpadPanel.ActualHeight`): the rows above them (the memory row,
+  the Scientific mode's unit and F-E row, the Programmer mode's radix list and the row under it)
+  stay in view with the memory buttons disabled, and a click there closes the flyout. In the
+  Standard and Programmer modes the flyout lies over the whole window, as Windows' does
+  (`Placement="Full"`): the header and those rows are drawn covered (`access::draw_covered`),
+  out of the Tab order and not clickable, not even by a screen reader, and a click anywhere
+  above the list closes it.
 
 ### `app/scientific_view.rs`
 
@@ -244,8 +262,10 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
 - Windows draws most key labels from the Calculator's own font; here they are Segoe UI text
   with an italic x (`function_label`, `superscript`), with Segoe UI Symbol for `⌊ ⌋ ⌈ ⌉ ∛`.
 - The history and memory flyouts cover only the keys, as tall as Windows' `NumpadPanel`: the
-  unit, F-E and memory rows stay in view, the memory buttons disabled, and a click there closes
-  the flyout.
+  unit, F-E and memory rows stay in view, the memory buttons disabled. The flyout lies over the
+  whole window, as Windows' does (`Placement="Full"`): the header and these rows are drawn
+  covered (`access::draw_covered`), out of the Tab order and not clickable, not even by a screen
+  reader, and a click anywhere above the list closes the flyout.
 
 ### `app/programmer_view.rs`
 
@@ -282,7 +302,8 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   `Relation`. Other letters are free variables (`variables`).
 - `expr` evaluates in `f64` (Windows' graphs use doubles too): `real_pow` gives negative bases
   real odd roots (`(−8)^(1/3)` is −2), trigonometry follows the angle unit, and what isn't real is
-  NaN. `derivative` is symbolic (the analysis needs f′ and f″); factorials have none.
+  NaN. `factorial` is exact for whole numbers up to 170! (rounded once beyond 22!), the gamma
+  function otherwise. `derivative` is symbolic (the analysis needs f′ and f″); factorials have none.
 - `plot` works in pixels of the graph. Functions are sampled about once a pixel and subdivided
   where they bend; a jump of more than a quarter of the height at the last subdivision breaks the
   line (tan's asymptotes), and a domain edge is found by bisection (√x starts at 0). Implicit
@@ -291,7 +312,8 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   automatic view, `grid_step` the labeled and minor grid lines, `trace` the curve point nearest
   the pointer with x rounded to `View::precision` (`RenderMain::GetPrecision`).
 - `analysis` finds the features numerically on a grid from −1000 to 1000 (`grid`), with
-  `sign_changes` (bisection; through poles for cusps when asked), touching zeros from f′,
+  `sign_changes` (bisection; through poles for cusps when asked), touching zeros from f′, the
+  ends of flat pieces where f′ is exactly 0 (`flat_ends`: |x − 1| + |x + 1| on [−1, 1]),
   limits from far-away and nearby values (`limit_of`: converged, geometric, or growing), and the
   domain from the zeros of `boundary_functions` (denominators, radicands, cos of tan's argument …)
   checked by evaluating f. A function built from trigonometric functions of linear arguments
@@ -410,8 +432,8 @@ These follow from the Windows source and are pinned by tests too:
   `2 + 3 × 4 +` shows `14`. Changing `−` to `×` in `1 + 2 −` gives `(1 + 2) ×`. `=` closes all
   open parentheses, and a number next to a parenthesis multiplies: `2(3)` → `6`.
 - The expression line writes subtraction as a hyphen: `9 - 4 =`.
-- `5 =` adds `5 =` to the history, and a finished function followed by a new number adds the
-  function (`√(4)`).
+- `5 =` adds `5 =` to the history, and a finished function followed by a new number or MR adds
+  the function with the result it showed (`√(4)` = `2`, not the recalled value).
 - After `=`, `CE` keeps the last operation: `2 + 3 =`, `CE`, `=` gives `0 + 3 =` → `3`.
 - Pasted text is checked like in `CopyPasteManager`: at most 512 characters, 100 operands and
   16 digits per operand (32 in the Scientific mode), exponents of up to 4 digits (`1.5e-3`).
@@ -503,11 +525,15 @@ These come from the Windows Calculator source and calc.exe, and are pinned by th
   around; a step of 0 or less is refused. Values are shown with 6 significant digits ("G6").
 - An empty graph shows −10 to 10 on both axes. The automatic view of x² in a 2140 × 1308 graph
   is x from −27.2204 to 27.2204 and y from −3.025 to 30.25, as in calc.exe.
+- The graph options' window boxes keep what is typed (`GraphingSettingsViewModel`): a minimum
+  at or above its maximum marks both boxes as errors, and the view waits for the pair to be in
+  order (X-Min 20, then X-Max 30, gives x from 20 to 30).
 - The grid labels at most 7 intervals of 1, 2 or 5 times a power of ten, with lines at a fifth
   of them (a fourth for 2s): 10 and 2 for x from −27 to 27, 5 and 1 for y from −3 to 30.
 - The wheel zooms by 15 % a notch around the pointer; the buttons by 1.0625 from the center.
 - The tracer rounds x to 10^(⌊log₁₀ x range⌋ − 3) and shows y with 15 decimals:
-  `(3.82, 14.592400000000000)`.
+  `(3.82, 14.592400000000000)`. A value that rounds to 0 has no sign, as .NET Native writes it:
+  `(0, 0.000000000000000)` just left of the origin on y = x.
 - The keypad's keys type `GetButtonOutput`'s text: `sin()` with the cursor inside, `root(x,n)`
   with the n selected, `log(b, x)` with the b selected, `^2`, `10^`, `1/`.
 - The analysis of the manual tests' functions, word for word: domain `{x ∈ ℝ}`, `{x ≠ 0}`,
@@ -519,7 +545,8 @@ These come from the Windows Calculator source and calc.exe, and are pinned by th
 
 ### Date calculation
 
-These come from the Windows Calculator source and are pinned by the tests in `dates.rs`:
+These come from the Windows Calculator source and are pinned by the tests in `dates.rs` and
+`app/date_view.rs`:
 
 - The difference ignores the order of the dates. It counts whole years, then whole months from
   where the years ended, then weeks (7 days), and the rest is days.
@@ -537,6 +564,9 @@ These come from the Windows Calculator source and are pinned by the tests in `da
   `Date out of Bound`. The offsets go from 0 to 999.
 - Formats: pickers show `October 15, 2026`, and the add/subtract result shows
   `Thursday, October 15, 2026` (in en-US; see "Regional formats").
+- The From date goes along when switching pages (`DateCalcOption_Changed`): picking
+  January 15, 2020 in "Difference between dates" makes it the From date of "Add or subtract
+  days" too, and back. The To date stays on its page.
 
 ### Unit converters
 
@@ -692,6 +722,6 @@ Unit tests don't cover the UI. After visual or interaction changes:
   commit to one topic.
 - In the PR description, say what changed, why, and how you verified it (tests and manual
   checks). Include before/after screenshots for UI changes.
-- Pushing a `v*` tag publishes a GitHub release for Windows, Linux and macOS, all x64
-  (`.github/workflows/release.yml`, see "Releasing" in the README). The tag must match `version` in `Cargo.toml`. Don't create or push tags unless
+- Pushing a `v*` tag publishes a GitHub release for Windows and Linux (x64) and macOS (Apple
+  silicon and Intel) (`.github/workflows/release.yml`, see "Releasing" in the README). The tag must match `version` in `Cargo.toml`. Don't create or push tags unless
   a maintainer asks.

@@ -447,6 +447,7 @@ FeedbackButton.Content=Əks-əlaqə göndər
 60=60-cı
 61=61-ci
 62=62-ci
+63=63-cü
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=ATM

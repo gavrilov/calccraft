@@ -447,6 +447,7 @@ FeedbackButton.Content=Испрати повратни информации
 60=60-ти
 61=61-ви
 62=62-ри
+63=63-ти
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=А
 UnitAbbreviation_Atmosphere=атм

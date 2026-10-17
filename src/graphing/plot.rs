@@ -33,13 +33,17 @@ impl View {
         self.y_max - self.y_min
     }
 
-    /// Whether the ranges can be drawn: finite, and not too small for doubles.
+    /// Whether the ranges can be drawn: finite, not too wide, wider than 1e-10 of their
+    /// ends (narrower ones lose their precision in doubles) and than `MIN_SPAN`. Around
+    /// the origin no relative limit stops zooming in, which used to go on into the
+    /// subnormal doubles, where the grid's powers of ten underflow.
     pub fn is_valid(&self) -> bool {
         let ok = |min: f64, max: f64| {
             min.is_finite()
                 && max.is_finite()
                 && max > min
                 && (max - min) > 1e-10 * min.abs().max(max.abs())
+                && (max - min) > MIN_SPAN
                 && (max - min) < 1e100
         };
         ok(self.x_min, self.x_max) && ok(self.y_min, self.y_max)
@@ -114,6 +118,11 @@ impl View {
     }
 }
 
+/// The narrowest range a view can have: 10⁸ times the smallest normal double (about
+/// 2.2e-300), so that a pixel's share of it, the grid's steps and the tracer's precision
+/// all stay normal numbers too.
+const MIN_SPAN: f64 = f64::MIN_POSITIVE * 1e8;
+
 /// The distance between the labeled grid lines and between all grid lines.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GridStep {
@@ -126,6 +135,14 @@ pub struct GridStep {
 /// (or fourth, for a 2) of that. Windows labels 10s and draws 2s for x from −27 to 27.
 pub fn grid_step(span: f64, pixels: f32) -> GridStep {
     let most = (pixels as f64 / 48.0).clamp(2.0, 7.0);
+    // Valid views (`View::is_valid`) are well inside these bounds. Outside them (0,
+    // subnormal, infinite or NaN spans) the powers of ten would be 0 or infinite, and
+    // the search below would never end.
+    let span = if span > 1e-300 {
+        span.min(1e300)
+    } else {
+        1e-300
+    };
     let mut power = 10f64.powf((span / most).log10().floor() - 1.0);
     loop {
         for (m, parts) in [(1.0, 5.0), (2.0, 4.0), (5.0, 5.0)] {
@@ -529,6 +546,7 @@ pub fn is_dashed(relation: Relation) -> bool {
 pub struct TracePoint {
     /// The index of the equation in the list passed to `trace`.
     pub equation: usize,
+    /// x rounded to the view's precision, ready to be shown.
     pub x: f64,
     pub y: f64,
     /// Where it is, in pixels.
@@ -564,9 +582,8 @@ pub fn trace(
         }
     }
     let (_, k, p) = best?;
-    let precision = view.precision();
     let (x, y) = view.point_at(p[0] as f64, p[1] as f64, w, h);
-    let x = (x / precision).round() * precision;
+    let x = rounded(x, view.precision());
     let y = match &equations[k].0.shape {
         Shape::Function(f) => f.eval(x, 0.0, env),
         _ => y,
@@ -582,6 +599,18 @@ pub fn trace(
         px: sx as f32,
         py: sy as f32,
     })
+}
+
+/// x rounded to the view's precision so that it prints as short as it is: 382 / 100 is
+/// the double nearest 3.82, 382 × 0.01 isn't. The tracer shows f at this x, so y has to
+/// be computed from it and not from a neighbor that prints the same.
+fn rounded(x: f64, precision: f64) -> f64 {
+    let steps = (x / precision).round();
+    if precision < 1.0 {
+        steps / (1.0 / precision).round()
+    } else {
+        steps * precision
+    }
 }
 
 fn nearest_on_segment(a: [f32; 2], b: [f32; 2], p: [f32; 2]) -> [f32; 2] {
@@ -903,6 +932,19 @@ mod tests {
     }
 
     #[test]
+    fn grid_steps_of_degenerate_spans() {
+        // Views don't get this narrow or wide, but these spans used to make the powers of
+        // ten 0 or infinite, and the search never ended.
+        for span in [5e-324, 1e-310, 0.0, -1.0, f64::INFINITY, f64::NAN] {
+            let step = grid_step(span, 800.0);
+            assert!(
+                step.minor > 0.0 && step.major.is_finite(),
+                "{span:e}: {step:?}"
+            );
+        }
+    }
+
+    #[test]
     fn view_math() {
         let view = View::DEFAULT;
         assert_eq!(view.px_of(0.0, 0.0, 200.0, 100.0), (100.0, 50.0));
@@ -928,6 +970,34 @@ mod tests {
             .precision(),
             0.01
         );
+    }
+
+    #[test]
+    fn zooming_in_stops_before_subnormal_views() {
+        // The zoom buttons held down on an empty graph: no relative limit stops a view
+        // around the origin, which used to shrink into the subnormal doubles.
+        let (w, h) = (1340.0, 760.0);
+        let mut view = View::DEFAULT;
+        for _ in 0..20_000 {
+            view = view.zoomed(w as f64 / 2.0, h as f64 / 2.0, w, h, 1.0 / 1.0625);
+        }
+        assert!(
+            view.width() > MIN_SPAN && view.width() < 1.1 * MIN_SPAN,
+            "{view:?}"
+        );
+        // Graph options' ranges: microscopic ones are drawn, subnormal ones refused.
+        let x_range = |x_min, x_max| {
+            View {
+                x_min,
+                x_max,
+                ..View::DEFAULT
+            }
+            .is_valid()
+        };
+        assert!(x_range(0.0, 1e-12));
+        assert!(x_range(-1e-200, 1e-200));
+        assert!(!x_range(0.0, 1e-305));
+        assert!(!x_range(0.0, 5e-324));
     }
 
     #[test]
@@ -1045,6 +1115,32 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn traced_values_are_of_the_x_shown() {
+        // Windows shows (3.82, 14.592400000000000) for x² near (3.95, 14.6): y is the
+        // value at the double nearest 3.82, not at 382 × 0.01 = 3.8200000000000003.
+        let eq = equation("x^2");
+        let view = View {
+            x_min: -27.2204,
+            x_max: 27.2204,
+            y_min: -3.025,
+            y_max: 30.25,
+        };
+        let (w, h) = (2140.0, 1308.0);
+        let p = plot(&eq, &Env::RADIANS, &view, w, h);
+        let traced = |x: f64, y: f64| {
+            let (px, py) = view.px_of(x, y, w, h);
+            let at = (px as f32, py as f32);
+            trace(&[(&eq, &p)], &Env::RADIANS, &view, w, h, at.0, at.1).unwrap()
+        };
+        let point = traced(3.95, 14.6);
+        assert_eq!((point.x, point.y), (3.82, 3.82 * 3.82));
+        let point = traced(-5.1, 26.01);
+        assert_eq!((point.x, point.y), (-5.1, 5.1 * 5.1));
+        assert_eq!(rounded(3.8213, 0.01).to_string(), "3.82");
+        assert_eq!(rounded(1234.0, 10.0), 1230.0);
     }
 
     #[test]

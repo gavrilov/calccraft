@@ -447,6 +447,7 @@ FeedbackButton.Content=Пікір жіберу
 60=60
 61=61
 62=62
+63=63
 UnitAbbreviation_Acre=акр
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=атм

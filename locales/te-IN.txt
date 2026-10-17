@@ -447,6 +447,7 @@ FeedbackButton.Content=అభిప్రాయాన్ని పంపండ�
 60=60 వ
 61=61 వ
 62=62 వ
+63=63 వ
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

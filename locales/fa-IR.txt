@@ -447,6 +447,7 @@ FeedbackButton.Content=ارسال بازخورد
 60=۶۰ اُمین
 61=۶۱ اُمین
 62=۶۲ اُمین
+63=۶۳ اُمین
 UnitAbbreviation_Acre=ایکر
 UnitAbbreviation_Angstrom=آ
 UnitAbbreviation_Atmosphere=فشار جو

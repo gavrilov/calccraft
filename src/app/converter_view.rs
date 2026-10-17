@@ -91,6 +91,18 @@ fn is_converter_key(id: Id) -> bool {
     (0..15).any(|i| id == Id::new("converter-key").with(i))
 }
 
+/// The resource keys of what a screen reader calls a field's value and its unit picker:
+/// "Convert from %1 %2" and "Input unit" for the field being typed into, "Converts into
+/// %1 %2" and "Output unit" for the other. Windows swaps them when the other field becomes
+/// the active one (`UnitConverterViewModel::OnSwitchActive`).
+fn automation_keys(converter: &Converter, top: bool) -> (&'static str, &'static str) {
+    if converter.value1_active() == top {
+        ("Format_ValueFrom", "InputUnit_Name")
+    } else {
+        ("Format_ValueTo", "OutputUnit_Name")
+    }
+}
+
 /// The name a screen reader gives a key of the converter's keypad.
 fn command_name(command: ConverterCommand) -> &'static str {
     tr(match command {
@@ -117,6 +129,17 @@ fn char_command(c: char) -> Option<ConverterCommand> {
         '0'..='9' => Some(ConverterCommand::Digit(c as u8 - b'0')),
         '.' | ',' => Some(ConverterCommand::Decimal),
         '-' => Some(ConverterCommand::Negate),
+        _ => None,
+    }
+}
+
+/// The command a named key stands for. Windows gives `CE` two keys, Delete and Esc
+/// (`UnitConverter` adds `Escape` to `ClearEntryButtonPos0`'s shortcut).
+fn key_command(key: Key) -> Option<ConverterCommand> {
+    match key {
+        Key::Backspace => Some(ConverterCommand::Backspace),
+        Key::Delete | Key::Escape => Some(ConverterCommand::Clear),
+        Key::F9 => Some(ConverterCommand::Negate),
         _ => None,
     }
 }
@@ -167,7 +190,8 @@ impl CalculatorApp {
         let now = ctx.input(|i| i.time);
         for event in ctx.input(|i| i.events.clone()) {
             // An open drop-down or menu takes the keyboard (Windows' `HonorShortcuts(false)`
-            // while the menu is open); Esc closes it.
+            // while the menu is open); Esc closes it without clearing (Windows' view model
+            // ignores `CE` while a drop-down is open).
             if self.converter.popup_open() || self.flyout == Flyout::Navigation {
                 if matches!(
                     event,
@@ -194,22 +218,18 @@ impl CalculatorApp {
                     modifiers,
                     ..
                 } if !modifiers.command => {
-                    let command = match key {
-                        Key::Escape => {
-                            self.flyout = Flyout::None;
-                            continue;
+                    // The keypad's keys ignore Enter, as Windows' `CalculatorButton`s do.
+                    if key == Key::Enter && access::focused(ctx).is_some_and(is_converter_key) {
+                        ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter));
+                    } else if let Some(command) = key_command(key) {
+                        // egui drops the focus on Esc; in Windows it's only `CE`.
+                        if key == Key::Escape
+                            && let Some(id) = self.last_focus
+                        {
+                            ctx.memory_mut(|memory| memory.request_focus(id));
                         }
-                        // The keypad's keys ignore Enter, as Windows' `CalculatorButton`s do.
-                        Key::Enter if access::focused(ctx).is_some_and(is_converter_key) => {
-                            ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter));
-                            continue;
-                        }
-                        Key::Backspace => ConverterCommand::Backspace,
-                        Key::Delete => ConverterCommand::Clear,
-                        Key::F9 => ConverterCommand::Negate,
-                        _ => continue,
-                    };
-                    self.converter_press(command, now);
+                        self.converter_press(command, now);
+                    }
                 }
                 Event::Copy => {
                     ctx.copy_text(numbers().localize_plain(&self.converter.converter.copy_text()))
@@ -360,19 +380,16 @@ impl CalculatorApp {
         let pos = pos2(left, rect.bottom() - margin - galley.size().y);
         painter.galley(pos, galley, p.text);
 
-        // "Convert from 5 Kilometers", "Converts into 3.106856 Miles"; like Windows, screen
-        // readers read the bottom value out when it changes.
+        // "Convert from 5 Kilometers" for the value being typed into, "Converts into
+        // 3.106856 Miles" for the other; like Windows, screen readers read the bottom value
+        // out when it changes.
         let unit = if top {
             converter.unit1()
         } else {
             converter.unit2()
         };
         let unit = unit_name(converter.units()[unit].key);
-        let format = if top {
-            "Format_ValueFrom"
-        } else {
-            "Format_ValueTo"
-        };
+        let (format, _) = automation_keys(converter, top);
         let name = tr_format(format, &[&value, unit]);
         let id = Id::new("converter-value").with(top);
         let info = || WidgetInfo::labeled(WidgetType::Button, true, &name);
@@ -405,12 +422,8 @@ impl CalculatorApp {
         let width = 4.0 + label.size().x + 8.0 + chevron.size().x + 12.0;
         let rect = Rect::from_min_size(pos2(row.left() + 12.0, row.top()), vec2(width, height));
 
-        let picker = if top {
-            tr("InputUnit_Name")
-        } else {
-            tr("OutputUnit_Name")
-        };
-        let info = access::combo_box(picker, name);
+        let (_, picker) = automation_keys(converter, top);
+        let info = access::combo_box(tr(picker), name);
         let id = unit_picker_id(top);
         let response = access::control(ui, p, rect, id, true, RADIUS, info);
         let color = if response.is_pointer_button_down_on() {
@@ -722,10 +735,39 @@ mod tests {
     }
 
     #[test]
+    fn automation_names_follow_the_active_field() {
+        let from = ("Format_ValueFrom", "InputUnit_Name");
+        let into = ("Format_ValueTo", "OutputUnit_Name");
+        let mut converter = Converter::new(Region::new("US"));
+        assert_eq!(automation_keys(&converter, true), from);
+        assert_eq!(automation_keys(&converter, false), into);
+        // Typing into the bottom value makes it the source, and Windows swaps the names.
+        converter.activate(false);
+        assert_eq!(automation_keys(&converter, true), into);
+        assert_eq!(automation_keys(&converter, false), from);
+        converter.activate(true);
+        assert_eq!(automation_keys(&converter, true), from);
+        assert_eq!(automation_keys(&converter, false), into);
+    }
+
+    #[test]
     fn typed_characters() {
         assert_eq!(char_command('7'), Some(ConverterCommand::Digit(7)));
         assert_eq!(char_command(','), Some(ConverterCommand::Decimal));
         assert_eq!(char_command('-'), Some(ConverterCommand::Negate));
         assert_eq!(char_command('+'), None);
+    }
+
+    #[test]
+    fn escape_is_ce() {
+        // Windows' converter gives `CE` two keys: Delete and Esc.
+        assert_eq!(key_command(Key::Delete), Some(ConverterCommand::Clear));
+        assert_eq!(key_command(Key::Escape), Some(ConverterCommand::Clear));
+        assert_eq!(
+            key_command(Key::Backspace),
+            Some(ConverterCommand::Backspace)
+        );
+        assert_eq!(key_command(Key::F9), Some(ConverterCommand::Negate));
+        assert_eq!(key_command(Key::Enter), None);
     }
 }

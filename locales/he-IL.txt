@@ -447,6 +447,7 @@ FeedbackButton.Content=שלח משוב
 60=ששים
 61=ששים ואחת
 62=ששים ושתיים
+63=ששים ושלוש
 UnitAbbreviation_Acre=אקר
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=אטמוספירות

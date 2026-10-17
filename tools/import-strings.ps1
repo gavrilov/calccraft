@@ -426,8 +426,8 @@ $keys = @(
     'FeedbackButton.Content'
 )
 
-# The ordinal numbers the bit toggling keypad names its bits by ("2nd bit"), keys 1 to 62.
-$keys += 1..62 | ForEach-Object { "$_" }
+# The ordinal numbers the bit toggling keypad names its bits by ("2nd bit"), keys 1 to 63.
+$keys += 1..63 | ForEach-Object { "$_" }
 
 # The engine's error messages in CEngineStrings.resw: divide by zero, invalid input,
 # undefined result, overflow, no result (a shift by the word size or more).
