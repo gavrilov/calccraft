@@ -87,6 +87,9 @@ const FEEDBACK_URL: &str = "https://github.com/gavrilov/calccraft/issues";
 const THEME_KEY: &str = "SelectedAppTheme";
 /// Storage key of the last converter and its units, the same as Windows uses.
 const CONVERTER_KEY: &str = "UnitConverterPreferences";
+/// Storage keys of the keep-on-top window's last size, the same as Windows uses.
+const COMPACT_WIDTH_KEY: &str = "calculatorAlwaysOnTopLastWidth";
+const COMPACT_HEIGHT_KEY: &str = "calculatorAlwaysOnTopLastHeight";
 /// Storage keys of the Language and Regional format choices, which Windows doesn't have:
 /// a language or locale name, or `Default` for the Windows setting (like the theme's).
 const LANGUAGE_KEY: &str = "CalcCraftLanguage";
@@ -374,6 +377,99 @@ enum Kind {
     Emphasized,
 }
 
+/// The window sizes that keep-on-top mode switches between.
+#[derive(Default)]
+struct WindowSizes {
+    /// The full window's size, which comes back when keep-on-top mode ends.
+    full: Option<egui::Vec2>,
+    /// The keep-on-top window's size when the mode was last left. As in Windows
+    /// (`ApplicationViewModel.ToggleAlwaysOnTop`), the mode opens at it again, and the
+    /// settings keep it (`calculatorAlwaysOnTopLastWidth` and `…Height`).
+    compact: Option<egui::Vec2>,
+}
+
+impl WindowSizes {
+    /// The sizes at start-up, with the keep-on-top size saved last time.
+    fn load(storage: Option<&dyn eframe::Storage>) -> Self {
+        let number = |key| {
+            storage?
+                .get_string(key)?
+                .parse::<f32>()
+                .ok()
+                .filter(|n| n.is_finite() && *n > 0.0)
+        };
+        let compact = number(COMPACT_WIDTH_KEY).zip(number(COMPACT_HEIGHT_KEY));
+        WindowSizes {
+            full: None,
+            compact: compact.map(|(width, height)| vec2(width, height)),
+        }
+    }
+
+    /// Saves the keep-on-top size, under Windows' keys.
+    fn save(&self, storage: &mut dyn eframe::Storage) {
+        if let Some(size) = self.compact {
+            storage.set_string(COMPACT_WIDTH_KEY, size.x.to_string());
+            storage.set_string(COMPACT_HEIGHT_KEY, size.y.to_string());
+        }
+    }
+
+    /// Keep-on-top mode starts: keeps the full window's size and returns the size to switch
+    /// to, the one keep-on-top mode was last left at, or Windows' 320 × 394 the first time.
+    fn enter_compact(&mut self, input: &egui::InputState) -> egui::Vec2 {
+        self.full = Some(window_size(input));
+        self.compact
+            .map_or(COMPACT_SIZE, |size| size.max(COMPACT_MIN_SIZE))
+    }
+
+    /// Keep-on-top mode ends: keeps the window's size for the next time and returns the
+    /// full window's size to switch back to.
+    fn leave_compact(&mut self, input: &egui::InputState) -> egui::Vec2 {
+        // Only a normal window's size is kept: Windows' keep-on-top window can't be
+        // maximized (X11 and Wayland keep the maximize button), and a minimized window has
+        // no size to come back to.
+        let viewport = input.viewport();
+        if viewport.maximized != Some(true) && viewport.minimized != Some(true) {
+            self.compact = Some(window_size(input));
+        }
+        self.full.take().unwrap_or(MIN_SIZE).max(MIN_SIZE)
+    }
+}
+
+/// The window's content size: the size of egui's area, which every platform reports.
+/// `ViewportInfo::inner_rect` would also give it, but it is always `None` on Wayland,
+/// which doesn't tell a window its position.
+fn window_size(input: &egui::InputState) -> egui::Vec2 {
+    input.viewport_rect().size()
+}
+
+/// The window commands that start (`on`) or end keep-on-top mode, switching to `size`.
+/// Windows' keep-on-top window (a compact overlay) has no maximize button and is never
+/// maximized: the mode turns the button off and leaves a maximized state before the new
+/// size, and its end turns the button back on.
+fn keep_on_top_commands(on: bool, size: egui::Vec2) -> Vec<ViewportCommand> {
+    let buttons = ViewportCommand::EnableButtons {
+        close: true,
+        minimized: true,
+        maximize: !on,
+    };
+    if on {
+        vec![
+            ViewportCommand::WindowLevel(WindowLevel::AlwaysOnTop),
+            buttons,
+            ViewportCommand::Maximized(false),
+            ViewportCommand::MinInnerSize(COMPACT_MIN_SIZE),
+            ViewportCommand::InnerSize(size),
+        ]
+    } else {
+        vec![
+            ViewportCommand::WindowLevel(WindowLevel::Normal),
+            buttons,
+            ViewportCommand::InnerSize(size),
+            ViewportCommand::MinInnerSize(MIN_SIZE),
+        ]
+    }
+}
+
 pub struct CalculatorApp {
     mode: Mode,
     /// The Standard mode's engine; the Scientific and Programmer modes have their own in
@@ -396,7 +492,7 @@ pub struct CalculatorApp {
     context_menu: Option<ContextMenu>,
     /// "Keep on top" mode: a small always-on-top window without the memory row.
     compact: bool,
-    full_size: Option<egui::Vec2>,
+    window_sizes: WindowSizes,
     /// Command triggered from the keyboard and when, to highlight its button.
     key_flash: Option<(Command, f64)>,
     page: Page,
@@ -489,7 +585,7 @@ impl CalculatorApp {
             dock_tab: Panel::History,
             context_menu: None,
             compact: false,
-            full_size: None,
+            window_sizes: WindowSizes::load(cc.storage),
             key_flash: None,
             page: Page::Calculator,
             theme,
@@ -848,16 +944,16 @@ impl CalculatorApp {
     fn set_compact(&mut self, ctx: &Context, compact: bool) {
         self.compact = compact;
         self.flyout = Flyout::None;
-        if compact {
-            self.full_size = ctx.input(|i| i.viewport().inner_rect.map(|r| r.size()));
-            ctx.send_viewport_cmd(ViewportCommand::WindowLevel(WindowLevel::AlwaysOnTop));
-            ctx.send_viewport_cmd(ViewportCommand::MinInnerSize(COMPACT_MIN_SIZE));
-            ctx.send_viewport_cmd(ViewportCommand::InnerSize(COMPACT_SIZE));
-        } else {
-            ctx.send_viewport_cmd(ViewportCommand::WindowLevel(WindowLevel::Normal));
-            let size = self.full_size.take().unwrap_or(MIN_SIZE);
-            ctx.send_viewport_cmd(ViewportCommand::InnerSize(size.max(MIN_SIZE)));
-            ctx.send_viewport_cmd(ViewportCommand::MinInnerSize(MIN_SIZE));
+        let sizes = &mut self.window_sizes;
+        let size = ctx.input(|i| {
+            if compact {
+                sizes.enter_compact(i)
+            } else {
+                sizes.leave_compact(i)
+            }
+        });
+        for command in keep_on_top_commands(compact, size) {
+            ctx.send_viewport_cmd(command);
         }
     }
 
@@ -2516,6 +2612,7 @@ impl eframe::App for CalculatorApp {
             graphing_view::THEME_KEY,
             self.graphing.match_app_theme.to_string(),
         );
+        self.window_sizes.save(storage);
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
@@ -3305,5 +3402,132 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    /// The settings file, in memory.
+    #[derive(Default)]
+    struct Settings(std::collections::HashMap<String, String>);
+
+    impl eframe::Storage for Settings {
+        fn get_string(&self, key: &str) -> Option<String> {
+            self.0.get(key).cloned()
+        }
+        fn set_string(&mut self, key: &str, value: String) {
+            self.0.insert(key.to_owned(), value);
+        }
+        fn remove_string(&mut self, key: &str) {
+            self.0.remove(key);
+        }
+        fn flush(&mut self) {}
+    }
+
+    /// A frame's input in a window of `size`, with what the platform says about it (`info`).
+    fn frame(size: egui::Vec2, info: egui::ViewportInfo) -> egui::InputState {
+        let mut raw = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            ..Default::default()
+        };
+        raw.viewports.insert(egui::ViewportId::ROOT, info);
+        let options = egui::InputOptions::default();
+        egui::InputState::default().begin_pass(raw, false, 1.0, options)
+    }
+
+    /// What Windows, macOS and X11 tell about a window of `size` that is neither maximized
+    /// nor minimized: where it is, too.
+    fn placed(size: egui::Vec2) -> egui::ViewportInfo {
+        egui::ViewportInfo {
+            inner_rect: Some(Rect::from_min_size(pos2(40.0, 30.0), size)),
+            maximized: Some(false),
+            minimized: Some(false),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn keep_on_top_opens_at_its_last_size() {
+        let (full, larger) = (vec2(700.0, 800.0), vec2(420.0, 600.0));
+        let mut sizes = WindowSizes::load(None);
+        assert_eq!(
+            sizes.enter_compact(&frame(full, placed(full))),
+            COMPACT_SIZE
+        );
+        // Made larger, left and entered again, it gets that size back, as in Windows.
+        assert_eq!(sizes.leave_compact(&frame(larger, placed(larger))), full);
+        assert_eq!(sizes.enter_compact(&frame(full, placed(full))), larger);
+        // A maximized or minimized window's size isn't kept.
+        let huge = vec2(1920.0, 1040.0);
+        let maximized = egui::ViewportInfo {
+            maximized: Some(true),
+            ..placed(huge)
+        };
+        let minimized = egui::ViewportInfo {
+            minimized: Some(true),
+            inner_rect: None,
+            ..placed(huge)
+        };
+        for info in [maximized, minimized] {
+            assert_eq!(sizes.leave_compact(&frame(huge, info)), full);
+            assert_eq!(sizes.enter_compact(&frame(full, placed(full))), larger);
+        }
+
+        // Windows keeps it in its settings, so it lasts until the next start too.
+        let mut settings = Settings::default();
+        sizes.save(&mut settings);
+        assert_eq!(settings.0[COMPACT_WIDTH_KEY], "420");
+        assert_eq!(settings.0[COMPACT_HEIGHT_KEY], "600");
+        let mut restarted = WindowSizes::load(Some(&settings));
+        assert_eq!(restarted.enter_compact(&frame(full, placed(full))), larger);
+        settings.0.insert(COMPACT_HEIGHT_KEY.into(), "tall".into());
+        assert_eq!(WindowSizes::load(Some(&settings)).compact, None);
+    }
+
+    #[test]
+    fn keep_on_top_window_cannot_be_maximized() {
+        use ViewportCommand::*;
+        // Windows' keep-on-top window has no maximize button and isn't maximized.
+        let (compact, full) = (vec2(420.0, 600.0), vec2(700.0, 800.0));
+        let buttons = |maximize| EnableButtons {
+            close: true,
+            minimized: true,
+            maximize,
+        };
+        assert_eq!(
+            keep_on_top_commands(true, compact),
+            [
+                WindowLevel(egui::WindowLevel::AlwaysOnTop),
+                buttons(false),
+                Maximized(false),
+                MinInnerSize(COMPACT_MIN_SIZE),
+                InnerSize(compact),
+            ]
+        );
+        assert_eq!(
+            keep_on_top_commands(false, full),
+            [
+                WindowLevel(egui::WindowLevel::Normal),
+                buttons(true),
+                InnerSize(full),
+                MinInnerSize(MIN_SIZE),
+            ]
+        );
+    }
+
+    #[test]
+    fn keep_on_top_size_without_a_window_position() {
+        // Wayland doesn't tell a window where it is, so egui has no `inner_rect` there;
+        // the size of egui's area is still the window's.
+        let wayland = egui::ViewportInfo {
+            maximized: Some(false),
+            minimized: Some(false),
+            ..Default::default()
+        };
+        let (full, larger) = (vec2(700.0, 800.0), vec2(420.0, 600.0));
+        let mut sizes = WindowSizes::load(None);
+        assert_eq!(
+            sizes.enter_compact(&frame(full, wayland.clone())),
+            COMPACT_SIZE
+        );
+        assert_eq!(sizes.leave_compact(&frame(larger, wayland.clone())), full);
+        assert_eq!(sizes.enter_compact(&frame(full, wayland)), larger);
     }
 }
