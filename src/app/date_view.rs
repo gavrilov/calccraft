@@ -636,6 +636,13 @@ impl CalculatorApp {
 
         let mut action = None;
 
+        // Page Up and Page Down flip pages, and a focused cell keeps its day, month or year,
+        // like in WinUI's CalendarView, so that Enter picks it. They come first, so that this
+        // frame already draws the page they show: AccessKit panics when the focus is on a cell
+        // that isn't drawn, and an Enter in the same frame has to press the new cell.
+        let paged = page_keys(ui, view, shown);
+        let shown = paged.unwrap_or(shown);
+
         // Header: the title zooms out, the arrows flip pages.
         let arrow_width = (width / 7.0).max(48.0);
         let title_button = Rect::from_min_max(
@@ -698,7 +705,7 @@ impl CalculatorApp {
             paint_centered(&painter, button.center(), icon_label(glyph, 8.0), color);
         }
 
-        // The mouse wheel flips pages too, and so do Page Up and Page Down.
+        // The mouse wheel flips pages too.
         if ui.rect_contains_pointer(rect) {
             self.date.wheel += ui.input(|i| wheel_delta(&i.events));
             if self.date.wheel.abs() >= WHEEL_STEP {
@@ -707,13 +714,6 @@ impl CalculatorApp {
                 if let Some(shown) = step_page(view, shown, forward) {
                     action = Some(CalendarAction::Show(view, shown));
                 }
-            }
-        }
-        for (key, forward) in [(Key::PageUp, false), (Key::PageDown, true)] {
-            if ui.input(|i| i.key_pressed(key))
-                && let Some(shown) = step_page(view, shown, forward)
-            {
-                action = Some(CalendarAction::Show(view, shown));
             }
         }
 
@@ -734,7 +734,11 @@ impl CalculatorApp {
             CalendarView::Year => year_view(p, ui, body, shown, cells),
             CalendarView::Decade => decade_view(p, ui, body, shown, cells),
         };
-        action = picked.or(action);
+        // A picked day comes first, then the page keys (which have moved the focus already),
+        // then the header and the wheel.
+        action = picked
+            .or(paged.map(|shown| CalendarAction::Show(view, shown)))
+            .or(action);
 
         match action {
             Some(CalendarAction::Pick(date)) => {
@@ -791,7 +795,7 @@ fn month_view(
     }
 
     let grid_top = body.top() + 2.0 + WEEKDAY_ROW_HEIGHT;
-    let page_start = dates::month_page_start(shown.year(), shown.month(), week_start);
+    let page_start = first_on_page(shown);
     let mut action = None;
     for i in 0..42 {
         let day = page_start + Days::new(i);
@@ -812,7 +816,7 @@ fn month_view(
             dimmed: day.month() != shown.month(),
             focus: cells.focus && day == cells.selected,
         };
-        let id = Id::new("calendar-day").with(i);
+        let id = cell_id(CalendarView::Month, i);
         // Screen readers get the whole date, not just the day of the month.
         let label = day.day().to_string();
         if calendar_cell(p, ui, id, cell, &label, &formats().date(day), state) {
@@ -846,7 +850,7 @@ fn year_view(
         };
         let label = &formats().months[month.month0() as usize];
         let name = formats().year_month(month);
-        let id = Id::new("calendar-month").with(i);
+        let id = cell_id(CalendarView::Year, u64::from(i));
         let cell = grid_cell(body, i as usize);
         if calendar_cell(p, ui, id, cell, label, &name, state) {
             action = Some(CalendarAction::Show(CalendarView::Month, month));
@@ -876,7 +880,7 @@ fn decade_view(
             dimmed: year > start + 9,
             focus: cells.focus && cells.selected.year() == year,
         };
-        let id = Id::new("calendar-year").with(i);
+        let id = cell_id(CalendarView::Decade, i as u64);
         let cell = grid_cell(body, i as usize);
         let label = year.to_string();
         if calendar_cell(p, ui, id, cell, &label, &label, state) {
@@ -1120,6 +1124,100 @@ fn step_page(view: CalendarView, shown: NaiveDate, forward: bool) -> Option<Naiv
     in_range.then_some(next)
 }
 
+/// Page Up and Page Down: the page to show, if they flip it. With a cell focused, the focus
+/// moves to the cell `page_focus` gives, on that page.
+fn page_keys(ui: &Ui, view: CalendarView, shown: NaiveDate) -> Option<NaiveDate> {
+    let mut page = None;
+    for (key, forward) in [(Key::PageUp, false), (Key::PageDown, true)] {
+        if !ui.input(|i| i.key_pressed(key)) {
+            continue;
+        }
+        let current = page.unwrap_or(shown);
+        let next = match focused_cell(ui, view) {
+            Some(index) => {
+                let (next, index) = page_focus(view, current, index, forward);
+                ui.memory_mut(|memory| memory.request_focus(cell_id(view, index)));
+                Some(next)
+            }
+            None => step_page(view, current, forward),
+        };
+        page = next.or(page);
+    }
+    page
+}
+
+/// Page Up or Page Down while the cell at `index` has the focus: the page to show and the
+/// cell to focus then. Like WinUI's CalendarView (`AddScopes`, then `CoerceDate`), the focused
+/// day, month or year moves by a page (a month, a year or ten years), to the last day of a
+/// shorter month and within the supported dates (so beyond them to the first or last day,
+/// month or year), and the page is the one that date is on.
+fn page_focus(view: CalendarView, shown: NaiveDate, index: u64, forward: bool) -> (NaiveDate, u64) {
+    let step = Months::new(match view {
+        CalendarView::Month => 1,
+        CalendarView::Year => 12,
+        CalendarView::Decade => 120,
+    });
+    let moved = cell_date(view, shown, index).and_then(|date| {
+        if forward {
+            date.checked_add_months(step)
+        } else {
+            date.checked_sub_months(step)
+        }
+    });
+    let date = moved.map_or(if forward { MAX_DATE } else { MIN_DATE }, dates::clamp);
+    // The first day of the cell the date is in.
+    let date = match view {
+        CalendarView::Month => date,
+        CalendarView::Year => first_of_month(date),
+        CalendarView::Decade => date.with_ordinal(1).unwrap_or(date),
+    };
+    let shown = first_of_month(date);
+    (shown, cell_index(view, shown, date))
+}
+
+/// The first day on the month view's page for the month of `shown`.
+fn first_on_page(shown: NaiveDate) -> NaiveDate {
+    dates::month_page_start(shown.year(), shown.month(), formats().first_day)
+}
+
+/// The first day of the cell at `index` on the page of `shown`: a day, the first of a month,
+/// or January 1 of a year, as `month_view`, `year_view` and `decade_view` lay them out.
+fn cell_date(view: CalendarView, shown: NaiveDate, index: u64) -> Option<NaiveDate> {
+    match view {
+        CalendarView::Month => first_on_page(shown).checked_add_days(Days::new(index)),
+        CalendarView::Year => NaiveDate::from_ymd_opt(shown.year(), 1, 1)?
+            .checked_add_months(Months::new(index as u32)),
+        CalendarView::Decade => NaiveDate::from_ymd_opt(decade_start(shown) + index as i32, 1, 1),
+    }
+}
+
+/// The index of the cell of `date` on the page of `shown`, the reverse of `cell_date`.
+fn cell_index(view: CalendarView, shown: NaiveDate, date: NaiveDate) -> u64 {
+    let index = match view {
+        CalendarView::Month => (date - first_on_page(shown)).num_days(),
+        CalendarView::Year => i64::from(date.year() - shown.year()) * 12 + i64::from(date.month0()),
+        CalendarView::Decade => i64::from(date.year() - decade_start(shown)),
+    };
+    index as u64
+}
+
+/// The id of the cell at `index` on a page of a calendar view, counted from the top left.
+fn cell_id(view: CalendarView, index: u64) -> Id {
+    let name = match view {
+        CalendarView::Month => "calendar-day",
+        CalendarView::Year => "calendar-month",
+        CalendarView::Decade => "calendar-year",
+    };
+    Id::new(name).with(index)
+}
+
+/// The index of the cell of a calendar view that has the keyboard focus.
+fn focused_cell(ui: &Ui, view: CalendarView) -> Option<u64> {
+    let focused = ui.memory(|memory| memory.focused())?;
+    let cells = if view == CalendarView::Month { 42 } else { 16 };
+    (0..cells).find(|&index| cell_id(view, index) == focused)
+}
+
 fn first_of_month(date: NaiveDate) -> NaiveDate {
     date.with_day(1).unwrap_or(date)
 }
@@ -1130,4 +1228,181 @@ fn decade_start(date: NaiveDate) -> i32 {
 
 fn today() -> NaiveDate {
     dates::clamp(Local::now().date_naive())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn date(year: i32, month: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(year, month, day).unwrap()
+    }
+
+    /// Page Up or Page Down in `view` on the page of `shown` with the cell of `date` focused:
+    /// the page shown then, and the date of the cell that has the focus.
+    fn page(
+        view: CalendarView,
+        shown: NaiveDate,
+        date: NaiveDate,
+        forward: bool,
+    ) -> (NaiveDate, NaiveDate) {
+        let (shown, index) = page_focus(view, shown, cell_index(view, shown, date), forward);
+        (shown, cell_date(view, shown, index).unwrap())
+    }
+
+    #[test]
+    fn page_keys_keep_the_focused_day() {
+        let month = |shown, day, forward| page(CalendarView::Month, shown, day, forward);
+        let october = date(2026, 10, 1);
+        // Like WinUI's CalendarView: the same day of the next or previous month.
+        assert_eq!(
+            month(october, date(2026, 10, 28), true),
+            (date(2026, 11, 1), date(2026, 11, 28))
+        );
+        assert_eq!(
+            month(october, date(2026, 10, 28), false),
+            (date(2026, 9, 1), date(2026, 9, 28))
+        );
+        // A day of the next month shown on this page moves on from that month.
+        assert_eq!(
+            month(october, date(2026, 11, 4), true),
+            (date(2026, 12, 1), date(2026, 12, 4))
+        );
+        // A shorter month gives its last day.
+        assert_eq!(
+            month(date(2026, 1, 1), date(2026, 1, 31), true),
+            (date(2026, 2, 1), date(2026, 2, 28))
+        );
+        // Beyond the supported dates, the first or last one.
+        assert_eq!(
+            month(date(9999, 12, 1), date(9999, 12, 15), true),
+            (date(9999, 12, 1), MAX_DATE)
+        );
+        assert_eq!(
+            month(date(1601, 1, 1), date(1601, 1, 15), false),
+            (date(1601, 1, 1), MIN_DATE)
+        );
+    }
+
+    #[test]
+    fn page_keys_keep_the_focused_month_and_year() {
+        // The year of the page shown then, and the focused month.
+        let year = |shown, month, forward| {
+            let (shown, focused) = page(CalendarView::Year, shown, month, forward);
+            (shown.year(), focused)
+        };
+        // The same month of the next year.
+        assert_eq!(
+            year(date(2026, 10, 1), date(2026, 3, 1), true),
+            (2027, date(2027, 3, 1))
+        );
+        // Beyond 9999, the last month, also from April 9999 shown dimmed on the page of 9998.
+        assert_eq!(
+            year(date(9999, 6, 1), date(9999, 6, 1), true),
+            (9999, date(9999, 12, 1))
+        );
+        assert_eq!(
+            year(date(9998, 1, 1), date(9999, 4, 1), true),
+            (9999, date(9999, 12, 1))
+        );
+        assert_eq!(
+            year(date(1601, 3, 1), date(1601, 3, 1), false),
+            (1601, date(1601, 1, 1))
+        );
+        // The decade of the page shown, and the focused year: ten years on, or the first or
+        // last supported year.
+        let decade = |shown, year, forward| {
+            let (shown, focused) = page(CalendarView::Decade, shown, year, forward);
+            (decade_start(shown), focused)
+        };
+        assert_eq!(
+            decade(date(2026, 10, 1), date(2026, 1, 1), true),
+            (2030, date(2036, 1, 1))
+        );
+        assert_eq!(
+            decade(date(9990, 1, 1), date(9995, 1, 1), true),
+            (9990, date(9999, 1, 1))
+        );
+        assert_eq!(
+            decade(date(1600, 1, 1), date(1605, 1, 1), false),
+            (1600, date(1601, 1, 1))
+        );
+    }
+
+    /// One frame of a calendar page with `keys` pressed, drawn like `draw_calendar` draws it:
+    /// Page Up and Page Down first, then the cells. Returns the page drawn and the date that a
+    /// pressed cell picks or opens.
+    fn frame(
+        ctx: &egui::Context,
+        view: CalendarView,
+        shown: NaiveDate,
+        keys: &[Key],
+    ) -> (NaiveDate, Option<NaiveDate>) {
+        let events = keys
+            .iter()
+            .map(|&key| Event::Key {
+                key,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            })
+            .collect();
+        let input = egui::RawInput {
+            events,
+            ..Default::default()
+        };
+        let mut result = (shown, None);
+        let mut output = ctx.run_ui(input, |ui| {
+            let shown = page_keys(ui, view, shown).unwrap_or(shown);
+            let p = &super::super::palette::DARK;
+            let body = Rect::from_min_size(pos2(8.0, 48.0), vec2(320.0, 290.0));
+            let cells = Cells {
+                today: date(2026, 10, 16),
+                selected: date(2026, 10, 16),
+                focus: false,
+            };
+            let picked = match view {
+                CalendarView::Month => month_view(p, ui, ui.painter(), body, shown, cells),
+                CalendarView::Year => year_view(p, ui, body, shown, cells),
+                CalendarView::Decade => decade_view(p, ui, body, shown, cells),
+            };
+            let picked = picked.map(|action| match action {
+                CalendarAction::Pick(date) | CalendarAction::Show(_, date) => date,
+            });
+            result = (shown, picked);
+        });
+        output.textures_delta.clear();
+        result
+    }
+
+    #[test]
+    fn page_down_and_enter_in_one_frame_press_the_new_cell() {
+        let ctx = egui::Context::default();
+        // The month view's weekday names need the app's font families.
+        super::super::setup_fonts(&ctx, &[]);
+        let press = |view, shown, focused: NaiveDate| {
+            frame(&ctx, view, shown, &[]);
+            let index = cell_index(view, shown, focused);
+            ctx.memory_mut(|memory| memory.request_focus(cell_id(view, index)));
+            frame(&ctx, view, shown, &[]);
+            frame(&ctx, view, shown, &[Key::PageDown, Key::Enter])
+        };
+        // October 28, 2026: Enter picks November 28.
+        assert_eq!(
+            press(CalendarView::Month, date(2026, 10, 1), date(2026, 10, 28)),
+            (date(2026, 11, 1), Some(date(2026, 11, 28)))
+        );
+        // June 9999, and April 9999 on the page of 9998: Enter opens December 9999.
+        let (shown, opened) = press(CalendarView::Year, date(9999, 6, 1), date(9999, 6, 1));
+        assert_eq!((shown.year(), opened), (9999, Some(date(9999, 12, 1))));
+        let (shown, opened) = press(CalendarView::Year, date(9998, 1, 1), date(9999, 4, 1));
+        assert_eq!((shown.year(), opened), (9999, Some(date(9999, 12, 1))));
+        // 9995 in the decade view: Enter opens 9999.
+        let (shown, opened) = press(CalendarView::Decade, date(9990, 1, 1), date(9995, 1, 1));
+        assert_eq!(
+            (decade_start(shown), opened),
+            (9990, Some(date(9999, 1, 1)))
+        );
+    }
 }

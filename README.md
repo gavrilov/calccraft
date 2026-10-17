@@ -139,7 +139,8 @@ It looks like the original (Segoe UI fonts, Fluent icons, the same layout and co
 | `Space` or `Enter` | Press the focused control (`Enter` is `=` on the keypad) |
 
 In the date calculation mode, `Esc` closes the open calendar or list, `Page Up` and `Page Down`
-flip the calendar's pages, and `Ctrl+C` copies the result.
+flip the calendar's pages (a focused day, month or year moves along to the new page, as in
+Windows), and `Ctrl+C` copies the result.
 
 In the scientific mode, these keys are added (Windows' own):
 

@@ -1120,7 +1120,9 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
     memory row, as with Windows' `CalculatorButton`. `Esc` is still `C` and keeps the focus.
   - Popups keep the focus inside. Opened with the keyboard, the menu, the drop-downs, the
     calendar and the history and memory flyouts focus their selected item, and the opener gets
-    the focus back when they close. `Page Up` and `Page Down` flip calendar pages.
+    the focus back when they close. `Page Up` and `Page Down` flip calendar pages and move a
+    focused day, month or year along (the same day of the next month, the same month of the
+    next year, ten years on), like WinUI's `CalendarView`.
   - With the menu or a context menu open, the calculator's keys do nothing, as in Windows.
 - **Differences:** the tab order follows the drawing order rather than Windows' `TabIndex`
   values (the memory row comes before the docked panel). Context menus open only with the mouse.
