@@ -8,6 +8,8 @@ mod engine;
 mod graphing;
 mod icon;
 mod locale;
+#[cfg(test)]
+mod monkey;
 
 use eframe::egui;
 
