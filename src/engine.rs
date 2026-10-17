@@ -1803,8 +1803,10 @@ impl Calculator {
             return;
         }
         self.begin(Command::MemoryRecall);
-        self.current = value;
+        // A finished function is logged with the number it showed: Windows' `IDC_RECALL`
+        // logs `m_numberString`, which the recalled value replaces only in `DisplayNum`.
         self.check_and_add_last_bin_op_to_history(true);
+        self.current = value;
         self.display_num();
     }
 
@@ -2696,6 +2698,36 @@ mod tests {
         press(&mut calc, "4");
         calc.execute(Command::MemorySubtract);
         assert_eq!(format_number(&calc.memory()[0]), "-4");
+    }
+
+    #[test]
+    fn memory_recall_logs_the_function_with_its_result() {
+        // MR after a finished function logs the function with the number it showed, not
+        // the one recalled: `√(4)` gives 2, though the memory has 7.
+        let mut calc = Calculator::default();
+        press(&mut calc, "7");
+        calc.execute(Command::MemoryStore);
+        press(&mut calc, "c4r");
+        calc.execute(Command::MemoryRecall);
+        assert_eq!(calc.display(), "7");
+        assert_eq!(history(&calc)[0], ("√(4)".to_string(), "2".to_string()));
+        assert_eq!(calc.history()[0].text, "2");
+        // The same for a memory item clicked after `±`.
+        press(&mut calc, "c5=n");
+        calc.memory_recall_item(0);
+        assert_eq!(
+            history(&calc)[0],
+            ("negate(5)".to_string(), "-5".to_string())
+        );
+        // And for MR after a closing parenthesis; recalling the entry gives its result.
+        let mut calc = Calculator::with_precedence();
+        press(&mut calc, "7");
+        calc.execute(Command::MemoryStore);
+        press(&mut calc, "c(2+3)");
+        calc.execute(Command::MemoryRecall);
+        assert_eq!(history(&calc)[0], ("(2 + 3)".to_string(), "5".to_string()));
+        calc.recall_history(0);
+        assert_eq!(calc.display(), "5");
     }
 
     #[test]

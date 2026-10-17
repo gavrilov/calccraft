@@ -447,6 +447,7 @@ FeedbackButton.Content=Siųsti atsiliepimą
 60=60-as
 61=61-as
 62=62-as
+63=63-ias
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

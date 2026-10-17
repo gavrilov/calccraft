@@ -875,7 +875,7 @@ pub fn sinh(x: &Number) -> Result<Number, CalcError> {
 
 fn sinh_float(x: &Number) -> Result<Float, CalcError> {
     let v = x.to_f64().unwrap_or(f64::NEG_INFINITY);
-    if v < -MAX_EXP / 10.0 || v > MAX_EXP {
+    if !(-MAX_EXP / 10.0..=MAX_EXP).contains(&v) {
         return Err(CalcError::InvalidInput);
     }
     let p = PREC + 16 + extra_bits(x);
@@ -910,7 +910,7 @@ fn cosh_float(x: &Number) -> Result<Float, CalcError> {
 /// tanh x (`tanhrat`: sinh x / cosh x, with both their limits).
 pub fn tanh(x: &Number) -> Result<Number, CalcError> {
     let v = x.to_f64().unwrap_or(f64::NEG_INFINITY);
-    if v < -MAX_EXP / 10.0 || v > MAX_EXP {
+    if !(-MAX_EXP / 10.0..=MAX_EXP).contains(&v) {
         return Err(CalcError::InvalidInput);
     }
     let p = PREC + 16 + extra_bits(x);

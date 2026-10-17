@@ -447,6 +447,7 @@ FeedbackButton.Content=Enviar comentários
 60=60.º
 61=61.º
 62=62.º
+63=63.º
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

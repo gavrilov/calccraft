@@ -382,6 +382,20 @@ mod tests {
     }
 
     #[test]
+    fn every_bit_has_an_ordinal() {
+        // The bit toggling keypad names bits 1 to 63 by their ordinals ("63rd bit") unless one
+        // is the word's highest bit, so a DWORD, WORD or BYTE needs "63" too.
+        for (language, text) in LOCALES {
+            let table = parse(text);
+            for bit in 1..=63 {
+                let key = bit.to_string();
+                assert!(table.contains_key(key.as_str()), "{language} has no {key}");
+            }
+        }
+        assert_eq!(load(ENGLISH).get("63"), "63rd");
+    }
+
+    #[test]
     fn languages_match_like_windows() {
         assert_eq!(match_language("de-DE"), Some("de-DE"));
         assert_eq!(match_language("de-AT"), Some("de-DE"));

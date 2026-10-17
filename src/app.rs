@@ -85,6 +85,9 @@ const REPOSITORY_URL: &str = "https://github.com/gavrilov/calccraft";
 const FEEDBACK_URL: &str = "https://github.com/gavrilov/calccraft/issues";
 /// Storage key and values of the theme choice, the same as Windows uses.
 const THEME_KEY: &str = "SelectedAppTheme";
+/// Storage key of the mode the app was closed in, the same as Windows uses
+/// (`ApplicationViewModel.Mode`); the value is `Mode::serialization_id`.
+const MODE_KEY: &str = "Mode";
 /// Storage key of the last converter and its units, the same as Windows uses.
 const CONVERTER_KEY: &str = "UnitConverterPreferences";
 /// Storage keys of the Language and Regional format choices, which Windows doesn't have:
@@ -310,6 +313,42 @@ impl Mode {
     fn has_history(self) -> bool {
         matches!(self, Mode::Standard | Mode::Scientific)
     }
+
+    /// Windows' id of the mode, `NavCategory`'s `SerializationId`: Windows saves it as its
+    /// `Mode` setting to open in that mode next time. The ids never change; 16 is the
+    /// Currency converter, which CalcCraft doesn't have.
+    fn serialization_id(self) -> i32 {
+        match self {
+            Mode::Standard => 0,
+            Mode::Scientific => 1,
+            Mode::Programmer => 2,
+            Mode::DateCalculation => 3,
+            Mode::Converter(category) => match category {
+                Category::Volume => 4,
+                Category::Length => 5,
+                Category::Weight => 6,
+                Category::Temperature => 7,
+                Category::Energy => 8,
+                Category::Area => 9,
+                Category::Speed => 10,
+                Category::Time => 11,
+                Category::Power => 12,
+                Category::Data => 13,
+                Category::Pressure => 14,
+                Category::Angle => 15,
+            },
+            Mode::Graphing => 17,
+        }
+    }
+
+    /// The mode with that `serialization_id`, if CalcCraft has it
+    /// (`NavCategoryStates.Deserialize`).
+    fn from_serialization_id(id: i32) -> Option<Mode> {
+        Mode::CALCULATORS
+            .into_iter()
+            .chain(Category::ALL.map(Mode::Converter))
+            .find(|mode| mode.serialization_id() == id)
+    }
 }
 
 /// What fills the window: the calculator or, as in Windows, the Settings page instead.
@@ -472,10 +511,16 @@ impl CalculatorApp {
             .storage
             .and_then(|s| s.get_string(graphing_view::THEME_KEY))
             .is_some_and(|v| v == "true");
+        let mode = cc
+            .storage
+            .and_then(|s| s.get_string(MODE_KEY))
+            .and_then(|id| id.parse().ok())
+            .and_then(Mode::from_serialization_id)
+            .unwrap_or(Mode::Standard);
         // Ctrl with plus, minus and 0 zoom the graph, not the whole window, and Windows
         // Calculator has no such zoom elsewhere either.
         cc.egui_ctx.options_mut(|o| o.zoom_with_keyboard = false);
-        Self {
+        let mut app = Self {
             mode: Mode::Standard,
             calc: Calculator::default(),
             scientific: scientific_view::ScientificState::new(),
@@ -508,7 +553,12 @@ impl CalculatorApp {
             all_scripts: false,
             settings_popup: None,
             type_ahead: (String::new(), 0.0),
-        }
+        };
+        // Like Windows (`MainPage.OnNavigatedTo`), open the mode the app was closed in, the
+        // way the menu switches to it: a calculator's engine takes the memory and becomes
+        // the one `engine()` returns.
+        app.set_mode(mode);
+        app
     }
 
     /// Whether a popup covers the page: the navigation menu, a context menu, or a
@@ -704,7 +754,8 @@ impl CalculatorApp {
             || self.context_menu.is_some()
             || self.programmer.popup_open()
             || self.scientific.popup_open();
-        let events = ctx.input(|i| i.events.clone());
+        let mut events = ctx.input(|i| i.events.clone());
+        remove_alt_gr_keys(&mut events, ctx.input(|i| i.key_down(Key::AltRight)));
         let now = ctx.input(|i| i.time);
         for event in events {
             match event {
@@ -1123,7 +1174,7 @@ impl CalculatorApp {
     // ------------------------------------------------------------ memory row
 
     /// The memory row, with its buttons disabled when `all_enabled` is false (while a
-    /// Scientific flyout covers the keys, Windows' `EnableMemoryControls(false)`).
+    /// flyout covers the keys, Windows' `EnableMemoryControls(false)`).
     fn draw_memory_row(&mut self, ui: &Ui, rect: Rect, now: f64, all_enabled: bool) {
         let buttons = [
             ("MC", Command::MemoryClear),
@@ -2504,6 +2555,8 @@ struct ContextMenu {
 impl eframe::App for CalculatorApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string(THEME_KEY, self.theme.key().to_owned());
+        // On the Settings page, the mode under it: Settings is a page, not a mode.
+        storage.set_string(MODE_KEY, self.mode.serialization_id().to_string());
         storage.set_string(CONVERTER_KEY, self.converter.converter.preferences());
         for (key, choice) in [
             (LANGUAGE_KEY, &self.language_choice),
@@ -2614,7 +2667,13 @@ impl CalculatorApp {
 
         if matches!(self.mode, Mode::Programmer | Mode::Scientific) {
             let header = Rect::from_min_size(main.min, vec2(main.width(), HEADER_HEIGHT));
-            self.draw_header(ui, header);
+            // The flyouts lie over the header too (see `draw_programmer` and
+            // `draw_scientific`).
+            if matches!(self.flyout, Flyout::History | Flyout::Memory) {
+                access::draw_covered(ui, || self.draw_header(ui, header));
+            } else {
+                self.draw_header(ui, header);
+            }
             let below = main.with_min_y(header.bottom());
             if self.mode == Mode::Programmer {
                 self.draw_programmer(ui, below, now);
@@ -2652,12 +2711,26 @@ impl CalculatorApp {
             main.max - vec2(MARGIN, MARGIN),
         );
 
-        self.draw_header(ui, header);
+        // An open history or memory flyout lies over the whole window, header included
+        // (Windows' `Placement="Full"`), so the controls under it stay in view, out of reach.
+        if matches!(self.flyout, Flyout::History | Flyout::Memory) {
+            access::draw_covered(ui, || self.draw_header(ui, header));
+        } else {
+            self.draw_header(ui, header);
+        }
         self.draw_display(ui, display);
         match self.flyout {
             Flyout::History | Flyout::Memory => {
+                // Windows makes the list as tall as the keys (`RowHeight =
+                // NumpadPanel.ActualHeight`): the memory row stays in view too, its buttons
+                // disabled (`EnableControls(false)`), and a click anywhere above the list
+                // closes it (`OnHistoryFlyOutTapped`).
+                if !self.compact {
+                    access::draw_covered(ui, || self.draw_memory_row(ui, memory_row, now, false));
+                }
+                let above = main.with_max_y(memory_row.bottom());
                 if ui
-                    .interact(display, Id::new("display"), Sense::CLICK)
+                    .interact(above, Id::new("display"), Sense::CLICK)
                     .clicked()
                 {
                     self.flyout = Flyout::None;
@@ -2667,7 +2740,7 @@ impl CalculatorApp {
                 } else {
                     Panel::Memory
                 };
-                self.draw_flyout(ui, below.with_min_y(display.bottom()), panel);
+                self.draw_flyout(ui, below.with_min_y(memory_row.bottom()), panel);
             }
             Flyout::None | Flyout::Navigation => {
                 if dock.is_none() {
@@ -2929,7 +3002,7 @@ fn repaint_for_flash<C>(ctx: &Context, flash: &mut Option<(C, f64)>, now: f64) {
 
 /// Removes the mode shortcuts (`Alt` + digit, `Ctrl+E`) from `events` and returns the
 /// mode the first one opens. `Ctrl+Alt` is `AltGr`, which types characters, so it's left
-/// alone. Text that comes with any `Alt` chord goes too.
+/// alone. Text that comes with any `Alt` chord goes too, but on a Mac only the mode keys'.
 fn take_mode_shortcut(events: &mut Vec<Event>) -> Option<Mode> {
     let mut chosen = None;
     let mut consumed = false;
@@ -2941,9 +3014,11 @@ fn take_mode_shortcut(events: &mut Vec<Event>) -> Option<Mode> {
             ..
         } if modifiers.alt && !modifiers.ctrl => {
             // In Windows an Alt chord is a system key and types nothing, but egui-winit
-            // still sends the key's text along.
-            consumed |= *pressed;
-            match Mode::for_alt_key(*key) {
+            // still sends the key's text along. A Mac's Option key types characters (`@` is
+            // Option+L on a German keyboard), so there only the mode keys type nothing.
+            let mode = Mode::for_alt_key(*key);
+            consumed |= *pressed && (mode.is_some() || !cfg!(target_os = "macos"));
+            match mode {
                 Some(mode) => {
                     chosen = chosen.or(pressed.then_some(mode));
                     false
@@ -2964,6 +3039,88 @@ fn take_mode_shortcut(events: &mut Vec<Event>) -> Option<Mode> {
         _ => true,
     });
     chosen
+}
+
+/// Removes the key events of letter keys pressed with `AltGr`, so that only the character it
+/// typed runs its shortcut: `AltGr+Q` types `@` on a German keyboard, which is √x, and the Q
+/// key's x² mustn't run too. Windows sees `AltGr` as `Ctrl+Alt`, which has no key shortcuts
+/// (`GetCurrentKeyDictionary`), but winit reports these keys without modifiers. (`Ctrl+Alt`
+/// typed with the left keys arrives with both modifiers, and goes to `handle_key`.)
+///
+/// `AltGr` is the right `Alt` key, whose presses and releases come in order with the other
+/// keys, so a key pressed before it in the same frame stays; `alt_gr` is whether it's down
+/// after the frame's events (egui's `key_down`). A letter key that typed only other characters
+/// than its letter counts as pressed with `AltGr` too, for where that isn't the right `Alt`
+/// key: `@`, `µ`, `€`. Its letter with diacritics is still its letter, so a dead key's letter
+/// keeps its key (`´` then E types `é`, which Windows sees as `VK_E`, and `´` then Q, which
+/// can't combine, types `´q`), and so does a letter of another script (a Russian keyboard types
+/// `й` on the Q key, `VK_Q` in Windows).
+fn remove_alt_gr_keys(events: &mut Vec<Event>, alt_gr: bool) {
+    // Whether AltGr is down before the frame's first event: the opposite of its first change
+    // in the frame (a press that repeats is no change), or how it ends the frame.
+    let mut held = events
+        .iter()
+        .find_map(|event| match event {
+            Event::Key {
+                key: Key::AltRight,
+                pressed,
+                repeat,
+                ..
+            } => Some(!pressed || *repeat),
+            _ => None,
+        })
+        .unwrap_or(alt_gr);
+    let mut i = 0;
+    while i < events.len() {
+        let with_alt_gr = match &events[i] {
+            Event::Key {
+                key: Key::AltRight,
+                pressed,
+                ..
+            } => {
+                held = *pressed;
+                false
+            }
+            // egui lets go of every key then.
+            Event::WindowFocused(false) => {
+                held = false;
+                false
+            }
+            Event::Key {
+                key, pressed: true, ..
+            } => key_letter(*key).is_some_and(|letter| {
+                let other = |c: char| {
+                    !base_letter(c).to_uppercase().eq([letter]) && !is_non_latin_letter(c)
+                };
+                // The text a key typed comes right after it.
+                let typed_other = match events.get(i + 1) {
+                    Some(Event::Text(text)) => !text.is_empty() && text.chars().all(other),
+                    _ => false,
+                };
+                held || typed_other
+            }),
+            _ => false,
+        };
+        if with_alt_gr {
+            events.remove(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+/// The letter that a letter of Latin-1 or Latin Extended-A is written with, without its
+/// diacritics (`é` is `e`, `Ś` `S`: their canonical decompositions), or `c` itself.
+fn base_letter(c: char) -> char {
+    // From U+00C0 and from U+0100 on, a space where a letter has no decomposition (`ß`, `ł`).
+    const LATIN_1: &[u8; 64] = b"AAAAAA CEEEEIIII NOOOOO  UUUUY  aaaaaa ceeeeiiii nooooo  uuuuy y";
+    const EXTENDED_A: &[u8; 128] = b"AaAaAaCcCcCcCcDd  EeEeEeEeEeGgGgGgGgHh  IiIiIiIiI   JjKk LlLlLl    NnNnNn   OoOoOo  RrRrRrSsSsSsSsTtTt  UuUuUuUuUuUuWwYyYZzZzZz ";
+    let base = match u32::from(c) {
+        code @ 0xC0..=0xFF => LATIN_1[code as usize - 0xC0],
+        code @ 0x100..=0x17F => EXTENDED_A[code as usize - 0x100],
+        _ => b' ',
+    };
+    if base == b' ' { c } else { char::from(base) }
 }
 
 /// The keypad's keys and the memory row are Windows' `CalculatorButton`s, which ignore
@@ -3087,6 +3244,22 @@ fn char_command(c: char) -> Option<Command> {
         'q' | 'Q' => Command::Function(Func::Square),
         _ => return None,
     })
+}
+
+/// The letter of a letter key (`Key::R` is `R`).
+fn key_letter(key: Key) -> Option<char> {
+    let mut name = key.name().chars();
+    match (name.next(), name.next()) {
+        (Some(letter @ 'A'..='Z'), None) => Some(letter),
+        _ => None,
+    }
+}
+
+/// Whether `c` is a letter of another script than Latin (Cyrillic, Greek, Hebrew, …).
+fn is_non_latin_letter(c: char) -> bool {
+    // The Latin letters are in the blocks before Greek (Basic Latin to the combining
+    // accents) and in Latin Extended Additional.
+    c.is_alphabetic() && !matches!(c, '\0'..='\u{36F}' | '\u{1E00}'..='\u{1EFF}')
 }
 
 /// The script fonts that the interface language and the regional format need, the
@@ -3284,10 +3457,10 @@ mod tests {
         assert_eq!(take_mode_shortcut(&mut events), Some(Mode::Graphing));
         assert!(events.is_empty());
 
-        // Alt+6 is no mode, and types nothing either.
+        // Alt+6 is no mode, and types nothing either (Option+6 types on a Mac).
         let mut events = vec![key(Key::Num6, Modifiers::ALT), Event::Text("6".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.len(), if cfg!(target_os = "macos") { 2 } else { 1 });
         assert!(matches!(events[0], Event::Key { .. }));
     }
 
@@ -3305,5 +3478,502 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn option_chords_type_on_a_mac() {
+        // Option types characters on a Mac: Option+L is `@` (√x) and Option+5 `[` (⌊x⌋) on a
+        // German keyboard, where egui reports the latter as the `[` key. In Windows an Alt
+        // chord types nothing.
+        for (pressed, text) in [(Key::L, "@"), (Key::OpenBracket, "[")] {
+            let mut events = vec![key(pressed, Modifiers::ALT), Event::Text(text.into())];
+            assert_eq!(take_mode_shortcut(&mut events), None);
+            let typed = events.contains(&Event::Text(text.into()));
+            assert_eq!(typed, cfg!(target_os = "macos"), "{pressed:?} {text}");
+        }
+        // The mode keys never type: Option+1 is `¡` on a US Mac keyboard.
+        let mut events = vec![key(Key::Num1, Modifiers::ALT), Event::Text("¡".into())];
+        assert_eq!(take_mode_shortcut(&mut events), Some(Mode::Standard));
+        assert!(events.is_empty());
+    }
+
+    /// What eframe saves in `app.ron`, in memory.
+    #[derive(Default)]
+    struct MemoryStorage(std::collections::BTreeMap<String, String>);
+
+    impl eframe::Storage for MemoryStorage {
+        fn get_string(&self, key: &str) -> Option<String> {
+            self.0.get(key).cloned()
+        }
+
+        fn set_string(&mut self, key: &str, value: String) {
+            self.0.insert(key.to_owned(), value);
+        }
+
+        fn remove_string(&mut self, key: &str) {
+            self.0.remove(key);
+        }
+
+        fn flush(&mut self) {}
+    }
+
+    /// The app as eframe starts it in `ctx`. In English, which other tests expect of `tr`,
+    /// whatever the Windows display language.
+    fn start_in(ctx: &Context) -> CalculatorApp {
+        let mut storage = MemoryStorage::default();
+        storage.0.insert(LANGUAGE_KEY.into(), "en-US".into());
+        let mut cc = eframe::CreationContext::_new_kittest(ctx.clone());
+        cc.storage = Some(&storage);
+        CalculatorApp::new(&cc)
+    }
+
+    /// Runs a frame of `app` in a window of `size` with `events`, as eframe does.
+    fn run(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, events: Vec<Event>) {
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            events,
+            ..Default::default()
+        };
+        let mut frame = eframe::Frame::_new_kittest();
+        let mut output = ctx.run_ui(input, |ui| eframe::App::ui(app, ui, &mut frame));
+        // There's no renderer to take the textures.
+        output.textures_delta.clear();
+    }
+
+    /// Clicks at `pos`: the pointer moves there, presses and releases, a frame each.
+    fn click(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, pos: Pos2) {
+        let button = |pressed| Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        for event in [Event::PointerMoved(pos), button(true), button(false)] {
+            run(ctx, app, size, vec![event]);
+        }
+    }
+
+    /// A screen reader's click on the control `id`, as Narrator sends it (AccessKit's
+    /// `Click` action), which egui takes for a real click.
+    fn screen_reader_click(id: Id) -> Event {
+        Event::AccessKitActionRequest(egui::accesskit::ActionRequest {
+            action: egui::accesskit::Action::Click,
+            target_node: id.accesskit_id(),
+            target_tree: egui::accesskit::TreeId::ROOT,
+            data: None,
+        })
+    }
+
+    #[test]
+    fn flyouts_cover_only_the_keys() {
+        for mode in [Mode::Standard, Mode::Programmer] {
+            // MS, and the Programmer mode's radix list (its BIN row).
+            let ms = match mode {
+                Mode::Programmer => programmer_view::memory_store_id(),
+                _ => Id::new("memory").with(4),
+            };
+            let mut ids = vec![ms];
+            if mode == Mode::Programmer {
+                ids.push(Id::new("radix").with(3));
+            }
+            let ctx = Context::default();
+            let mut app = start_in(&ctx);
+            app.set_mode(mode);
+            app.engine_mut().execute(Command::MemoryStore);
+            // The smallest window, Windows' 320 × 500.
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let rect = |id| ctx.read_response(id).map(|response| response.rect);
+            let rows: Vec<_> = ids.into_iter().map(|id| (id, rect(id).unwrap())).collect();
+            app.flyout = Flyout::Memory;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let flyout = rect(Id::new("flyout")).unwrap();
+            for (id, row) in rows {
+                assert!(
+                    row.bottom() <= flyout.top(),
+                    "{mode:?}: the flyout from y = {} covers {row:?}",
+                    flyout.top()
+                );
+                // Still drawn, out of the Tab order under the flyout.
+                let covered = ctx.read_response(id.with("covered"));
+                assert_eq!(covered.as_ref().map(|r| r.rect), Some(row), "{mode:?}");
+                // MS is disabled, like the keys (`EnableControls(false)`).
+                if id == ms {
+                    assert!(!covered.unwrap().sense.senses_click(), "{mode:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn flyouts_lie_over_the_header() {
+        // The header's buttons: the menu, and in the Standard mode keep on top and history.
+        let standard = ["menu", "keep-on-top", "history"];
+        let cases = [
+            (Mode::Standard, Flyout::History, &standard[..]),
+            (Mode::Standard, Flyout::Memory, &standard[..]),
+            (Mode::Programmer, Flyout::Memory, &standard[..1]),
+        ];
+        for (mode, flyout, buttons) in cases {
+            // With a calculation in the history (not in the Programmer mode) and in memory.
+            let start = |ctx: &Context| {
+                let mut app = start_in(ctx);
+                app.set_mode(mode);
+                for command in [
+                    Command::Digit(2),
+                    Command::Operator(Op::Add),
+                    Command::Digit(3),
+                    Command::Equals,
+                    Command::MemoryStore,
+                ] {
+                    app.engine_mut().execute(command);
+                }
+                run(ctx, &mut app, MIN_SIZE, vec![]);
+                app
+            };
+            // A click on a header button only closes the flyout (`OnHistoryFlyOutTapped`).
+            for name in buttons {
+                let ctx = Context::default();
+                let mut app = start(&ctx);
+                let button = ctx.read_response(Id::new(name)).unwrap().rect;
+                app.flyout = flyout;
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                click(&ctx, &mut app, MIN_SIZE, button.center());
+                assert!(
+                    app.flyout == Flyout::None && !app.compact,
+                    "{mode:?}: a click on {name} did more than close the flyout"
+                );
+            }
+            // Tab only reaches the list.
+            let ctx = Context::default();
+            let mut app = start(&ctx);
+            app.flyout = flyout;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let list = ctx.read_response(Id::new("flyout")).unwrap().rect;
+            let tab = key(Key::Tab, Modifiers::NONE);
+            for _ in 0..6 {
+                run(&ctx, &mut app, MIN_SIZE, vec![tab.clone()]);
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                let focused = access::focused(&ctx).unwrap();
+                let rect = ctx.read_response(focused).unwrap().rect;
+                assert!(
+                    rect.top() >= list.top(),
+                    "{mode:?}: Tab reached {focused:?}"
+                );
+            }
+        }
+
+        // Docked there's no flyout, and none opens in keep-on-top mode: the header works.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        let docked = vec2(DOCK_WIDTH, 600.0);
+        app.flyout = Flyout::Memory;
+        run(&ctx, &mut app, docked, vec![]);
+        let menu = ctx.read_response(Id::new("menu")).unwrap().rect;
+        click(&ctx, &mut app, docked, menu.center());
+        assert!(app.flyout == Flyout::Navigation);
+        app.set_compact(&ctx, true);
+        run(&ctx, &mut app, COMPACT_SIZE, vec![]);
+        let full = ctx.read_response(Id::new("full")).unwrap().rect;
+        click(&ctx, &mut app, COMPACT_SIZE, full.center());
+        assert!(!app.compact);
+    }
+
+    #[test]
+    fn covered_controls_ignore_screen_reader_clicks() {
+        // What the flyouts lie over: the header and the memory row, and in the Programmer
+        // mode the radix list and the row under it.
+        let standard = [
+            ("menu", Id::new("menu")),
+            ("keep on top", Id::new("keep-on-top")),
+            ("History", Id::new("history")),
+            ("MS", Id::new("memory").with(4)),
+            ("M˅", Id::new("memory-list")),
+        ];
+        let programmer = [
+            ("menu", Id::new("menu")),
+            ("HEX", Id::new("radix").with(0)),
+            (
+                "bit toggling keypad",
+                Id::new("programmer-keypad-switch").with(1),
+            ),
+            ("word size", Id::new("programmer-word-size")),
+            ("MS", programmer_view::memory_store_id()),
+            ("M˅", Id::new("memory-list")),
+        ];
+        let cases = [
+            (Mode::Standard, Flyout::History, &standard[..]),
+            (Mode::Standard, Flyout::Memory, &standard[..]),
+            (Mode::Programmer, Flyout::Memory, &programmer[..]),
+        ];
+        for (mode, flyout, controls) in cases {
+            let ctx = Context::default();
+            let mut app = start_in(&ctx);
+            app.set_mode(mode);
+            app.engine_mut().execute(Command::MemoryStore);
+            app.flyout = flyout;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            // Nothing may change: egui takes AccessKit's `Click` for a real click, so the
+            // controls must not sense clicks at all.
+            let state = |app: &CalculatorApp| {
+                let calc = app.engine();
+                let programmer = (app.programmer.bit_flip, calc.radix(), calc.word_size());
+                (app.flyout, app.compact, programmer, calc.memory().len())
+            };
+            let before = state(&app);
+            for &(name, id) in controls {
+                let covered = id.with("covered");
+                run(&ctx, &mut app, MIN_SIZE, vec![screen_reader_click(covered)]);
+                assert!(
+                    state(&app) == before,
+                    "{mode:?}: a screen reader's click on {name} went through"
+                );
+                let response = ctx.read_response(covered).unwrap();
+                assert!(!response.sense.senses_click(), "{mode:?}: {name}");
+            }
+        }
+    }
+
+    /// The app as eframe starts it, with what `storage` holds.
+    fn start(storage: &MemoryStorage) -> CalculatorApp {
+        let mut cc = eframe::CreationContext::_new_kittest(Context::default());
+        cc.storage = Some(storage);
+        CalculatorApp::new(&cc)
+    }
+
+    #[test]
+    fn opens_in_the_mode_it_was_closed_in() {
+        // In English, which other tests expect of `tr`, whatever the Windows display language.
+        let mut storage = MemoryStorage::default();
+        storage.0.insert(LANGUAGE_KEY.into(), "en-US".into());
+        let mut app = start(&storage);
+        for mode in Mode::CALCULATORS
+            .into_iter()
+            .chain(Category::ALL.map(Mode::Converter))
+        {
+            app.set_mode(mode);
+            // Settings is a page over the mode, not a mode.
+            app.page = Page::Settings;
+            eframe::App::save(&mut app, &mut storage);
+            let reopened = start(&storage);
+            assert_eq!(reopened.mode, mode);
+            assert!(reopened.page == Page::Calculator);
+            // The mode's own engine is the one with the memory, as after picking it in the menu.
+            let engine = match mode {
+                Mode::Scientific => &reopened.scientific.calc,
+                Mode::Programmer => &reopened.programmer.calc,
+                _ => &reopened.calc,
+            };
+            assert!(std::ptr::eq(reopened.engine(), engine), "{mode:?}");
+        }
+    }
+
+    #[test]
+    fn modes_are_saved_with_windows_ids() {
+        // `NavCategory`'s `SerializationId`s.
+        let ids = [
+            (Mode::Standard, 0),
+            (Mode::Scientific, 1),
+            (Mode::Programmer, 2),
+            (Mode::DateCalculation, 3),
+            (Mode::Converter(Category::Volume), 4),
+            (Mode::Converter(Category::Length), 5),
+            (Mode::Converter(Category::Weight), 6),
+            (Mode::Converter(Category::Temperature), 7),
+            (Mode::Converter(Category::Energy), 8),
+            (Mode::Converter(Category::Area), 9),
+            (Mode::Converter(Category::Speed), 10),
+            (Mode::Converter(Category::Time), 11),
+            (Mode::Converter(Category::Power), 12),
+            (Mode::Converter(Category::Data), 13),
+            (Mode::Converter(Category::Pressure), 14),
+            (Mode::Converter(Category::Angle), 15),
+            (Mode::Graphing, 17),
+        ];
+        for (mode, id) in ids {
+            assert_eq!(mode.serialization_id(), id, "{mode:?}");
+            assert_eq!(Mode::from_serialization_id(id), Some(mode));
+        }
+        // Currency, and ids no version of Windows has: the app opens in Standard.
+        for id in [16, -1, 18] {
+            assert_eq!(Mode::from_serialization_id(id), None);
+        }
+    }
+
+    /// Whether a key's event stays a key press, with the text it typed after it, and `AltGr`
+    /// held since an earlier frame or not.
+    fn stays_key(pressed: Key, text: &str, alt_gr: bool) -> bool {
+        let mut events = vec![key(pressed, Modifiers::NONE), Event::Text(text.into())];
+        remove_alt_gr_keys(&mut events, alt_gr);
+        assert_eq!(
+            events.last(),
+            Some(&Event::Text(text.into())),
+            "the text stays"
+        );
+        events.len() == 2
+    }
+
+    #[test]
+    fn alt_gr_characters() {
+        // AltGr+Q types `@` (√x), AltGr+M the micro sign `µ` and AltGr+E `€` on a German
+        // keyboard, and winit reports these keys without modifiers. Windows has no key
+        // shortcuts with AltGr, which it sees as Ctrl+Alt.
+        assert!(!stays_key(Key::Q, "@", false));
+        assert!(!stays_key(Key::M, "µ", false));
+        assert!(!stays_key(Key::E, "€", false));
+        // The key's letter in either case, and a letter of another script, which Windows'
+        // shortcuts see as the key's letter (a Russian keyboard types `й` on the Q key, `VK_Q`).
+        assert!(stays_key(Key::Q, "q", false));
+        assert!(stays_key(Key::Q, "Q", false));
+        assert!(stays_key(Key::Q, "й", false));
+        // A Turkish keyboard's I key types `ı`, whose capital is `I`.
+        assert!(stays_key(Key::I, "ı", false));
+        // Only letter keys: Shift+2 types `@` on a US keyboard.
+        assert!(stays_key(Key::Num2, "@", false));
+        // Ctrl+Q types nothing, and stays a key press.
+        let mut events = vec![key(Key::Q, Modifiers::COMMAND)];
+        remove_alt_gr_keys(&mut events, false);
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn dead_keys_and_alt_gr_held() {
+        // A dead key's letter is still the key's: `´` then E types `é` on a French or German
+        // keyboard, which is E (`exp`) in Windows (`VK_E`).
+        assert!(stays_key(Key::E, "é", false));
+        assert!(stays_key(Key::E, "Ê", false));
+        // A dead key that can't combine with the letter types both: `´` then Q types `´q` on a
+        // German keyboard, which is still Q (x²) in Windows (`VK_Q`).
+        assert!(stays_key(Key::Q, "´q", false));
+        // So is a `ś` typed without AltGr held (Polish AltGr+S's, where AltGr isn't the right
+        // Alt key).
+        assert!(stays_key(Key::S, "ś", false));
+        // With AltGr held, no letter key is a shortcut, whatever it typed: AltGr+R types
+        // nothing on a German keyboard, and egui-winit sends `r` then.
+        assert!(!stays_key(Key::S, "ś", true));
+        assert!(!stays_key(Key::R, "r", true));
+        assert!(!stays_key(Key::Q, "@", true));
+        // Other keys stay: AltGr+2 types `²`.
+        assert!(stays_key(Key::Num2, "²", true));
+    }
+
+    #[test]
+    fn alt_gr_in_order() {
+        let alt_gr = |pressed, repeat| Event::Key {
+            key: Key::AltRight,
+            physical_key: Some(Key::AltRight),
+            pressed,
+            repeat,
+            modifiers: Modifiers::NONE,
+        };
+        let q = key(Key::Q, Modifiers::NONE);
+        // A plain Q, then AltGr+Q, in one frame: the right Alt key goes down between them, and
+        // stays down, so only the second Q is AltGr's (4, Q, AltGr+Q is √(sqr(4)) = 4).
+        let mut events = vec![q.clone(), Event::Text("q".into()), alt_gr(true, false)];
+        events.extend([q.clone(), Event::Text("@".into())]);
+        remove_alt_gr_keys(&mut events, true);
+        let kept = [q.clone(), Event::Text("q".into()), alt_gr(true, false)];
+        assert_eq!(events, [&kept[..], &[Event::Text("@".into())]].concat());
+        // AltGr, held since an earlier frame (its press repeats), is let go before an S.
+        let s = key(Key::S, Modifiers::NONE);
+        let mut events = vec![alt_gr(true, true), alt_gr(false, false), s.clone()];
+        events.push(Event::Text("s".into()));
+        remove_alt_gr_keys(&mut events, false);
+        assert!(events.contains(&s));
+        // Held since an earlier frame, without an event in this one: Polish AltGr+S's `ś` is
+        // AltGr's.
+        let mut events = vec![s.clone(), Event::Text("ś".into())];
+        remove_alt_gr_keys(&mut events, true);
+        assert_eq!(events, [Event::Text("ś".into())]);
+    }
+
+    #[test]
+    fn scientific_flyouts_lie_over_the_window() {
+        // The header's menu and History buttons, and the unit, F-E, MS and M˅ buttons above
+        // the list.
+        let controls = [
+            ("menu", Id::new("menu")),
+            ("History", Id::new("history")),
+            ("DEG", Id::new("scientific-angle")),
+            ("F-E", Id::new("scientific-fe")),
+            ("MS", Id::new("memory").with(4)),
+            ("M˅", Id::new("memory-list")),
+        ];
+        for flyout in [Flyout::History, Flyout::Memory] {
+            let label = if flyout == Flyout::History {
+                "history"
+            } else {
+                "memory"
+            };
+            // With a calculation in the history and in memory.
+            let ctx = Context::default();
+            let mut app = start_in(&ctx);
+            app.set_mode(Mode::Scientific);
+            for command in [
+                Command::Digit(2),
+                Command::Operator(Op::Add),
+                Command::Digit(3),
+                Command::Equals,
+                Command::MemoryStore,
+            ] {
+                app.engine_mut().execute(command);
+            }
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let rect = |id| ctx.read_response(id).map(|response| response.rect);
+            let rects: Vec<_> = controls.iter().map(|&(_, id)| rect(id).unwrap()).collect();
+            // Nothing but the flyout changes.
+            let unchanged = |app: &CalculatorApp| {
+                let calc = &app.scientific.calc;
+                calc.angle() == Angle::Degrees && !calc.notation() && calc.memory().len() == 1
+            };
+            // A click anywhere above the list only closes the flyout (`OnHistoryFlyOutTapped`).
+            for (&(name, _), button) in controls.iter().zip(&rects) {
+                app.flyout = flyout;
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                click(&ctx, &mut app, MIN_SIZE, button.center());
+                assert!(
+                    app.flyout == Flyout::None && unchanged(&app),
+                    "{label} flyout: a click on {name} did more than close it"
+                );
+            }
+            app.flyout = flyout;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            // The rows stay in view, out of the Tab order, and nothing there can be clicked,
+            // not even by a screen reader: egui takes AccessKit's `Click` for a real click.
+            for (&(name, id), &before) in controls.iter().zip(&rects) {
+                let covered = id.with("covered");
+                run(&ctx, &mut app, MIN_SIZE, vec![screen_reader_click(covered)]);
+                assert!(
+                    app.flyout == flyout && unchanged(&app),
+                    "{label} flyout: a screen reader's click on {name} went through"
+                );
+                let response = ctx.read_response(covered).unwrap();
+                assert_eq!(response.rect, before, "{label} flyout: {name}");
+                assert!(!response.sense.senses_click(), "{label} flyout: {name}");
+            }
+            // Tab only reaches the list.
+            let list = rect(Id::new("flyout")).unwrap();
+            let tab = key(Key::Tab, Modifiers::NONE);
+            for _ in 0..6 {
+                run(&ctx, &mut app, MIN_SIZE, vec![tab.clone()]);
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                let focused = access::focused(&ctx).unwrap();
+                let rect = ctx.read_response(focused).unwrap().rect;
+                assert!(
+                    rect.top() >= list.top(),
+                    "{label} flyout: Tab reached {focused:?}"
+                );
+            }
+        }
+
+        // Docked there's no flyout, and the header works.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        app.set_mode(Mode::Scientific);
+        let docked = vec2(DOCK_WIDTH, 600.0);
+        app.flyout = Flyout::Memory;
+        run(&ctx, &mut app, docked, vec![]);
+        let menu = ctx.read_response(Id::new("menu")).unwrap().rect;
+        click(&ctx, &mut app, docked, menu.center());
+        assert!(app.flyout == Flyout::Navigation);
     }
 }
