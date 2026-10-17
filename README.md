@@ -290,6 +290,7 @@ The draft is published only when all three are there. Tags with a suffix, such a
 | `src/app/access.rs` | Keyboard focus, focus rectangles and screen reader names for the custom-painted controls |
 | `src/app/strings.rs` | The interface's text in the user's language, from `locales/` |
 | `src/app/region.rs` | The user's regional formats, read from Windows |
+| `src/app/share.rs` | The graphing mode's Windows share sheet: the graph, the equations and the variables as the data it shares |
 | `src/app/palette.rs` | The dark and light color palettes |
 | `src/app/icons.rs` | The icons: code points of the embedded icon font |
 | `src/app/date_view.rs` | User interface of the date calculation mode: date pickers, calendar, drop-down lists |
