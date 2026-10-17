@@ -16,6 +16,9 @@ use crate::engine::{
     BASIC_PASTE_CHARACTERS, clean_paste, extract_operands, group_thousands, operand_matches,
 };
 
+#[cfg(test)]
+mod ms_tables;
+
 /// Longest number that can be typed, the minus sign included (`MAXIMUMDIGITSALLOWED`).
 const MAX_DIGITS: usize = 15;
 /// Results get at least this many significant digits (`OPTIMALDIGITSALLOWED`).
