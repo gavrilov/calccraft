@@ -297,6 +297,11 @@ UI code and is covered by unit tests.*
   - `Ctrl+H` (history), `Ctrl+Shift+D` (clear history)
 - **Acceptance Criteria:**
   - All hotkeys work without focusing a button, and the pressed key's button flashes.
+  - `R` and `Q` work on layouts without Latin letters too (`к` and `й` on a Russian keyboard):
+    Windows' letter shortcuts are virtual keys, which such a layout keeps at the US places. On
+    Windows that includes the Greek Q key, which types `;` (and `Ctrl+Q` there is `M−`). As in
+    Windows, they don't work with `Shift` (Caps Lock is fine) or `Alt`, and a symbol typed with
+    `AltGr` on a letter key stays a symbol (`\` on a Czech keyboard's Q key).
   - While the history or memory flyout is open, the keypad and memory keys do nothing
     (`EnableControls(false)`); `Esc`, `Ctrl+H`, `Ctrl+Shift+D`, copy and paste still work.
   - `Alt` with any other key types nothing.
@@ -631,6 +636,8 @@ mode of `CCalcEngine`, run by `Calculator::programmer()` in `src/engine.rs`), UI
     shortcuts of the four (mostly hidden) word size buttons, each switching to the next size;
     `.` and `\` are NAND and NOR, since the decimal point is disabled; `<` and `>` follow the
     Bit shift menu. The mode's own keys override the Standard ones (`%` is mod here).
+  - `A`–`F` work on layouts without Latin letters too, at the keys' US places (Windows'
+    virtual keys), with `Shift` too: the F key of a Russian keyboard types `а` and is `F`.
 
 #### `FEAT-PROG-008` Programmer Mode UI
 - **Status:** `[x] COMPLETED`

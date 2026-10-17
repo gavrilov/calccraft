@@ -179,7 +179,13 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   named keys and `Ctrl` shortcuts; in the Programmer mode `ProgrammerState::char_command` and
   `key_command` take their place, and in the Scientific mode `ScientificState::char_command`
   and `key_command` (letters arrive as keys there, `Shift`, `Ctrl` or both picking the inverse
-  and hyperbolic functions, so letter text is ignored). The date mode and the converters have their own
+  and hyperbolic functions, so letter text is ignored). On a layout without Latin letters the
+  letter keys type their own script (`к` on the R key of a Russian keyboard), and
+  `latin_letters` turns that text into the key's letter, which Windows' shortcuts see: they're
+  virtual keys. A symbol typed on such a letter key (`;` on the Greek Q key) is its letter only
+  where `layout_letter` can ask Windows (with `Ctrl` too, when egui sends no text) and the key
+  types it without `AltGr` (a Czech keyboard's `AltGr+Q`, `\`, stays). Keys pressed with `Alt`
+  stay as they are, and with `Shift` only the Programmer mode's letters are converted (Windows has `Shift` chords for `A`–`F`, not for `R` and `Q`). The date mode and the converters have their own
   `handle_date_keyboard` and `handle_converter_keyboard`, so calculator keys do nothing there, and
   the Graphing mode `handle_graphing_keyboard` (its text boxes take the typing).
   `handle_mode_keys` (`Alt+1` … `Alt+5`, `Ctrl+E`, from Windows' `NavCategory`) runs first in

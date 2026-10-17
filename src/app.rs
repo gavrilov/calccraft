@@ -704,7 +704,8 @@ impl CalculatorApp {
             || self.context_menu.is_some()
             || self.programmer.popup_open()
             || self.scientific.popup_open();
-        let events = ctx.input(|i| i.events.clone());
+        let mut events = ctx.input(|i| i.events.clone());
+        latin_letters(&mut events, layout_letter, self.mode == Mode::Programmer);
         let now = ctx.input(|i| i.time);
         for event in events {
             match event {
@@ -3089,6 +3090,149 @@ fn char_command(c: char) -> Option<Command> {
     })
 }
 
+/// Gives the letters that a layout without Latin letters types (Russian, Greek, …) the
+/// letter of their key, which is what Windows' letter shortcuts see: they're virtual keys
+/// (`R`, `Q`, `A`–`F`), and the R key of a Russian keyboard is `VK_R` although it types `к`.
+/// egui reports such a key by its place on a US keyboard (`Key::R`), right before its text.
+/// Where such a layout types a symbol on a letter key (`;` on the Greek Q key), egui names the
+/// key after the symbol, and `layout_letter` tells the letter of its virtual key (Windows
+/// only) if the key types the symbol without AltGr: the key becomes that letter's, and so does
+/// its text, if any (there's none while Ctrl is held, and the Greek `Ctrl+Q` is `M−`). Windows
+/// has no letter shortcuts with Alt or AltGr (`Ctrl+Alt`), so a key pressed with Alt stays as
+/// it is, and so does a Czech keyboard's `AltGr+Q` (`\`), which winit reports without
+/// modifiers. With `Shift` only the Programmer mode's letters are shortcuts (`Shift+A` … `F`,
+/// `shift_letters`): Windows has no `Shift` chords for the Standard mode's `R` and `Q`, so a
+/// Russian `Shift+R` (`К`) stays as typed there.
+fn latin_letters(
+    events: &mut [Event],
+    layout_letter: impl Fn(Key, char) -> Option<char>,
+    shift_letters: bool,
+) {
+    for i in 0..events.len() {
+        // The text a key typed comes right after it, and there's none while Ctrl is held.
+        let (keys, rest) = events.split_at_mut(i + 1);
+        let Event::Key {
+            key,
+            physical_key,
+            pressed: true,
+            modifiers,
+            ..
+        } = &mut keys[i]
+        else {
+            continue;
+        };
+        let text = match rest.first_mut() {
+            Some(Event::Text(text)) => Some(text),
+            _ => None,
+        };
+        // Latin letters stay as typed, as any text of a layout with Latin letters does.
+        let latin = text.as_deref().is_some_and(|text| {
+            text.is_empty()
+                || text
+                    .chars()
+                    .any(|c| c.is_alphabetic() && !is_non_latin_letter(c))
+        });
+        if latin || modifiers.alt || (modifiers.shift && !shift_letters) {
+            continue;
+        }
+        let other_script = text
+            .as_deref()
+            .is_some_and(|text| text.chars().all(is_non_latin_letter));
+        let letter = match key_letter(*key) {
+            Some(letter) if other_script => letter,
+            // A symbol typed on a letter key (`@` with AltGr) is the symbol.
+            Some(_) => continue,
+            // The symbol typed, or the key's own while Ctrl is held.
+            None => {
+                let symbol = text.as_deref().map_or(key.symbol_or_name(), String::as_str);
+                let mut chars = symbol.chars();
+                let (Some(physical), Some(typed), None) =
+                    (*physical_key, chars.next(), chars.next())
+                else {
+                    continue;
+                };
+                let Some(letter) = layout_letter(physical, typed) else {
+                    continue;
+                };
+                letter
+            }
+        };
+        if let Some(letter_key) = Key::from_name(&letter.to_string()) {
+            *key = letter_key;
+        }
+        if let Some(text) = text {
+            *text = letter.to_string();
+        }
+    }
+}
+
+/// The letter of the virtual key that the keyboard layout puts at a letter key's place, if
+/// that key types `typed` without AltGr, which is what Windows' letter shortcuts see: a Greek
+/// keyboard's Q key types `;` and is `VK_Q`, a Czech keyboard's Q key types `\` only with
+/// AltGr, and a French keyboard's key at the US M key's place types `,` and is
+/// `VK_OEM_COMMA`. Only Windows tells.
+#[cfg(windows)]
+fn layout_letter(physical: Key, typed: char) -> Option<char> {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        GetKeyboardLayout, MAPVK_VSC_TO_VK, MapVirtualKeyExW, VkKeyScanExW,
+    };
+    let scan_code = us_scan_code(physical)?;
+    let typed = u16::try_from(u32::from(typed)).ok()?;
+    // SAFETY: these only read the keyboard layout of the calling thread, which runs the UI.
+    let (vk, typed) = unsafe {
+        let layout = GetKeyboardLayout(0);
+        (
+            MapVirtualKeyExW(scan_code, MAPVK_VSC_TO_VK, layout),
+            VkKeyScanExW(typed, layout),
+        )
+    };
+    vk_letter(vk, typed)
+}
+
+#[cfg(not(windows))]
+fn layout_letter(_physical: Key, _typed: char) -> Option<char> {
+    None
+}
+
+/// The letter of a letter key's virtual key `vk` (the letters' virtual keys are their ASCII
+/// codes), if `typed` is that key without Ctrl and Alt: `typed` is what `VkKeyScanExW` gives
+/// for the typed character, the virtual key that types it and then the Shift (1), Ctrl (2) and
+/// Alt (4) it takes. AltGr is Ctrl+Alt there.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn vk_letter(vk: u32, typed: i16) -> Option<char> {
+    let [typed_vk, shift_state] = typed.to_le_bytes();
+    if u32::from(typed_vk) != vk || shift_state & 6 != 0 {
+        return None;
+    }
+    char::from_u32(vk).filter(char::is_ascii_uppercase)
+}
+
+/// The scan code (set 1) of a letter key, by its place on a US keyboard.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn us_scan_code(physical: Key) -> Option<u32> {
+    let letter = key_letter(physical)?;
+    // The letter rows of a US keyboard and the scan codes they start at.
+    [(0x10, "QWERTYUIOP"), (0x1E, "ASDFGHJKL"), (0x2C, "ZXCVBNM")]
+        .into_iter()
+        .find_map(|(first, row)| Some(first + row.find(letter)? as u32))
+}
+
+/// The letter of a letter key (`Key::R` is `R`).
+fn key_letter(key: Key) -> Option<char> {
+    let mut name = key.name().chars();
+    match (name.next(), name.next()) {
+        (Some(letter @ 'A'..='Z'), None) => Some(letter),
+        _ => None,
+    }
+}
+
+/// Whether `c` is a letter of another script than Latin (Cyrillic, Greek, Hebrew, …).
+fn is_non_latin_letter(c: char) -> bool {
+    // The Latin letters are in the blocks before Greek (Basic Latin to the combining
+    // accents) and in Latin Extended Additional.
+    c.is_alphabetic() && !matches!(c, '\0'..='\u{36F}' | '\u{1E00}'..='\u{1EFF}')
+}
+
 /// The script fonts that the interface language and the regional format need, the
 /// language's first (its glyphs win for characters that both have, like Chinese and
 /// Japanese ideographs), or all of them.
@@ -3305,5 +3449,175 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    /// The text of a key press, as the calculator reads it.
+    fn text_of(pressed: Key, text: &str) -> String {
+        let mut events = vec![key(pressed, Modifiers::NONE), Event::Text(text.into())];
+        latin_letters(&mut events, |_, _| None, false);
+        match &events[1] {
+            Event::Text(text) => text.clone(),
+            event => panic!("{event:?}"),
+        }
+    }
+
+    #[test]
+    fn letters_of_other_scripts() {
+        // A Russian keyboard types к, й and а on the R, Q and F keys, and a Greek one μ on
+        // the M key. egui reports those keys as R, Q, F and M, and Windows' shortcuts
+        // (virtual keys) see those letters.
+        assert_eq!(text_of(Key::R, "к"), "R");
+        assert_eq!(text_of(Key::Q, "Й"), "Q");
+        assert_eq!(text_of(Key::F, "а"), "F");
+        assert_eq!(text_of(Key::M, "μ"), "M");
+        assert_eq!(char_command('R'), Some(Command::Function(Func::Reciprocal)));
+        assert_eq!(char_command('Q'), Some(Command::Function(Func::Square)));
+        // Latin letters, digits and what AltGr types stay as typed: AltGr+Q types `@` (√x)
+        // and AltGr+M the micro sign `µ` on a German keyboard, AltGr+A `ą` on a Polish one.
+        assert_eq!(text_of(Key::R, "r"), "r");
+        assert_eq!(text_of(Key::Q, "@"), "@");
+        assert_eq!(text_of(Key::A, "ą"), "ą");
+        assert_eq!(text_of(Key::M, "µ"), "µ");
+        assert_eq!(text_of(Key::Num1, "1"), "1");
+        // A Russian letter on another key (ж is on the `;` key) or without its key stays too.
+        assert_eq!(text_of(Key::Semicolon, "ж"), "ж");
+        let mut events = vec![Event::Text("к".into())];
+        latin_letters(&mut events, |_, _| None, false);
+        assert_eq!(events, [Event::Text("к".into())]);
+    }
+
+    /// What Windows tells of a Greek keyboard (`layout_letter`): `VK_Q` at the Q key's place,
+    /// which types `;`, and `:` with Shift (`VkKeyScanExW`).
+    fn greek(physical: Key, typed: char) -> Option<char> {
+        let typed = match typed {
+            ';' => 0x0051,
+            ':' => 0x0151,
+            _ => -1,
+        };
+        vk_letter(if physical == Key::Q { 0x51 } else { 0 }, typed)
+    }
+
+    #[test]
+    fn symbols_on_letter_keys() {
+        let pressed = |key, physical| Event::Key {
+            key,
+            physical_key: Some(physical),
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        };
+        // A Greek keyboard's Q key types `;`, and egui names the key after it, but Windows'
+        // layout has `VK_Q` there (`layout_letter`): the key and its text become Q's.
+        let mut events = vec![pressed(Key::Semicolon, Key::Q), Event::Text(";".into())];
+        latin_letters(&mut events, greek, false);
+        assert_eq!(events, [pressed(Key::Q, Key::Q), Event::Text("Q".into())]);
+        // A French keyboard's `,` key and a Dvorak keyboard's `.` key are at the US M and E
+        // keys' places, but their virtual keys aren't letters: they stay as typed.
+        for (key, physical, text) in [(Key::Comma, Key::M, ","), (Key::Period, Key::E, ".")] {
+            let mut events = vec![pressed(key, physical), Event::Text(text.into())];
+            latin_letters(&mut events, |_, _| None, false);
+            assert_eq!(events, [pressed(key, physical), Event::Text(text.into())]);
+        }
+        // A Czech keyboard's Q key types `\` with AltGr, which egui names, and winit reports
+        // AltGr without modifiers. Windows sees `VK_Q` with Ctrl+Alt: no shortcut, so the key
+        // and its text stay.
+        let czech = |physical: Key, typed: char| {
+            let typed = if typed == '\\' { 0x0651 } else { -1 };
+            vk_letter(if physical == Key::Q { 0x51 } else { 0 }, typed)
+        };
+        let mut events = vec![pressed(Key::Backslash, Key::Q), Event::Text("\\".into())];
+        latin_letters(&mut events, czech, false);
+        let typed = [pressed(Key::Backslash, Key::Q), Event::Text("\\".into())];
+        assert_eq!(events, typed);
+        // The French A key is at the US Q key's place, and egui names it A already.
+        let mut events = vec![pressed(Key::A, Key::Q), Event::Text("a".into())];
+        latin_letters(&mut events, greek, false);
+        assert_eq!(events, [pressed(Key::A, Key::Q), Event::Text("a".into())]);
+        // The letter keys' scan codes, by their places on a US keyboard.
+        assert_eq!(us_scan_code(Key::Q), Some(0x10));
+        assert_eq!(us_scan_code(Key::P), Some(0x19));
+        assert_eq!(us_scan_code(Key::A), Some(0x1E));
+        assert_eq!(us_scan_code(Key::L), Some(0x26));
+        assert_eq!(us_scan_code(Key::Z), Some(0x2C));
+        assert_eq!(us_scan_code(Key::M), Some(0x32));
+        assert_eq!(us_scan_code(Key::Semicolon), None);
+    }
+
+    #[test]
+    fn virtual_key_letters() {
+        // `VkKeyScanExW` gives a character's virtual key, then the Shift (1), Ctrl (2) and Alt
+        // (4) it takes. The Greek `;` and `:` are `VK_Q`'s, without and with Shift: Q.
+        assert_eq!(vk_letter(0x51, 0x0051), Some('Q'));
+        assert_eq!(vk_letter(0x51, 0x0151), Some('Q'));
+        // The Czech `\` is `VK_Q`'s with AltGr (Ctrl+Alt), which has no shortcuts.
+        assert_eq!(vk_letter(0x51, 0x0651), None);
+        // A character of another key (`VK_OEM_102`), or of none.
+        assert_eq!(vk_letter(0x51, 0x00E2), None);
+        assert_eq!(vk_letter(0x51, -1), None);
+        // `VK_OEM_COMMA` (the French `,` at the US M key's place) is no letter.
+        assert_eq!(vk_letter(0xBC, 0x00BC), None);
+    }
+
+    #[test]
+    fn shifted_letters_of_other_scripts() {
+        // Shift+R types `К` on a Russian keyboard. Windows has no Shift chords for the Standard
+        // mode's R and Q, so it stays as typed there, while the Programmer mode's Shift+A to F
+        // are digits.
+        let typed = |pressed, text: &str, programmer| {
+            let mut events = vec![key(pressed, Modifiers::SHIFT), Event::Text(text.into())];
+            latin_letters(&mut events, |_, _| None, programmer);
+            match &events[1] {
+                Event::Text(text) => text.clone(),
+                event => panic!("{event:?}"),
+            }
+        };
+        assert_eq!(typed(Key::R, "К", false), "К");
+        assert_eq!(typed(Key::Q, "Й", false), "Й");
+        assert_eq!(typed(Key::F, "А", true), "F");
+        // Caps Lock types `К` without Shift: R, 1/x.
+        assert_eq!(text_of(Key::R, "К"), "R");
+        // The Greek Shift+Q types `:`, `VK_Q` with Shift in Windows: no shortcut either.
+        let colon = Event::Key {
+            key: Key::Colon,
+            physical_key: Some(Key::Q),
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::SHIFT,
+        };
+        let mut events = vec![colon.clone(), Event::Text(":".into())];
+        latin_letters(&mut events, greek, false);
+        assert_eq!(events, [colon, Event::Text(":".into())]);
+    }
+
+    #[test]
+    fn letter_keys_without_text() {
+        // egui-winit sends no text while Ctrl is held: the Greek Ctrl+Q is `;`'s key alone, and
+        // still `VK_Q` in Windows, which is M−.
+        let ctrl = Modifiers::CTRL | Modifiers::COMMAND;
+        let pressed = |key| Event::Key {
+            key,
+            physical_key: Some(Key::Q),
+            pressed: true,
+            repeat: false,
+            modifiers: ctrl,
+        };
+        let mut events = vec![pressed(Key::Semicolon)];
+        latin_letters(&mut events, greek, false);
+        assert_eq!(events, [pressed(Key::Q)]);
+        // Where the virtual key there isn't a letter, the key stays.
+        let mut events = vec![pressed(Key::Semicolon)];
+        latin_letters(&mut events, |_, _| None, false);
+        assert_eq!(events, [pressed(Key::Semicolon)]);
+        // Windows has no shortcuts with Alt, and left Ctrl+Alt is no Ctrl chord: the key stays.
+        let ctrl_alt = Event::Key {
+            key: Key::Semicolon,
+            physical_key: Some(Key::Q),
+            pressed: true,
+            repeat: false,
+            modifiers: ctrl | Modifiers::ALT,
+        };
+        let mut events = vec![ctrl_alt.clone()];
+        latin_letters(&mut events, greek, false);
+        assert_eq!(events, [ctrl_alt]);
     }
 }
