@@ -1187,6 +1187,12 @@ impl Calculator {
 
     /// One command through the engine (`ProcessCommandWorker`).
     fn process(&mut self, command: Command) {
+        // `→deg` isn't among the commands that finish the typed number in Windows (it joins
+        // the unary operators only later, and `IDC_INV` finishes the number inside it), so
+        // the expression line gets its operand as typed: `30.50 →deg` is `degrees(30.50)`,
+        // while the other functions write the finished number, `sin₀(30.5)`.
+        let typed =
+            (self.record && command == Command::Function(Func::Degrees)).then(|| self.input.text());
         // When `begin` finds the typed number too large (`99.e+9999`), Windows goes on with
         // the command all the same: `99 exp 9999 +` shows `Overflow` and `9.9e+10000 +`.
         self.begin(command);
@@ -1195,7 +1201,7 @@ impl Calculator {
             Command::Decimal => self.point(),
             Command::Operator(op) => self.binary(op),
             Command::Function(Func::Negate) => self.negate(),
-            Command::Function(func) => self.unary(func),
+            Command::Function(func) => self.unary(func, typed),
             Command::Percent => self.percent(),
             Command::Equals => self.equals(),
             Command::Clear => self.clear(),
@@ -1409,13 +1415,18 @@ impl Calculator {
         self.change_op = true;
     }
 
-    fn unary(&mut self, func: Func) {
+    /// `typed` is the number as typed, when the function writes it to the expression line
+    /// that way (`→deg`).
+    fn unary(&mut self, func: Func, typed: Option<String>) {
         // `5 + √` works on the 5 (so `5 + 1/x` isn't a division by zero).
         if matches!(self.last_key, Key::Operator(_)) {
             self.current = self.last.clone();
         }
         if !self.line.operand_added() {
-            self.add_operand();
+            match typed {
+                Some(text) => self.line.add_operand(text, self.current.clone()),
+                None => self.add_operand(),
+            }
         }
         self.line.add_unary_op(&func.name(self.angle));
         self.refresh();
@@ -3295,6 +3306,35 @@ mod tests {
         assert!(calc.history().is_empty());
         press_scientific(&mut calc, "c 4 sqrt 2");
         assert_eq!(calc.history()[0].expression, "√(4)");
+    }
+
+    #[test]
+    fn degrees_write_the_operand_as_it_was_typed() {
+        // Source: microsoft/calculator, CalcManager/CEngine/scicomm.cpp. `IDC_DEGREES` is not in
+        // the list of commands that finish the typed number (line 152), so its operand
+        // reaches `AddOpndToHistory` as `m_numberString`, the text as typed. The same keys on a
+        // build of Microsoft's CalcManager (d125246) give these expression lines.
+        assert_eq!(
+            run_scientific("30.50 todeg"),
+            pair("30.833333333333333333333333333333", "degrees(30.50)")
+        );
+        assert_eq!(run_scientific("30.50 neg todeg").1, "degrees(-30.50)");
+        assert_eq!(
+            run_scientific("5 exp 3 todeg"),
+            pair("5,000", "degrees(5.e+3)")
+        );
+        assert_eq!(run_scientific("3 . todeg").1, "degrees(3.)");
+        assert_eq!(run_scientific(". todeg").1, "degrees(0.)");
+        // F-E changes how finished numbers are written, not the typed text.
+        assert_eq!(run_scientific("fe 20 todeg").1, "degrees(20)");
+        assert_eq!(
+            run_scientific("30.50 todeg + 1 =").1,
+            "degrees(30.50) + 1 ="
+        );
+        // The other functions, and a number that is not being typed, are written finished.
+        assert_eq!(run_scientific("30.50 dms").1, "dms(30.5)");
+        assert_eq!(run_scientific("30.50 sin").1, "sin₀(30.5)");
+        assert_eq!(run_scientific("2 + 3 todeg").1, "2 + degrees(3)");
     }
 
     #[test]
