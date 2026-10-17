@@ -52,6 +52,8 @@ src/app/access.rs        keyboard focus, focus visuals and screen reader names o
 src/app/icons.rs         the icons: code points of the embedded icon font, and a test that it has them
 src/app/strings.rs       the interface's text in the user's language (from locales/)
 src/app/region.rs        the user's regional formats, read from Windows
+src/app/palette.rs       the dark and light color palettes (`DARK`, `LIGHT`)
+src/app/share.rs         the Windows share sheet for the graph (`IDataTransferManagerInterop`)
 src/app/date_view.rs     the date calculation mode's UI (a child module of app.rs)
 src/app/converter_view.rs  the converters' UI (a child module of app.rs)
 src/app/scientific_view.rs  the Scientific mode's UI (a child module of app.rs)

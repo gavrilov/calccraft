@@ -300,7 +300,8 @@ UI code and is covered by unit tests.*
   - While the history or memory flyout is open, the keypad and memory keys do nothing
     (`EnableControls(false)`); `Esc`, `Ctrl+H`, `Ctrl+Shift+D`, copy and paste still work.
   - `Alt` with any other key types nothing.
-  - Buttons never take keyboard focus, so `Enter` always means `=` (see AGENTS.md pitfalls).
+  - Buttons can take the keyboard focus (`FEAT-SHELL-005`), but `Enter` on the keypad stays `=`:
+    `handle_key` consumes it, so the focused key isn't pressed on top of it (see AGENTS.md pitfalls).
 
 #### `FEAT-STD-006` Clipboard Copy and Paste (numbers)
 - **Status:** `[x] COMPLETED`
@@ -1167,7 +1168,7 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
   `src/locale.rs` (`NumberFormat`, `without_weekday`), `src/app/region.rs` (`Formats`), `src/dates.rs` (`Words`)
 - **Description:** Translated strings and regional number and date formats.
 - **Acceptance Criteria:**
-  - The interface uses the Windows Calculator's translations (60 languages, all 442 strings
+  - The interface uses the Windows Calculator's translations (60 languages, all 764 strings
     CalcCraft shows, unit names included) and follows the Windows display languages, matched like
     Windows' resource lookup (`de-AT` → `de-DE`, `es-AR` → `es-MX`, `zh-Hant` → `zh-TW`).
   - Decimal and grouping separators and date formats follow the system region (the user locale,
