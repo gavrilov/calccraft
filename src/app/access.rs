@@ -33,6 +33,32 @@ fn covered(ui: &Ui) -> bool {
         .unwrap_or(false)
 }
 
+/// Where the "under an open flyout" flag lives in egui's temporary data.
+fn under_flyout_id() -> Id {
+    Id::new("access-under-flyout")
+}
+
+fn under_flyout(ui: &Ui) -> bool {
+    ui.ctx()
+        .data(|data| data.get_temp(under_flyout_id()))
+        .unwrap_or(false)
+}
+
+/// Draws the controls that an open history or memory flyout lies over: in view, but out of
+/// the `Tab` order and not clickable, since Windows' flyout covers the whole window
+/// (`Placement="Full"`). Not even a screen reader can click them: egui takes AccessKit's
+/// `Click` action for a real click. The flyout's own overlay takes the pointer's clicks.
+pub(super) fn draw_covered(ui: &Ui, draw: impl FnOnce()) {
+    let ctx = ui.ctx();
+    let covered = covered(ui);
+    let under_flyout = under_flyout(ui);
+    set_covered(ctx, true);
+    ctx.data_mut(|data| data.insert_temp(under_flyout_id(), true));
+    draw();
+    ctx.data_mut(|data| data.insert_temp(under_flyout_id(), under_flyout));
+    set_covered(ctx, covered);
+}
+
 /// Registers a control drawn in `rect`: clickable when enabled, focusable unless a
 /// popup covers it, and described by `info`. Draws the focus visual when it has the
 /// keyboard focus, with corners of `radius`.
@@ -65,7 +91,10 @@ pub(super) fn interact(
     info: impl Fn() -> WidgetInfo,
 ) -> Response {
     let covered = covered(ui);
-    let sense = if covered || sense == Sense::hover() {
+    let sense = if under_flyout(ui) {
+        // Only drawn: no click (AccessKit's `Click` action included) and no focus.
+        Sense::hover()
+    } else if covered || sense == Sense::hover() {
         sense
     } else {
         sense | Sense::FOCUSABLE

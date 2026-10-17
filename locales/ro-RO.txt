@@ -447,6 +447,7 @@ FeedbackButton.Content=Trimiteți feedback
 60=al 60-lea
 61=al 61-lea
 62=al 62-lea
+63=al 63-lea
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

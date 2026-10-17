@@ -447,6 +447,7 @@ FeedbackButton.Content=ግብረመልስ ላክ
 60=60ኛ
 61=61ኛ
 62=62ኛ
+63=63ኛ
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

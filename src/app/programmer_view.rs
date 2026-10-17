@@ -266,13 +266,25 @@ impl CalculatorApp {
         let center_y = result.center().y - result.height() * 0.14;
         self.draw_display_sized(ui, display, expression.bottom() - 15.0, font, center_y);
         if matches!(self.flyout, Flyout::History | Flyout::Memory) {
+            // As in the other modes, the list is as tall as the keys (`RowHeight =
+            // NumpadPanel.ActualHeight`): the radix list and the row under it stay in view,
+            // with `MS` disabled, and a click anywhere above the list (from the top of the
+            // window, header included) closes the flyout.
+            access::draw_covered(ui, || {
+                self.draw_radix_list(ui, radixes);
+                self.draw_programmer_controls(ui, controls, now);
+            });
+            let above = Rect::from_min_max(
+                pos2(area.left(), ui.max_rect().top()),
+                controls.right_bottom(),
+            );
             if ui
-                .interact(display, Id::new("display"), Sense::CLICK)
+                .interact(above, Id::new("display"), Sense::CLICK)
                 .clicked()
             {
                 self.flyout = Flyout::None;
             }
-            self.draw_flyout(ui, area.with_min_y(display.bottom()), Panel::Memory);
+            self.draw_flyout(ui, area.with_min_y(keypad.top()), Panel::Memory);
             return;
         }
         if !self.docked {
@@ -513,7 +525,8 @@ impl CalculatorApp {
             inner.right() - 2.0 * column
         });
         let command = Command::MemoryStore;
-        let enabled = self.programmer.calc.is_enabled(command);
+        // An open flyout disables it, like the memory row's buttons (`EnableMemoryControls`).
+        let enabled = self.programmer.calc.is_enabled(command) && !self.keypad_disabled();
         let flash = self.is_flashing(command, now);
         if self.button_flash(
             ui,

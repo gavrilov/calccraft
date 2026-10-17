@@ -447,6 +447,7 @@ FeedbackButton.Content=Stuur terugvoer
 60=60ste
 61=61ste
 62=62ste
+63=63ste
 UnitAbbreviation_Acre=akker
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm.

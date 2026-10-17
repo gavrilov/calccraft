@@ -447,6 +447,7 @@ FeedbackButton.Content=ಪ್ರತಿಕ್ರಿಯೆ ಕಳುಹಿಸಿ
 60=60 ನೆಯ
 61=61 ನೆಯ
 62=62 ನೆಯ
+63=63 ನೆಯ
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

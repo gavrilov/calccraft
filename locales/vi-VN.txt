@@ -447,6 +447,7 @@ FeedbackButton.Content=Gửi phản hồi
 60=Thứ 60
 61=Thứ 61
 62=Thứ 62
+63=Thứ 63
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

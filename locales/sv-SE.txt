@@ -447,6 +447,7 @@ FeedbackButton.Content=Skicka feedback
 60=60:e
 61=61:a
 62=62:a
+63=63:e
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=E
 UnitAbbreviation_Atmosphere=atm

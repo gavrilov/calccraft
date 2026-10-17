@@ -447,6 +447,7 @@ FeedbackButton.Content=ส่งคำติชม
 60=ที่ 60
 61=ที่ 61
 62=ที่ 62
+63=ที่ 63
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

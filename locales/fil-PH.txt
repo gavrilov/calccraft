@@ -447,6 +447,7 @@ FeedbackButton.Content=Magpadala ng feedback
 60=Ika-60
 61=Ika-61
 62=Ika-62
+63=Ika-63
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm
