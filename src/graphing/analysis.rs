@@ -519,9 +519,11 @@ fn boundary_functions(e: &Expr, out: &mut Vec<Expr>) {
             boundary_functions(a, out);
         }
         Root(a, n) | LogBase(n, a) => {
+            // A root's order is a denominator (root(a, n) is a^(1/n), undefined where n
+            // is 0, like 2^(1/x)), and a logarithm's base can be neither 0 nor 1.
             out.push((**a).clone());
+            out.push((**n).clone());
             if matches!(e, LogBase(..)) {
-                out.push((**n).clone());
                 out.push(sub(n, 1.0));
             }
             boundary_functions(a, out);
@@ -541,11 +543,17 @@ struct Interval {
     hi_closed: bool,
 }
 
-/// The points where `fun` may start, stop or be punched out.
-fn domain_candidates(fun: &Fun, xs: &[f64]) -> Vec<f64> {
+/// The points where `fun` may start, stop or be punched out, and those of them that are
+/// out whatever f's value there: the zeros of a root's order. The 0th root has no value
+/// (yroot divides by the order, `math::root`), but f's value can't tell: root(a, 0) is
+/// a^(±∞), which is 1 for a = 1, and doubles miss the zero of x² − 2 at √2 by 4.4e-16.
+fn domain_candidates(fun: &Fun, xs: &[f64]) -> (Vec<f64>, Vec<f64>) {
     let mut functions = Vec::new();
     boundary_functions(fun.e, &mut functions);
-    let mut candidates = Vec::new();
+    let (mut candidates, mut holes, mut orders) = (Vec::new(), Vec::new(), Vec::new());
+    // The candidates that come from the orders: their zeros, and those of the functions
+    // inside them.
+    let mut own = Vec::new();
     for (i, g) in functions.iter().enumerate() {
         // A polynomial lists x once for each power.
         if !g.has_x() || functions[..i].contains(g) {
@@ -555,9 +563,50 @@ fn domain_candidates(fun: &Fun, xs: &[f64]) -> Vec<f64> {
         let gf = |x: f64| g.eval(x, 0.0, &fun.env);
         let dgf = |x: f64| dg.as_ref().map_or(f64::NAN, |d| d.eval(x, 0.0, &fun.env));
         let dgf: &dyn Fn(f64) -> f64 = &dgf;
-        candidates.extend(zeros(&gf, dg.as_ref().map(|_| dgf), xs));
+        if fun.e.any(&|e| matches!(e, Expr::Root(_, n) if **n == *g)) {
+            holes.extend(sign_changes(&gf, xs, false).into_iter().map(|c| c.0));
+            orders.push(g);
+        }
+        let inside = fun.e.any(&|e| match e {
+            Expr::Root(_, n) => {
+                let mut within = Vec::new();
+                boundary_functions(n, &mut within);
+                **n == *g || within.contains(g)
+            }
+            _ => false,
+        });
+        let found = zeros(&gf, dg.as_ref().map(|_| dgf), xs);
+        if inside {
+            own.extend(found.iter().copied());
+        }
+        candidates.extend(found);
     }
-    dedupe(candidates)
+    // Besides where an order changes sign, where it is exactly 0 at a candidate of its own:
+    // the edge 0 of sqrt(x) in root(0.5, sqrt(x)), which no sign change shows. Not at the
+    // others, where it may only round to 0 (e^(x/10⁸) − 1 at 10⁻⁸, the edge of
+    // sqrt(x − 10⁻⁸)), nor where it only comes close (x² + 10⁻¹⁴ at 0) or underflows, as
+    // e^(−x²) does far out.
+    let zero_at = |n: &Expr, x: f64| {
+        let v = |x: f64| n.eval(x, 0.0, &fun.env);
+        let h = 1e-6 * x.abs().max(1.0);
+        v(x) == 0.0
+            && [x - h, x + h]
+                .iter()
+                .any(|&y| v(y).is_finite() && v(y) != 0.0)
+    };
+    holes.extend(
+        dedupe(own)
+            .into_iter()
+            .filter(|&x| orders.iter().any(|n| zero_at(n, x))),
+    );
+    (dedupe(candidates), dedupe(holes))
+}
+
+/// Whether `x` is one of `points`, as `dedupe` tells them apart.
+fn among(points: &[f64], x: f64) -> bool {
+    points
+        .iter()
+        .any(|&p| (p - x).abs() <= 1e-9 * x.abs().max(1.0))
 }
 
 /// Points snapped to the exact values they are near, without repeats. `recognize` is
@@ -569,11 +618,12 @@ fn snapped(points: Vec<f64>) -> Vec<f64> {
 /// The domain of an aperiodic function, as intervals, or `None` if it has too many
 /// pieces to tell.
 fn domain(fun: &Fun, xs: &[f64]) -> Option<Vec<Interval>> {
-    let points = domain_candidates(fun, xs);
+    let (points, holes) = domain_candidates(fun, xs);
     if points.len() > 40 {
         return None;
     }
     let points = snapped(points);
+    let holes = snapped(holes);
     let defined_between = |a: f64, b: f64| {
         let probes: Vec<f64> = match (a.is_finite(), b.is_finite()) {
             (true, true) => vec![a + (b - a) * 0.25, (a + b) / 2.0, a + (b - a) * 0.75],
@@ -592,7 +642,7 @@ fn domain(fun: &Fun, xs: &[f64]) -> Option<Vec<Interval>> {
         if !defined_between(a, b) {
             continue;
         }
-        let closed = |x: f64| x.is_finite() && fun.defined(x);
+        let closed = |x: f64| x.is_finite() && fun.defined(x) && !among(&holes, x);
         let piece = Interval {
             lo: a,
             hi: b,
@@ -1196,17 +1246,19 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let d2 = |x: f64| fun.d2(x);
 
     // The domain: ℝ but for poles (tan's π/2 + πn). Gaps can't be written here.
-    let candidates = in_period(snapped(domain_candidates(fun, &xs)), p);
+    let (candidates, holes) = domain_candidates(fun, &xs);
+    let candidates = in_period(snapped(candidates), p);
+    let holes = in_period(snapped(holes), p);
     let excluded: Vec<f64> = candidates
         .iter()
         .copied()
-        .filter(|&x| !fun.defined(x))
+        .filter(|&x| !fun.defined(x) || among(&holes, x))
         .collect();
     if (0..400).any(|i| !fun.f(p * (i as f64 + 0.5) / 400.0).is_finite()) {
         features.too_complex.extend(SMOOTH_FEATURES);
         return features;
     }
-    if fun.defined(0.0) {
+    if fun.defined(0.0) && !among(&excluded, 0.0) {
         features.y_intercept = Some(exact::format(fun.f(0.0)));
     }
     if excluded.is_empty() {
@@ -1729,6 +1781,54 @@ mod tests {
                 ("(0, ∞)", Direction::Constant)
             ]
         );
+    }
+
+    #[test]
+    fn variable_root_order() {
+        // root(2, x) is 2^(1/x): its order is a denominator, so x = 0 is out.
+        let f = analyze_text("y=root(2,x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 0}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (0, 1) ∪ (1, ∞)}"));
+        assert_eq!(f.vertical_asymptotes, vec!["x = 0"]);
+        assert_eq!(f, analyze_text("y=2^(1/x)"));
+        // The zeros of the order are out though root(0.5, 0) and root(1, 0) evaluate to
+        // 0.5^∞ = 0 and 1^∞ = 1.
+        let f = analyze_text("y=root(0.5,x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 0}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (0, 1) ∪ (1, ∞)}"));
+        let f = analyze_text("y=root(1,x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 0}"));
+        assert_eq!(f.range.as_deref(), Some("{y = 1}"));
+        // Doubles miss the zeros of x² − 2 at ±√2 by 4.4e-16, and root(1, 4.4e-16) is 1:
+        // the zeros of the order are out all the same.
+        let f = analyze_text("y=root(1,x^2-2)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ −√2, x ≠ √2}"));
+        assert_eq!(f.range.as_deref(), Some("{y = 1}"));
+        let f = analyze_text("y=root(0.5,x^2-2)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ −√2, x ≠ √2}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (0, 1) ∪ [√2, ∞)}"));
+        assert_eq!(f.vertical_asymptotes, vec!["x = −√2", "x = √2"]);
+        // An order can also be 0 at the edge of its own domain, which no sign change
+        // shows: sqrt(x) at 0.
+        let f = analyze_text("y=root(0.5,sqrt(x))");
+        assert_eq!(f.domain.as_deref(), Some("{x > 0}"));
+        assert_eq!(f.y_intercept, None);
+        let f = analyze_text("y=root(0.5,sqrt(1-x^2))");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ (−1, 1)}"));
+        // But no near misses: x² + 10⁻¹⁴ only comes close to 0, and e^(−x²) underflows to 0
+        // far out.
+        let f = analyze_text("y=root(1,x^2+0.00000000000001)");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        assert_eq!(f.y_intercept.as_deref(), Some("1"));
+        let f = analyze_text("y=root(1,e^(-x^2))");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 1"]);
+        // Nor at another part's candidate: e^(−900) underflows to 0, but root(1, e^(−900))
+        // is 1; e^(10⁻¹⁶) − 1 rounds to 0 at the edge 10⁻⁸ of the square root, but isn't 0.
+        let f = analyze_text("y=root(1,e^(-x^2))+sqrt(x-30)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≥ 30}"));
+        let f = analyze_text("y=root(1,e^(x/100000000)-1)+sqrt(x-0.00000001)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≥ 0.00000001}"));
     }
 
     #[test]
