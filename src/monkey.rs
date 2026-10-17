@@ -996,3 +996,117 @@ fn replay_dates() {
     }
     std::fs::write(output, out).expect("write output");
 }
+
+/// The category named like its variant (`Length`, `Temperature`, …).
+fn category_named(name: &str) -> Category {
+    *Category::ALL
+        .iter()
+        .find(|c| format!("{c:?}") == name)
+        .unwrap_or_else(|| panic!("no category {name}"))
+}
+
+fn json_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// What the replay writes for a converter: both fields (the typed one first, without group
+/// separators) and the "About equal to" results.
+fn converter_snapshot(conv: &Converter) -> String {
+    let (typed, other) = if conv.value1_active() {
+        (conv.value1(), conv.value2())
+    } else {
+        (conv.value2(), conv.value1())
+    };
+    let suggestions: Vec<String> = conv
+        .suggestions()
+        .iter()
+        .map(|s| {
+            let value = json_escape(&s.value.replace(',', ""));
+            format!("[\"{value}\",\"{}\"]", s.key)
+        })
+        .collect();
+    format!(
+        "{{\"from\":\"{}\",\"to\":\"{}\",\"sug\":[{}]}}",
+        json_escape(&typed.replace(',', "")),
+        json_escape(&other.replace(',', "")),
+        suggestions.join(",")
+    )
+}
+
+/// Runs one converter session (`U:From:To` picks the units of the first and second field in
+/// the order of the typed and the other one, as Microsoft's harness does).
+fn converter_session(region: &str, name: &str, keys: &[String]) -> Vec<String> {
+    let mut conv = Converter::new(Region::new(region));
+    conv.set_category(category_named(name));
+    let mut steps = vec![converter_snapshot(&conv)];
+    for key in keys {
+        match key.as_str() {
+            d if d.len() == 1 && d.as_bytes()[0].is_ascii_digit() => {
+                conv.execute(ConverterCommand::Digit(d.as_bytes()[0] - b'0'))
+            }
+            "PNT" => conv.execute(ConverterCommand::Decimal),
+            "NEG" => conv.execute(ConverterCommand::Negate),
+            "BACK" => conv.execute(ConverterCommand::Backspace),
+            "CLEAR" => conv.execute(ConverterCommand::Clear),
+            "SWITCH" => conv.activate(!conv.value1_active()),
+            k if k.starts_with("U:") => {
+                let (from, to) = k[2..].split_once(':').expect("U:From:To");
+                let units = conv.units();
+                let index = |key: &str| units.iter().position(|u| u.key == key).expect("unit");
+                let (from, to) = (index(from), index(to));
+                if conv.value1_active() {
+                    conv.set_unit1(from);
+                    conv.set_unit2(to);
+                } else {
+                    conv.set_unit1(to);
+                    conv.set_unit2(from);
+                }
+            }
+            k if k.starts_with("C:") => conv.set_category(category_named(&k[2..])),
+            other => panic!("unknown key {other}"),
+        }
+        steps.push(converter_snapshot(&conv));
+    }
+    steps
+}
+
+/// Replays converter sessions (`region Category key key …`, keys `0`-`9`, `PNT`, `NEG`, `BACK`,
+/// `CLEAR`, `SWITCH`, `U:From:To`, `C:Category`) of `CALCCRAFT_CONV_IN` into
+/// `CALCCRAFT_CONV_OUT`: what both fields and the "About equal to" results show after each key,
+/// in the format of a harness around Microsoft's `UnitConverter.cpp`.
+#[test]
+#[ignore = "tool for the oracle comparison: needs CALCCRAFT_CONV_IN and CALCCRAFT_CONV_OUT"]
+fn replay_converter() {
+    let input = std::env::var("CALCCRAFT_CONV_IN").expect("CALCCRAFT_CONV_IN");
+    let output = std::env::var("CALCCRAFT_CONV_OUT").expect("CALCCRAFT_CONV_OUT");
+    let text = std::fs::read_to_string(input).expect("read input");
+    let mut out = String::new();
+    for line in text.lines().filter(|l| !l.trim().is_empty()) {
+        let mut words = line.split_whitespace();
+        let (region, name) = (
+            words.next().unwrap().to_string(),
+            words.next().unwrap().to_string(),
+        );
+        let keys: Vec<String> = words.map(str::to_string).collect();
+        let outcome = guarded(Duration::from_secs(5), {
+            let keys = keys.clone();
+            move || converter_session(&region, &name, &keys)
+        });
+        let keys_json: Vec<String> = keys.iter().map(|k| format!("\"{k}\"")).collect();
+        match outcome {
+            Ok(steps) => out.push_str(&format!(
+                "{{\"keys\":[{}],\"steps\":[{}]}}
+",
+                keys_json.join(","),
+                steps.join(",")
+            )),
+            Err(problem) => out.push_str(&format!(
+                "{{\"keys\":[{}],\"fail\":\"{}\"}}
+",
+                keys_json.join(","),
+                json_escape(&problem)
+            )),
+        }
+    }
+    std::fs::write(output, out).expect("write output");
+}
