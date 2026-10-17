@@ -422,7 +422,8 @@ These follow from the Windows source and are pinned by tests too:
 - Pasted text is checked like in `CopyPasteManager`: at most 512 characters, 100 operands and
   16 digits per operand (32 in the Scientific mode), exponents of up to 4 digits (`1.5e-3`).
   Invalid text shows `Invalid input`. Valid text is typed in after a `CE`, so `12 + 5 =` gives
-  `17`; `e` is `exp`, and a sign after it goes to the exponent.
+  `17`; `e` is `exp`, and a sign after it goes to the exponent. In the Scientific mode an operand
+  that is only a sign must end there: white space after it (`6++` and a line break) is invalid.
 
 When you change or add behavior, check it against the real calculator (`calc.exe`) or its
 source first, then add or update a test in `engine.rs`.
