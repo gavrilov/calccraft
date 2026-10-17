@@ -18,6 +18,8 @@
 
 mod integer;
 mod math;
+#[cfg(test)]
+mod ms_oracle;
 
 use std::cmp::Ordering;
 
