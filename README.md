@@ -223,13 +223,13 @@ handy for logging.
 ## Development
 
 ```bash
-cargo test                                  # calculator and date tests
+cargo test                                  # unit tests
 cargo fmt --check                           # formatting
 cargo clippy --all-targets -- -D warnings   # lints
 ```
 
 All three must pass before a change is merged.
-[GitHub Actions](.github/workflows/ci.yml) runs them on Windows for every push and pull request.
+[GitHub Actions](.github/workflows/ci.yml) runs them on Windows, Linux and macOS for every push and pull request.
 Contributors (people and AI agents alike)
 should read [AGENTS.md](AGENTS.md) first: it describes the architecture, the Windows behaviors
 that the tests pin down, and known pitfalls.
