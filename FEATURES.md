@@ -1162,7 +1162,8 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
 - **Acceptance Criteria:**
   - The interface uses the Windows Calculator's translations (60 languages, all 442 strings
     CalcCraft shows, unit names included) and follows the Windows display languages, matched like
-    Windows' resource lookup (`de-AT` → `de-DE`, `es-AR` → `es-MX`, `zh-Hant` → `zh-TW`).
+    Windows' resource lookup (`de-AT` → `de-DE`, `es-AR` → `es-MX`, `zh-Hant` → `zh-TW`,
+    `zh-Hans-HK` → `zh-CN`; never a translation in another script, so `az-Cyrl-AZ` gets none).
   - Decimal and grouping separators and date formats follow the system region (the user locale,
     including changes made in Settings): see "Regional formats" in AGENTS.md.
   - Japanese, Chinese, Korean, Thai and Amharic load a Windows font with their script.
