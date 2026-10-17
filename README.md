@@ -141,6 +141,9 @@ It looks like the original (Segoe UI fonts, Fluent icons, the same layout and co
 In the date calculation mode, `Esc` closes the open calendar or list, `Page Up` and `Page Down`
 flip the calendar's pages, and `Ctrl+C` copies the result.
 
+In the calendar, the arrow keys move the focus by a day or a week (by a month or a year, or four,
+in the year and decade views), across rows and pages, as in Windows.
+
 In the scientific mode, these keys are added (Windows' own):
 
 | Key | Action |
