@@ -175,8 +175,11 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
 - Text is Segoe UI from `%WINDIR%\Fonts` (regular, semibold and light). Where a Segoe UI file is
   missing, `setup_fonts` uses the embedded Inter (`assets/fonts/Inter.ttf`, a variable font) at
   the same weight instead.
-- Keyboard: `char_command` handles text input (digits, operators), and `handle_key` handles
-  named keys and `Ctrl` shortcuts; in the Programmer mode `ProgrammerState::char_command` and
+- Keyboard: `char_command` handles text input (digits, operators; the letters `R` and `Q` only
+  without `Shift`, `remove_shifted_letters`), and `handle_key` handles
+  named keys (`key_command`, alone only: Windows has no `Shift` or `Alt` chords of them) and
+  `Ctrl` shortcuts (not with `Alt`, which is also `AltGr` in Windows); in the Programmer mode
+  `ProgrammerState::char_command` and
   `key_command` take their place, and in the Scientific mode `ScientificState::char_command`
   and `key_command` (letters arrive as keys there, `Shift`, `Ctrl` or both picking the inverse
   and hyperbolic functions, so letter text is ignored). The date mode and the converters have their own
@@ -586,8 +589,9 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
 - **`num-bigint` must stay on 0.4.x.** `num-rational` 0.4 depends on it, and `BigRational`'s
   integer type has to match ours. `cargo add num-bigint` without a version picks 0.5 and breaks the build.
 - **egui 0.36 API:** the app implements `App::ui(&mut self, ui, frame)` (not `update`).
-- **Focus:** egui presses a focused widget on `Space` *and* `Enter`. `handle_key` consumes
-  `Enter` when it means `=`, so the focused key isn't pressed on top of it. Don't call
+- **Focus:** egui presses a focused widget on `Space` *and* `Enter`. `handle_key` takes every
+  `Enter` press (`remove_enter_presses`) unless a control that isn't a calculator key has the
+  focus, so a focused key is never pressed by it, with a modifier neither. Don't call
   `ui.interact` with `Sense::click()` (which is focusable) for controls: go through
   `access::control`. egui's arrow-key search remembers focusable widgets as long as their ids are
   used, which is why covered controls take another id. egui never scrolls to the focused widget

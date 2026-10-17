@@ -704,7 +704,12 @@ impl CalculatorApp {
             || self.context_menu.is_some()
             || self.programmer.popup_open()
             || self.scientific.popup_open();
-        let events = ctx.input(|i| i.events.clone());
+        let mut events = ctx.input(|i| i.events.clone());
+        // The Programmer mode's A–F have Shift chords in Windows, the Standard mode's letters
+        // don't, and the Scientific mode reads its letters as keys.
+        if self.mode == Mode::Standard {
+            remove_shifted_letters(&mut events);
+        }
         let now = ctx.input(|i| i.time);
         for event in events {
             match event {
@@ -753,6 +758,14 @@ impl CalculatorApp {
     }
 
     fn handle_key(&mut self, ctx: &Context, key: Key, modifiers: Modifiers, now: f64) {
+        if key == Key::Enter {
+            // Enter presses a focused button that isn't one of the calculator's keys.
+            if access::focused(ctx).is_some_and(|id| !is_calculator_key(id)) {
+                return;
+            }
+            // Otherwise the focused key isn't pressed, whatever the modifiers.
+            ctx.input_mut(|i| remove_enter_presses(&mut i.events));
+        }
         let programmer = self.mode == Mode::Programmer;
         // The Scientific mode's letter keys, some with Shift or Ctrl (sinh is Ctrl+S).
         let scientific = (self.mode == Mode::Scientific && key != Key::Escape)
@@ -762,8 +775,9 @@ impl CalculatorApp {
             command
         } else if modifiers.command {
             // Keep on top hides the history and disables the memory buttons, and Windows
-            // turns their shortcuts off (`AreHistoryShortcutsEnabled`).
-            if self.compact {
+            // turns their shortcuts off (`AreHistoryShortcutsEnabled`). Windows has no
+            // `Ctrl+Alt` shortcuts at all: that's also `AltGr` (`GetCurrentKeyDictionary`).
+            if self.compact || modifiers.alt {
                 return;
             }
             // Windows' Ctrl+Shift shortcuts are only Ctrl+Shift+D and the Scientific
@@ -789,31 +803,22 @@ impl CalculatorApp {
             command
         } else {
             match key {
-                // Enter presses a focused button that isn't one of the calculator's keys.
-                Key::Enter if access::focused(ctx).is_some_and(|id| !is_calculator_key(id)) => {
-                    return;
-                }
-                Key::Enter => {
-                    // Otherwise it's `=`, and the focused key isn't pressed too.
-                    ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Enter));
-                    Command::Equals
-                }
                 Key::Escape if self.context_menu.is_some() => return self.context_menu = None,
                 Key::Escape if self.programmer.close_popup() => return,
                 Key::Escape if self.scientific.close_popup() => return,
                 Key::Escape if self.flyout != Flyout::None => return self.flyout = Flyout::None,
+                // egui drops the focus on Esc; in Windows it's only `C`.
                 Key::Escape => {
-                    // egui drops the focus on Esc; in Windows it's only `C`.
                     if let Some(id) = self.last_focus {
                         ctx.memory_mut(|memory| memory.request_focus(id));
                     }
-                    Command::Clear
                 }
-                Key::Delete => Command::ClearEntry,
-                Key::Backspace => Command::Backspace,
-                Key::F9 => Command::Function(Func::Negate),
                 Key::F1 if self.compact => return self.set_compact(ctx, false),
-                _ => return,
+                _ => {}
+            }
+            match key_command(key, modifiers) {
+                Some(command) => command,
+                None => return,
             }
         };
         if !self.keypad_disabled() {
@@ -3089,6 +3094,54 @@ fn char_command(c: char) -> Option<Command> {
     })
 }
 
+/// Keys that don't type: `Enter` is `=`, `Esc` `C`, `Delete` `CE`, `Backspace` `⌫` and `F9`
+/// `±`. They work only alone, as in Windows, which looks a key up in the shortcuts of its
+/// modifiers (`KeyboardShortcutManager.GetCurrentKeyDictionary`): none of these keys has a
+/// `Shift`, `Ctrl` or `Alt` chord.
+fn key_command(key: Key, modifiers: Modifiers) -> Option<Command> {
+    if modifiers.any() {
+        return None;
+    }
+    Some(match key {
+        Key::Enter => Command::Equals,
+        Key::Escape => Command::Clear,
+        Key::Delete => Command::ClearEntry,
+        Key::Backspace => Command::Backspace,
+        Key::F9 => Command::Function(Func::Negate),
+        _ => return None,
+    })
+}
+
+/// Removes the `Enter` presses, with any modifiers, so that egui doesn't press the focused key
+/// with them: Windows' `CalculatorButton` ignores `Enter`, which is `=` alone and nothing with
+/// a modifier.
+fn remove_enter_presses(events: &mut Vec<Event>) {
+    events.retain(|event| {
+        !matches!(
+            event,
+            Event::Key {
+                key: Key::Enter,
+                pressed: true,
+                ..
+            }
+        )
+    });
+}
+
+/// Removes the letters typed with `Shift`, for the Standard mode: its letters (`R` is `1/x`,
+/// `Q` `x²`) are Windows' virtual keys, which have no `Shift` chords there, so `Shift+R` does
+/// nothing while Caps Lock's `R` is `1/x`. Characters typed with `Shift` (`@`, `%`, `*`) count.
+fn remove_shifted_letters(events: &mut Vec<Event>) {
+    // The text a key typed comes right after it.
+    let mut shift = false;
+    events.retain(|event| {
+        let shifted_letter =
+            shift && matches!(event, Event::Text(text) if text.chars().all(char::is_alphabetic));
+        shift = matches!(event, Event::Key { pressed: true, modifiers, .. } if modifiers.shift);
+        !shifted_letter
+    });
+}
+
 /// The script fonts that the interface language and the regional format need, the
 /// language's first (its glyphs win for characters that both have, like Chinese and
 /// Japanese ideographs), or all of them.
@@ -3305,5 +3358,65 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn keys_without_chords() {
+        let keys = [
+            (Key::Enter, Command::Equals),
+            (Key::Escape, Command::Clear),
+            (Key::Delete, Command::ClearEntry),
+            (Key::Backspace, Command::Backspace),
+            (Key::F9, Command::Function(Func::Negate)),
+        ];
+        for (pressed, command) in keys {
+            assert_eq!(key_command(pressed, Modifiers::NONE), Some(command));
+        }
+        // Windows has no Shift, Alt, Ctrl or Ctrl+Alt chords of these keys: Shift+Esc doesn't
+        // clear, Alt+Enter and Shift+Enter aren't `=`.
+        let alt_gr = Modifiers::CTRL | Modifiers::ALT | Modifiers::COMMAND;
+        let chords = [Modifiers::SHIFT, Modifiers::ALT, Modifiers::COMMAND, alt_gr];
+        for (pressed, _) in keys {
+            for modifiers in chords {
+                assert_eq!(
+                    key_command(pressed, modifiers),
+                    None,
+                    "{pressed:?} {modifiers:?}"
+                );
+            }
+        }
+        assert_eq!(key_command(Key::R, Modifiers::NONE), None);
+    }
+
+    #[test]
+    fn enter_never_presses_calculator_keys() {
+        // egui presses the focused control on any Enter, but Windows' `CalculatorButton`
+        // ignores Enter with any modifiers: Ctrl+Enter mustn't press the focused 7 key.
+        let alt_gr = Modifiers::CTRL | Modifiers::ALT | Modifiers::COMMAND;
+        let chords = [Modifiers::SHIFT, Modifiers::ALT, Modifiers::COMMAND, alt_gr];
+        for modifiers in [Modifiers::NONE].into_iter().chain(chords) {
+            let mut events = vec![key(Key::Enter, modifiers), key(Key::Num7, Modifiers::NONE)];
+            remove_enter_presses(&mut events);
+            assert_eq!(events, [key(Key::Num7, Modifiers::NONE)], "{modifiers:?}");
+        }
+    }
+
+    #[test]
+    fn standard_letters_without_shift() {
+        // The Standard mode's R and Q are keys without Shift chords in Windows: Shift+R does
+        // nothing, while Caps Lock's R is 1/x, and the characters typed with Shift count.
+        let typed = |pressed, modifiers, text: &str| {
+            let mut events = vec![key(pressed, modifiers), Event::Text(text.into())];
+            remove_shifted_letters(&mut events);
+            events.len() == 2
+        };
+        assert!(!typed(Key::R, Modifiers::SHIFT, "R"));
+        assert!(!typed(Key::Q, Modifiers::SHIFT, "Q"));
+        // Shift with Caps Lock types `r`.
+        assert!(!typed(Key::R, Modifiers::SHIFT, "r"));
+        assert!(typed(Key::R, Modifiers::NONE, "R"));
+        assert!(typed(Key::Q, Modifiers::NONE, "q"));
+        assert!(typed(Key::Num2, Modifiers::SHIFT, "@"));
+        assert!(typed(Key::Num8, Modifiers::SHIFT, "*"));
     }
 }

@@ -301,6 +301,10 @@ UI code and is covered by unit tests.*
     (`EnableControls(false)`); `Esc`, `Ctrl+H`, `Ctrl+Shift+D`, copy and paste still work.
   - `Alt` with any other key types nothing.
   - Buttons never take keyboard focus, so `Enter` always means `=` (see AGENTS.md pitfalls).
+  - As in Windows, `Shift` and `Alt` with `Enter`, `Esc`, `Delete`, `Backspace` or `F9` do
+    nothing, and neither do the `Ctrl` shortcuts with `Alt` (`Ctrl+Alt` is `AltGr` there),
+    `Shift+R` and `Shift+Q` (Caps Lock's `R` and `Q` work). `Enter` with a modifier doesn't
+    press the focused key either.
 
 #### `FEAT-STD-006` Clipboard Copy and Paste (numbers)
 - **Status:** `[x] COMPLETED`
