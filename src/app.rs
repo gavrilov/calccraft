@@ -1166,7 +1166,7 @@ impl CalculatorApp {
             return;
         }
 
-        let enabled = !self.engine().memory().is_empty() && !self.engine().has_error();
+        let enabled = memory_list_enabled(self.engine());
         let label = Self::memory_list_label();
         let name = if self.flyout == Flyout::Memory {
             tr("MemoryButton_Close")
@@ -1369,6 +1369,13 @@ impl CalculatorApp {
             MenuTarget::Memory(i) => !history && i < self.engine().memory().len(),
             MenuTarget::Radix(_) => true,
         });
+        // In the error state the memory items are disabled, and so are their menus.
+        let items_enabled = history || memory_items_enabled(self.engine());
+        if !items_enabled {
+            self.context_menu = self
+                .context_menu
+                .filter(|menu| !matches!(menu.target, MenuTarget::Memory(_)));
+        }
         let empty = if history {
             self.engine().history().is_empty()
         } else {
@@ -1400,6 +1407,7 @@ impl CalculatorApp {
             egui::ScrollArea::vertical()
                 .id_salt(("list", history))
                 .auto_shrink(false)
+                .scroll_source(list_scroll_source(items_enabled))
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 0.0;
                     // A flyout opened with the keyboard focuses its first item.
@@ -1412,8 +1420,8 @@ impl CalculatorApp {
                         }
                     } else {
                         for i in 0..self.engine().memory().len() {
-                            let focus = self.take_popup_focus(i == 0);
-                            if let Some(a) = self.memory_item(ui, i, focus) {
+                            let focus = items_enabled && self.take_popup_focus(i == 0);
+                            if let Some(a) = self.memory_item(ui, i, focus, items_enabled) {
                                 action = Some(a);
                             }
                         }
@@ -1431,7 +1439,13 @@ impl CalculatorApp {
         } else {
             tr("ClearMemory.AutomationName")
         };
-        if self.button(ui, trash, Id::new("trash"), Kind::Subtle, true, label, name) {
+        let id = Id::new("trash");
+        // With the items disabled, the clear-all button is the first control the memory
+        // flyout, opened with the keyboard, can focus.
+        if !items_enabled && self.flyout == Flyout::Memory && self.take_popup_focus(true) {
+            ui.memory_mut(|memory| memory.request_focus(id));
+        }
+        if self.button(ui, trash, id, Kind::Subtle, true, label, name) {
             action = Some(FlyoutAction::ClearAll);
         }
         // Drawn last, so it covers the panel and catches the clicks outside it. The radix
@@ -1466,7 +1480,7 @@ impl CalculatorApp {
                 }
             }
             Some(FlyoutAction::ClearAll) if history => self.engine_mut().clear_history(),
-            Some(FlyoutAction::ClearAll) => self.engine_mut().execute(Command::MemoryClear),
+            Some(FlyoutAction::ClearAll) => self.engine_mut().memory_clear_all(),
             Some(FlyoutAction::OpenMenu(target, pos)) => {
                 self.context_menu = Some(ContextMenu { target, pos });
             }
@@ -1533,8 +1547,16 @@ impl CalculatorApp {
     }
 
     /// Memory slot; on hover it shows MC, M+ and M− buttons, and so it does while it or
-    /// one of them has the keyboard focus. `focus` gives it the focus.
-    fn memory_item(&self, ui: &mut Ui, index: usize, focus: bool) -> Option<FlyoutAction> {
+    /// one of them has the keyboard focus. `focus` gives it the focus. A slot that isn't
+    /// `enabled` (in the error state) only shows its value: no hover, buttons, clicks, focus
+    /// or context menu, as a disabled WinUI control gets no input.
+    fn memory_item(
+        &self,
+        ui: &mut Ui,
+        index: usize,
+        focus: bool,
+        enabled: bool,
+    ) -> Option<FlyoutAction> {
         let p = self.palette;
         let calc = self.engine();
         let value = &calc.memory()[index];
@@ -1552,15 +1574,20 @@ impl CalculatorApp {
 
         let (rect, _) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
         let id = Id::new("memory-slot").with(index);
-        let info = access::item(WidgetType::SelectableLabel, &shown, false);
-        let response = access::control(ui, p, rect, id, true, RADIUS, info);
+        if !enabled {
+            // It may have had the focus when the error came (in the docked list).
+            ui.memory_mut(|memory| memory.surrender_focus(id));
+        }
+        let info = || WidgetInfo::selected(WidgetType::SelectableLabel, enabled, false, &shown);
+        let response = access::control(ui, p, rect, id, enabled, RADIUS, info);
         if focus {
             response.request_focus();
         }
         let buttons_focused = access::focused(ui.ctx()).is_some_and(|focused| {
             (0..3).any(|i| focused == Id::new("memory-item").with(index).with(i))
         });
-        let hovered = ui.rect_contains_pointer(rect) || response.has_focus() || buttons_focused;
+        let hovered =
+            enabled && (ui.rect_contains_pointer(rect) || response.has_focus() || buttons_focused);
         let painter = ui.painter();
         if hovered {
             painter.rect_filled(rect, RADIUS, p.subtle_hover);
@@ -2461,6 +2488,30 @@ impl CalculatorApp {
     }
 }
 
+/// Whether `M˅`, which opens the memory list, is enabled: whenever there is memory, in the
+/// error state too. Windows' `ErrorLayout` disables MC, MR, M+, M− and MS but not
+/// `MemoryButton`, whose `IsEnabled` follows only `IsMemoryEmpty`.
+fn memory_list_enabled(calc: &Calculator) -> bool {
+    !calc.memory().is_empty()
+}
+
+/// Whether the memory list's items take clicks, the focus and a right click, and show MC,
+/// M+ and M− on hover: not in the error state, where the list's `ErrorLayout` disables
+/// `MemoryListView` (`Memory.xaml`). Its clear-all button stays enabled.
+fn memory_items_enabled(calc: &Calculator) -> bool {
+    !calc.has_error()
+}
+
+/// How the history or memory list scrolls: by default, but not at all while its items are
+/// disabled (the memory list in the error state), as a disabled `ListView` takes no input.
+fn list_scroll_source(items_enabled: bool) -> egui::scroll_area::ScrollSource {
+    if items_enabled {
+        egui::scroll_area::ScrollSource::default()
+    } else {
+        egui::scroll_area::ScrollSource::NONE
+    }
+}
+
 #[derive(Clone, Copy)]
 enum SettingsAction {
     ToggleTheme,
@@ -3259,6 +3310,59 @@ mod tests {
             pressed: true,
             repeat: false,
             modifiers,
+        }
+    }
+
+    #[test]
+    fn memory_list_opens_in_the_error_state() {
+        // Windows' `ErrorLayout` disables MC, MR, M+, M− and MS, but not `M˅`, which only
+        // needs memory; the list's own `ErrorLayout` disables the list, its items and its
+        // scrolling. That holds in the Standard, Scientific and Programmer modes.
+        let engines = [
+            Calculator::default(),
+            Calculator::with_precedence(),
+            Calculator::programmer(),
+        ];
+        for mut calc in engines {
+            assert!(!memory_list_enabled(&calc));
+            calc.execute(Command::Digit(5));
+            calc.execute(Command::MemoryStore);
+            assert!(memory_items_enabled(&calc));
+            assert_eq!(
+                list_scroll_source(memory_items_enabled(&calc)),
+                egui::scroll_area::ScrollSource::default()
+            );
+            for command in [
+                Command::Digit(1),
+                Command::Operator(Op::Divide),
+                Command::Digit(0),
+                Command::Equals,
+            ] {
+                calc.execute(command);
+            }
+            assert!(calc.has_error());
+            assert!(
+                memory_list_enabled(&calc),
+                "M˅ is disabled in the error state"
+            );
+            assert!(
+                !memory_items_enabled(&calc),
+                "the memory items are enabled in the error state"
+            );
+            assert_eq!(
+                list_scroll_source(memory_items_enabled(&calc)),
+                egui::scroll_area::ScrollSource::NONE,
+                "the memory list scrolls in the error state"
+            );
+            for command in [
+                Command::MemoryClear,
+                Command::MemoryRecall,
+                Command::MemoryAdd,
+                Command::MemorySubtract,
+                Command::MemoryStore,
+            ] {
+                assert!(!calc.is_enabled(command), "{command:?} is enabled");
+            }
         }
     }
 

@@ -413,6 +413,10 @@ These follow from the Windows source and are pinned by tests too:
 - `5 =` adds `5 =` to the history, and a finished function followed by a new number adds the
   function (`√(4)`).
 - After `=`, `CE` keeps the last operation: `2 + 3 =`, `CE`, `=` gives `0 + 3 =` → `3`.
+- In the error state `MC`, `MR`, `M+`, `M−` and `MS` are disabled, but `M˅` still opens the
+  memory list (`ErrorLayout` leaves `MemoryButton` alone), in all three calculator modes. The
+  list's items are disabled then, with their `MC`, `M+`, `M−` and context menu, and the list
+  doesn't scroll (the list's own `ErrorLayout`), but its clear-all button still empties it.
 - Pasted text is checked like in `CopyPasteManager`: at most 512 characters, 100 operands and
   16 digits per operand (32 in the Scientific mode), exponents of up to 4 digits (`1.5e-3`).
   Invalid text shows `Invalid input`. Valid text is typed in after a `CE`, so `12 + 5 =` gives

@@ -19,8 +19,8 @@ use super::icons::{
 use super::strings::{tr, tr_format};
 use super::{
     CalculatorApp, ContextMenu, Flyout, FlyoutAction, GAP, Kind, MARGIN, MEMORY_BUTTON_MAX_WIDTH,
-    MenuTarget, Panel, RADIUS, access, command_name, negate_label, numbers, paint_radio, semibold,
-    text,
+    MenuTarget, Panel, RADIUS, access, command_name, memory_list_enabled, negate_label, numbers,
+    paint_radio, semibold, text,
 };
 use crate::engine::{Calculator, Command, Func, Op, Radix, WordSize};
 
@@ -530,7 +530,7 @@ impl CalculatorApp {
         if self.docked {
             return;
         }
-        let enabled = !self.programmer.calc.memory().is_empty() && !has_error;
+        let enabled = memory_list_enabled(&self.programmer.calc);
         let name = if self.flyout == Flyout::Memory {
             tr("MemoryButton_Close")
         } else {

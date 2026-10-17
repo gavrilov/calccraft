@@ -1905,6 +1905,21 @@ impl Calculator {
         self.display_num();
     }
 
+    /// The memory list's clear-all button (`MemorizedNumberClearAll`). Unlike `MC`, it stays
+    /// enabled in the error state, and Windows still empties the list; the engine then ignores
+    /// the `IDC_MCLEAR` it gets, apart from hiding the expression shown after `=`, which every
+    /// command does first (`ProcessCommandWorker`).
+    pub fn memory_clear_all(&mut self) {
+        if self.error.is_none() {
+            self.execute(Command::MemoryClear);
+            return;
+        }
+        if !self.no_prev_equ {
+            self.shown.clear();
+        }
+        self.memory.clear();
+    }
+
     pub fn memory_clear_item(&mut self, index: usize) {
         if index < self.memory.len() {
             self.memory.remove(index);
@@ -2669,6 +2684,36 @@ mod tests {
     fn new_number_after_result() {
         assert_eq!(run("2+3=4"), ("4".into(), "".into()));
         assert_eq!(run("2+3=*2="), ("10".into(), "5 × 2 =".into()));
+    }
+
+    #[test]
+    fn memory_list_clears_in_the_error_state() {
+        // The list's clear-all button stays enabled in the error state, and
+        // `MemorizedNumberClearAll` empties the list; MC stays disabled.
+        let mut calc = Calculator::default();
+        press(&mut calc, "5");
+        calc.execute(Command::MemoryStore);
+        press(&mut calc, "1/0=");
+        calc.execute(Command::MemoryClear);
+        assert_eq!(calc.memory().len(), 1);
+        calc.memory_clear_all();
+        assert!(calc.memory().is_empty(), "the memory isn't cleared");
+        // The error stays. Like every command, `IDC_MCLEAR` hides the expression shown
+        // after `=` first (`ProcessCommandWorker`), but not one an error left otherwise.
+        assert_eq!(
+            (calc.display(), calc.expression()),
+            ("Cannot divide by zero".into(), "".into())
+        );
+        let mut calc = Calculator::default();
+        press(&mut calc, "5");
+        calc.execute(Command::MemoryStore);
+        press(&mut calc, "0i");
+        calc.memory_clear_all();
+        assert!(calc.memory().is_empty());
+        assert_eq!(
+            (calc.display(), calc.expression()),
+            ("Cannot divide by zero".into(), "1/(0)".into())
+        );
     }
 
     #[test]

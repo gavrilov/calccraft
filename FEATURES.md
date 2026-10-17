@@ -178,7 +178,8 @@ UI code and is covered by unit tests.*
 - **Priority:** `P1`
 - **Depends On:** `FEAT-CORE-001`
 - **Windows ref:** `src/CalcManager/CalculatorManager.cpp`, `src/Calculator.ViewModels/StandardCalculatorViewModel.cs`
-- **Rust:** `src/engine.rs` (`Command::Memory*`, `memory_add`, `memory_recall_item`, `memory_clear_item`)
+- **Rust:** `src/engine.rs` (`Command::Memory*`, `memory_add`, `memory_recall_item`, `memory_clear_item`,
+  `memory_clear_all`)
 - **Description:** A memory list, newest first (up to 100 values):
   - `MS` stores the display as a new item.
   - `MR` recalls the newest item.
@@ -186,7 +187,10 @@ UI code and is covered by unit tests.*
   - `MC` clears all items.
 - **Acceptance Criteria:**
   - `MC`, `MR` and `M˅` are disabled while memory is empty; `MS`, `M+` and `M−` are always enabled.
-  - All memory buttons are disabled in the error state.
+  - In the error state all memory buttons but `M˅` are disabled; `M˅` still opens the memory
+    list, as in Windows (its `ErrorLayout` leaves `MemoryButton` enabled). The list's items, with
+    their `MC`, `M+`, `M−` and context menu, are disabled too, and the list doesn't scroll
+    (`Memory.xaml`'s `ErrorLayout`), but its clear-all button still clears the memory.
   - After a memory operation, the next digit starts a new number.
 
 #### `FEAT-CORE-007` History Tape & Expression Tracking
