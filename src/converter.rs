@@ -1411,6 +1411,7 @@ mod tests {
     #[test]
     fn activating_the_other_field_swaps_roles() {
         let mut c = converter(Category::Length, "Kilometers", "Miles");
+        assert!(c.value1_active());
         press(&mut c, "5");
         c.activate(false);
         assert!(!c.value1_active());
@@ -1422,6 +1423,54 @@ mod tests {
         // The units stay with their fields.
         assert_eq!(c.units()[c.unit1()].name, "Kilometers");
         assert_eq!(c.units()[c.unit2()].name, "Miles");
+        c.activate(true);
+        assert!(c.value1_active());
+    }
+
+    /// A new source unit makes the next digit start a new number; a new target unit
+    /// just converts again.
+    #[test]
+    fn only_a_new_source_unit_starts_a_new_number() {
+        let mut c = converter(Category::Length, "Kilometers", "Miles");
+        let position =
+            |c: &Converter, name: &str| c.units().iter().position(|u| u.name == name).unwrap();
+        press(&mut c, "5");
+        let feet = position(&c, "Feet");
+        c.set_unit2(feet);
+        press(&mut c, "1");
+        assert_eq!(c.value1(), "51");
+        let meters = position(&c, "Meters");
+        c.set_unit1(meters);
+        assert_eq!(c.value1(), "51");
+        press(&mut c, "7");
+        assert_eq!(c.value1(), "7");
+        // The same source unit again changes nothing.
+        c.set_unit1(meters);
+        press(&mut c, "3");
+        assert_eq!(c.value1(), "73");
+    }
+
+    #[test]
+    fn backspace_removes_the_last_character_and_keeps_a_zero() {
+        let mut c = converter(Category::Temperature, "Celsius", "Kelvin");
+        press(&mut c, "123<");
+        assert_eq!(c.value1(), "12");
+        press(&mut c, "<<");
+        assert_eq!(c.value1(), "0");
+        press(&mut c, "<");
+        assert_eq!(c.value1(), "0");
+        // A minus sign counts as a character, and goes with the last digit.
+        press(&mut c, "56n");
+        assert_eq!(c.value1(), "-56");
+        press(&mut c, "<");
+        assert_eq!(c.value1(), "-5");
+        press(&mut c, "<");
+        assert_eq!(c.value1(), "0");
+        // The decimal point can be removed and typed again.
+        press(&mut c, "1.<");
+        assert_eq!(c.value1(), "1");
+        press(&mut c, ".5");
+        assert_eq!(c.value1(), "1.5");
     }
 
     #[test]
