@@ -2667,10 +2667,9 @@ impl CalculatorApp {
 
         if matches!(self.mode, Mode::Programmer | Mode::Scientific) {
             let header = Rect::from_min_size(main.min, vec2(main.width(), HEADER_HEIGHT));
-            // The Programmer mode's flyout lies over the header too (see `draw_programmer`).
-            if self.mode == Mode::Programmer
-                && matches!(self.flyout, Flyout::History | Flyout::Memory)
-            {
+            // The flyouts lie over the header too (see `draw_programmer` and
+            // `draw_scientific`).
+            if matches!(self.flyout, Flyout::History | Flyout::Memory) {
                 access::draw_covered(ui, || self.draw_header(ui, header));
             } else {
                 self.draw_header(ui, header);
@@ -3885,5 +3884,96 @@ mod tests {
         let mut events = vec![s.clone(), Event::Text("ś".into())];
         remove_alt_gr_keys(&mut events, true);
         assert_eq!(events, [Event::Text("ś".into())]);
+    }
+
+    #[test]
+    fn scientific_flyouts_lie_over_the_window() {
+        // The header's menu and History buttons, and the unit, F-E, MS and M˅ buttons above
+        // the list.
+        let controls = [
+            ("menu", Id::new("menu")),
+            ("History", Id::new("history")),
+            ("DEG", Id::new("scientific-angle")),
+            ("F-E", Id::new("scientific-fe")),
+            ("MS", Id::new("memory").with(4)),
+            ("M˅", Id::new("memory-list")),
+        ];
+        for flyout in [Flyout::History, Flyout::Memory] {
+            let label = if flyout == Flyout::History {
+                "history"
+            } else {
+                "memory"
+            };
+            // With a calculation in the history and in memory.
+            let ctx = Context::default();
+            let mut app = start_in(&ctx);
+            app.set_mode(Mode::Scientific);
+            for command in [
+                Command::Digit(2),
+                Command::Operator(Op::Add),
+                Command::Digit(3),
+                Command::Equals,
+                Command::MemoryStore,
+            ] {
+                app.engine_mut().execute(command);
+            }
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let rect = |id| ctx.read_response(id).map(|response| response.rect);
+            let rects: Vec<_> = controls.iter().map(|&(_, id)| rect(id).unwrap()).collect();
+            // Nothing but the flyout changes.
+            let unchanged = |app: &CalculatorApp| {
+                let calc = &app.scientific.calc;
+                calc.angle() == Angle::Degrees && !calc.notation() && calc.memory().len() == 1
+            };
+            // A click anywhere above the list only closes the flyout (`OnHistoryFlyOutTapped`).
+            for (&(name, _), button) in controls.iter().zip(&rects) {
+                app.flyout = flyout;
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                click(&ctx, &mut app, MIN_SIZE, button.center());
+                assert!(
+                    app.flyout == Flyout::None && unchanged(&app),
+                    "{label} flyout: a click on {name} did more than close it"
+                );
+            }
+            app.flyout = flyout;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            // The rows stay in view, out of the Tab order, and nothing there can be clicked,
+            // not even by a screen reader: egui takes AccessKit's `Click` for a real click.
+            for (&(name, id), &before) in controls.iter().zip(&rects) {
+                let covered = id.with("covered");
+                run(&ctx, &mut app, MIN_SIZE, vec![screen_reader_click(covered)]);
+                assert!(
+                    app.flyout == flyout && unchanged(&app),
+                    "{label} flyout: a screen reader's click on {name} went through"
+                );
+                let response = ctx.read_response(covered).unwrap();
+                assert_eq!(response.rect, before, "{label} flyout: {name}");
+                assert!(!response.sense.senses_click(), "{label} flyout: {name}");
+            }
+            // Tab only reaches the list.
+            let list = rect(Id::new("flyout")).unwrap();
+            let tab = key(Key::Tab, Modifiers::NONE);
+            for _ in 0..6 {
+                run(&ctx, &mut app, MIN_SIZE, vec![tab.clone()]);
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                let focused = access::focused(&ctx).unwrap();
+                let rect = ctx.read_response(focused).unwrap().rect;
+                assert!(
+                    rect.top() >= list.top(),
+                    "{label} flyout: Tab reached {focused:?}"
+                );
+            }
+        }
+
+        // Docked there's no flyout, and the header works.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        app.set_mode(Mode::Scientific);
+        let docked = vec2(DOCK_WIDTH, 600.0);
+        app.flyout = Flyout::Memory;
+        run(&ctx, &mut app, docked, vec![]);
+        let menu = ctx.read_response(Id::new("menu")).unwrap().rect;
+        click(&ctx, &mut app, docked, menu.center());
+        assert!(app.flyout == Flyout::Navigation);
     }
 }
