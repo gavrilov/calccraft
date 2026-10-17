@@ -2932,36 +2932,42 @@ fn repaint_for_flash<C>(ctx: &Context, flash: &mut Option<(C, f64)>, now: f64) {
 /// alone. Text that comes with any `Alt` chord goes too.
 fn take_mode_shortcut(events: &mut Vec<Event>) -> Option<Mode> {
     let mut chosen = None;
-    let mut consumed = false;
-    events.retain(|event| match event {
-        Event::Key {
-            key,
-            pressed,
-            modifiers,
-            ..
-        } if modifiers.alt && !modifiers.ctrl => {
-            // In Windows an Alt chord is a system key and types nothing, but egui-winit
-            // still sends the key's text along.
-            consumed |= *pressed;
-            match Mode::for_alt_key(*key) {
+    // Whether the event before is an `Alt` chord's key press.
+    let mut after_alt_chord = false;
+    events.retain(|event| {
+        let keep = match event {
+            Event::Key {
+                key,
+                pressed,
+                modifiers,
+                ..
+            } if modifiers.alt && !modifiers.ctrl => match Mode::for_alt_key(*key) {
                 Some(mode) => {
                     chosen = chosen.or(pressed.then_some(mode));
                     false
                 }
                 None => true,
+            },
+            Event::Key {
+                key: Key::E,
+                pressed,
+                modifiers,
+                ..
+            } if modifiers.command_only() => {
+                chosen = chosen.or(pressed.then_some(Mode::DateCalculation));
+                false
             }
-        }
-        Event::Key {
-            key: Key::E,
-            pressed,
-            modifiers,
-            ..
-        } if modifiers.command_only() => {
-            chosen = chosen.or(pressed.then_some(Mode::DateCalculation));
-            false
-        }
-        Event::Text(_) if consumed => false,
-        _ => true,
+            // In Windows an Alt chord is a system key and types nothing, but egui-winit
+            // still sends the key's text along, right after the key. Only that text goes:
+            // keys typed after the chord in the same frame still type.
+            Event::Text(_) => !after_alt_chord,
+            _ => true,
+        };
+        after_alt_chord = matches!(
+            event,
+            Event::Key { pressed: true, modifiers, .. } if modifiers.alt && !modifiers.ctrl
+        );
+        keep
     });
     chosen
 }
@@ -3305,5 +3311,21 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn alt_chords_take_only_their_own_text() {
+        // Alt+2 opens the Scientific mode and types nothing, but a 7 typed right after it, in
+        // the same frame, is typed.
+        let seven = [key(Key::Num7, Modifiers::NONE), Event::Text("7".into())];
+        let mut events = vec![key(Key::Num2, Modifiers::ALT), Event::Text("2".into())];
+        events.extend(seven.clone());
+        assert_eq!(take_mode_shortcut(&mut events), Some(Mode::Scientific));
+        assert_eq!(events, seven);
+        // The same after an Alt chord that isn't a mode key.
+        let mut events = vec![key(Key::Num6, Modifiers::ALT), Event::Text("6".into())];
+        events.extend(seven.clone());
+        assert_eq!(take_mode_shortcut(&mut events), None);
+        assert!(events.ends_with(&seven));
     }
 }
