@@ -350,6 +350,132 @@ fn microsoft_calculator_manager_tests() {
     );
 }
 
+/// Sequences on which this engine and Microsoft's `CalcManager` agree, see the file's header.
+const GOLDEN: &str = include_str!("ms_golden.txt");
+
+/// What the view model and the digit grouping own is compared without it: commas and spaces
+/// in numbers, the binary list's leading zeros (the view model pads them), and the spaces
+/// of the expression line.
+fn plain_number(s: &str) -> String {
+    let s = s.replace([',', ' '], "");
+    let (sign, digits) = match s.strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", s.as_str()),
+    };
+    let trimmed = digits.trim_start_matches('0');
+    let digits = if trimmed.is_empty() || trimmed.starts_with(['.', 'e']) {
+        // `0`, `0.5`: keep one zero in front of what follows.
+        format!("0{trimmed}")
+    } else {
+        trimmed.to_string()
+    };
+    format!("{sign}{digits}")
+}
+
+fn unescape(s: &str) -> String {
+    s.replace("\\t", "\t")
+        .replace("\\n", "\n")
+        .replace("\\\\", "\\")
+}
+
+#[test]
+fn microsoft_golden_vectors() {
+    let mut failures = Vec::new();
+    let mut checked = 0;
+    for line in GOLDEN
+        .lines()
+        .filter(|l| !l.starts_with('#') && !l.is_empty())
+    {
+        let fields: Vec<&str> = line.split('\t').collect();
+        let [
+            mode,
+            keys,
+            display,
+            expression,
+            error,
+            parens,
+            memory,
+            history,
+            radixes,
+        ] = fields[..]
+        else {
+            panic!("bad line {line}");
+        };
+        let keys: Vec<String> = keys.split(' ').map(str::to_string).collect();
+        let (steps, played_history) = play(mode, &keys);
+        let last = steps.last().unwrap();
+        let mut differences = Vec::new();
+        if plain_number(&last.display) != plain_number(&unescape(display)) {
+            differences.push(format!("display {:?}, Microsoft {display:?}", last.display));
+        }
+        if without_spaces(&last.expression) != without_spaces(&unescape(expression)) {
+            differences.push(format!(
+                "expression {:?}, Microsoft {expression:?}",
+                last.expression
+            ));
+        }
+        if u8::from(last.error).to_string() != error {
+            differences.push(format!("error {}, Microsoft {error}", last.error));
+        }
+        if last.parens.to_string() != parens {
+            differences.push(format!("parentheses {}, Microsoft {parens}", last.parens));
+        }
+        let memory: Vec<String> = memory
+            .split('|')
+            .filter(|item| !item.is_empty())
+            .map(|item| plain_number(&unescape(item)))
+            .collect();
+        let played_memory: Vec<String> =
+            last.memory.iter().map(|item| plain_number(item)).collect();
+        if played_memory != memory {
+            differences.push(format!("memory {:?}, Microsoft {memory:?}", last.memory));
+        }
+        if mode != "prog" {
+            let expected: Vec<(String, String)> = history
+                .split(';')
+                .filter(|item| !item.is_empty())
+                .map(|item| {
+                    let (e, r) = item.split_once("=>").unwrap();
+                    (without_spaces(&unescape(e)), plain_number(&unescape(r)))
+                })
+                .collect();
+            let played: Vec<(String, String)> = played_history
+                .iter()
+                .map(|(e, r)| (without_spaces(e), plain_number(r)))
+                .collect();
+            if played != expected {
+                differences.push(format!("history {played_history:?}, Microsoft {history:?}"));
+            }
+        } else if radixes != "-" {
+            let expected: Vec<String> = radixes.split('|').map(plain_number).collect();
+            let played: Vec<String> = last
+                .radixes
+                .iter()
+                .flatten()
+                .map(|item| plain_number(item))
+                .collect();
+            if played != expected {
+                differences.push(format!("radixes {:?}, Microsoft {radixes:?}", last.radixes));
+            }
+        }
+        checked += 1;
+        if !differences.is_empty() {
+            failures.push(format!(
+                "{mode} {}: {}",
+                keys.join(" "),
+                differences.join("; ")
+            ));
+        }
+    }
+    assert!(checked >= 1500, "only {checked} vectors");
+    assert!(
+        failures.is_empty(),
+        "{} of {checked}:\n{}",
+        failures.len(),
+        failures[..failures.len().min(20)].join("\n")
+    );
+}
+
 /// Replays `CALCCRAFT_REPLAY_IN` (lines `mode KEY KEY …`) into `CALCCRAFT_REPLAY_OUT`.
 #[test]
 #[ignore = "tool for the oracle comparison: needs CALCCRAFT_REPLAY_IN and CALCCRAFT_REPLAY_OUT"]
