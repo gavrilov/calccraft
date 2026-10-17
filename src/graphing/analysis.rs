@@ -417,13 +417,90 @@ fn sign_changes(g: &dyn Fn(f64) -> f64, xs: &[f64], through_poles: bool) -> Vec<
                 }
             }
             let c = (a.0 + b.0) / 2.0;
-            let small = g(c).abs() <= 1e-6 * (prev.1.abs() + cur.1.abs()) + 1e-12;
-            if through_poles || small {
+            // A zero, not a pole or a jump: g is small there, or keeps shrinking towards
+            // it, as next to a vertical tangent (∛(x² − 2) is still 7.6e-6 at the double
+            // closest to √2, from a radicand of 4.4e-16).
+            let span = cur.0 - prev.0;
+            let zero = || {
+                g(c).abs() <= 1e-6 * (prev.1.abs() + cur.1.abs()) + 1e-12
+                    || (shrinks(g, c, -span) && shrinks(g, c, span))
+            };
+            if through_poles || zero() {
                 out.push((c, prev.0, cur.0));
             }
         }
     }
     out
+}
+
+/// Whether |`g`| shrinks towards `c` from `c + span`, as next to a zero with a vertical
+/// tangent: at `c` it's less than half what it is a millionth of `span` away, which is less
+/// than half what it is a thousandth away. Next to a pole it grows, and next to a jump it
+/// levels off, so where g changes sign at `c`, c is a zero.
+fn shrinks(g: &dyn Fn(f64) -> f64, c: f64, span: f64) -> bool {
+    let (near, far) = (g(c + span * 1e-6).abs(), g(c + span * 1e-3).abs());
+    g(c).abs() < 0.5 * near && near < 0.5 * far
+}
+
+/// Whether `f` tends to 0 at the end `x` of its domain, from the side of `side`: |f(x)| is
+/// at most 1e-12, or its limit from inside is 0 to within the limit's own error. Next to a
+/// vertical tangent, f(x) itself is far from the limit: √(x² − 2) is 2.1e-8 at the double
+/// closest to √2, and root(x² − 2, 4) 1.5e-4.
+///
+/// Inside, f ≈ L + C·hᵖ + D·hᵖ⁺¹ at h = 2⁻⁴, 2⁻⁶, … 2⁻²⁴ of max(1, |x|) (rounded up to a
+/// power of 2, so that x + h is exact), from the first h where f is defined all the way in.
+/// The ratios of successive differences tell p, the exponent of a root, or another fraction
+/// with a denominator up to 32; Richardson's extrapolation then removes hᵖ and hᵖ⁺¹. Further
+/// in, rounding noise grows, so the two successive estimates of L that agree best give it,
+/// and their difference its error: root(x² − 2, 4) + 10⁻⁸ comes out as 1.0004e-8 ± 4e-12.
+/// L has to be 0 within three times that error (and 10⁻¹² of f, for an error that comes out
+/// too small), and with it below the 10⁻⁹ the analysis shows as 0: 10⁶·root(x² − 2, 4) +
+/// 10⁻⁶ comes out as 4.7e-6 ± 4e-6. And f(x) has to be what C·hᵖ makes of a few ulps:
+/// √(x + 10⁻¹⁴) tends to 0 at −10⁻¹⁴, but it's 10⁻⁷ at 0.
+fn tends_to_zero(f: &dyn Fn(f64) -> f64, x: f64, side: f64) -> bool {
+    let at = f(x);
+    if at.abs() <= 1e-12 {
+        return true;
+    }
+    let scale = side * x.abs().max(1.0).log2().ceil().exp2();
+    let r: f64 = 0.25;
+    let all: Vec<f64> = (2..13).map(|k| f(x + scale * r.powi(k))).collect();
+    let start = all
+        .iter()
+        .rposition(|y| !y.is_finite())
+        .map_or(0, |i| i + 1);
+    let v = &all[start..];
+    if v.len() < 7 {
+        return false;
+    }
+    let steps: Vec<f64> = v.windows(2).map(|w| w[1] - w[0]).collect();
+    let exponent = |j: usize| fraction((steps[j + 1] / steps[j]).ln() / r.ln());
+    let Some(p) = (0..steps.len() - 2).find_map(|j| {
+        let p = exponent(j)?;
+        (exponent(j + 1) == Some(p) && p < 1.0).then_some(p)
+    }) else {
+        return false;
+    };
+    let richardson = |s: &[f64], q: f64| -> Vec<f64> {
+        s.windows(2)
+            .map(|w| (w[1] - q * w[0]) / (1.0 - q))
+            .collect()
+    };
+    let q = r.powf(p);
+    let estimates = richardson(&richardson(v, q), q * r);
+    let Some((error, limit)) = estimates
+        .windows(2)
+        .map(|w| ((w[1] - w[0]).abs(), w[0]))
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+    else {
+        return false;
+    };
+    let bound = 3.0 * error;
+    let c = (v[0] - limit).abs() / (scale.abs() * r.powi(2 + start as i32)).powf(p);
+    let rounding = c * (8.0 * f64::EPSILON * x.abs().max(1.0)).powf(p);
+    limit.abs() <= bound + 1e-12 * v[0].abs().max(1.0)
+        && limit.abs() + bound <= 1e-9
+        && (at - limit).abs() <= rounding
 }
 
 /// The zeros of `g`: sign changes, and touching zeros (zeros of `dg` where g is 0, like
@@ -697,6 +774,73 @@ fn set_text(v: char, intervals: &[Interval]) -> String {
     format!("{{{body}}}")
 }
 
+/// What `e` divides by: denominators, cos of tan's and sec's argument, sin of cot's and
+/// csc's, the argument of coth, csch and acsch, ln of a logarithm's base (log(b, x) is
+/// ln x/ln b), and the base of a negative power.
+fn divisors(e: &Expr, env: &Env, out: &mut Vec<Expr>) {
+    use Expr::*;
+    match e {
+        Bin(op, a, b) => {
+            match op {
+                BinOp::Div => out.push((**b).clone()),
+                BinOp::Pow if !b.has_x() && b.eval(0.0, 0.0, env) < 0.0 => out.push((**a).clone()),
+                _ => {}
+            }
+            divisors(a, env, out);
+            divisors(b, env, out);
+        }
+        Call(f, a) => {
+            match f {
+                Func::Tan | Func::Sec => out.push(Call(Func::Cos, a.clone())),
+                Func::Cot | Func::Csc => out.push(Call(Func::Sin, a.clone())),
+                Func::Coth | Func::Csch | Func::Acsch => out.push((**a).clone()),
+                _ => {}
+            }
+            divisors(a, env, out);
+        }
+        Root(a, n) | LogBase(n, a) => {
+            if matches!(e, LogBase(..)) {
+                out.push(Call(Func::Ln, n.clone()));
+            }
+            divisors(a, env, out);
+            divisors(n, env, out);
+        }
+        Neg(a) | Factorial(a) => divisors(a, env, out),
+        _ => {}
+    }
+}
+
+/// Whether `fun` divides by 0 at `x`, though it may evaluate to a number there by rounding:
+/// (x² − 2)/∛(x² − 2)² is ∛(x² − 2) but for holes at ±√2, and its divisor is 5.8e-11 at
+/// the double closest to √2. A divisor is 0 at x, or tends to 0 there: |d| ≈ L + C·hᵖ at
+/// h = 10⁻⁴, 10⁻⁶, 10⁻⁸ and 10⁻¹⁰ of max(1, |x|), with the same p from both ratios of
+/// successive differences, and L, extrapolated from the last two values, is 0 to within
+/// three times its change from the two before, plus what an ulp or so of x + h makes of
+/// C·hᵖ (rounding). x² + 10⁻¹⁴ tends to 10⁻¹⁴ at 0, and 1 + 10000·root(|x − 1|, 32) to 1
+/// at 1, though it is 5234 a billionth away.
+fn divides_by_zero(fun: &Fun, x: f64) -> bool {
+    let mut found = Vec::new();
+    divisors(fun.e, &fun.env, &mut found);
+    let h = |k: i32| x.abs().max(1.0) * 10f64.powi(-2 * k);
+    found.iter().filter(|d| d.has_x()).any(|d| {
+        let size = |x: f64| d.eval(x, 0.0, &fun.env).abs();
+        size(x) == 0.0
+            || [1.0, -1.0].iter().any(|&side| {
+                let v: Vec<f64> = (2..6).map(|k| size(x + side * h(k))).collect();
+                let steps: Vec<f64> = v.windows(2).map(|w| w[0] - w[1]).collect();
+                let power = |i: usize| fraction((steps[i + 1] / steps[i]).ln() / 0.01f64.ln());
+                let Some(p) = power(0).filter(|&p| power(1) == Some(p)) else {
+                    return false;
+                };
+                let q = 0.01f64.powf(p);
+                let limit = |i: usize| v[i + 1] - steps[i] * q / (1.0 - q);
+                let ulps = 8.0 * ((x + side * h(5)).abs() * f64::EPSILON).max(f64::MIN_POSITIVE);
+                let rounding = p * v[3] * ulps / h(5) / (1.0 - q);
+                limit(2).abs() <= 3.0 * (limit(2) - limit(1)).abs() + rounding
+            })
+    })
+}
+
 // ------------------------------------------------------------------ limits
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -744,6 +888,18 @@ fn limit_of(v: &[f64]) -> Limit {
     Limit::Unknown
 }
 
+/// The fraction k/n with n ≤ 32 that `p` is within 0.2% of, preferring small n.
+fn fraction(p: f64) -> Option<f64> {
+    if p.is_nan() || p <= 0.0 {
+        return None;
+    }
+    (1..=32).find_map(|n| {
+        let k = (p * n as f64).round();
+        let near = k / n as f64;
+        (k >= 1.0 && (near - p).abs() <= 2e-3 * p).then_some(near)
+    })
+}
+
 /// The limit at x → ±∞ of `g`.
 fn limit_at_infinity(g: &dyn Fn(f64) -> f64, sign: f64) -> Limit {
     let v: Vec<f64> = (1..=6).map(|k| g(sign * 10f64.powi(2 * k))).collect();
@@ -763,6 +919,23 @@ fn limit_at(fun: &Fun, p: f64, side: f64) -> Limit {
 
 fn point_text(x: f64, y: f64) -> String {
     format!("({}, {})", exact::format(x), exact::format(y))
+}
+
+/// The value of `fun` at a point: 0 at one of its `zeros` where f tends to 0 from each side
+/// it's defined on. Next to a vertical tangent, f is far from 0 at the double closest to a
+/// zero (∛(x² − 2) is 7.6e-6 at √2); but a point next to a zero needn't be on it:
+/// x^(1/3) + 10⁻⁸ is 0 at −10⁻²⁴ but 10⁻⁸ at 0.
+fn value_at(fun: &Fun, zeros: &[f64], x: f64) -> f64 {
+    let f = |x: f64| fun.f(x);
+    let step = 1e-9 * x.abs().max(1.0);
+    let sides: Vec<f64> = [1.0, -1.0]
+        .into_iter()
+        .filter(|&side| f(x + side * step).is_finite())
+        .collect();
+    let on_zero = zeros.iter().any(|&z| (z - x).abs() <= step)
+        && !sides.is_empty()
+        && sides.iter().all(|&side| tends_to_zero(&f, x, side));
+    if on_zero { 0.0 } else { f(x) }
 }
 
 /// The value of a limit, written for a range end.
@@ -849,26 +1022,33 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
     let d2 = |x: f64| fun.d2(x);
     let slope: &dyn Fn(f64) -> f64 = &d1;
 
-    // Zeros, also at the ends of the domain (√(25 − x²) at ±5). Exact values are
-    // looked for only when there are few (sin(x)/x has hundreds).
+    // Zeros, also at the ends of the domain (√(25 − x²) at ±5, and √(x² − 2) at ±√2,
+    // which is 2.1e-8 at the double closest to √2 but tends to 0). Exact values are looked
+    // for only when there are few (sin(x)/x has hundreds).
     let mut roots: Vec<f64> = zeros(&f, Some(slope), &xs)
         .into_iter()
         .filter(|&x| inside(x) && fun.defined(x))
         .collect();
+    // Not where f divides by 0: (x² − 2)/∛(x² − 2)² tends to 0 at ±√2, holes.
+    roots.retain(|&x| !divides_by_zero(fun, x));
     for i in &intervals {
-        for (end, closed) in [(i.lo, i.lo_closed), (i.hi, i.hi_closed)] {
-            if closed && fun.f(end).abs() <= 1e-12 {
+        for (end, closed, side) in [(i.lo, i.lo_closed, 1.0), (i.hi, i.hi_closed, -1.0)] {
+            if closed && tends_to_zero(&f, end, side) && !divides_by_zero(fun, end) {
                 roots.push(end);
             }
         }
     }
-    if roots.len() > 20 {
+    let roots = if roots.len() > 20 {
         features.too_complex.push(Feature::XIntercept);
-    } else if !roots.is_empty() {
-        let roots = dedupe(roots.iter().map(|&x| exact::snap(x, TIGHT)).collect());
+        Vec::new()
+    } else {
+        dedupe(roots.iter().map(|&x| exact::snap(x, TIGHT)).collect())
+    };
+    if !roots.is_empty() {
         let parts: Vec<String> = roots.iter().map(|x| exact::format(*x)).collect();
         features.x_intercepts = Some(parts.join(", "));
     }
+    let y = |x: f64| value_at(fun, &roots, x);
 
     // Turning points, where f′ changes sign (through ∞ at a cusp).
     let mut turns: Vec<(f64, bool)> = sign_changes(&d1, &xs, true)
@@ -891,7 +1071,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
         ]);
     } else {
         for &(c, minimum) in &turns {
-            let text = point_text(c, fun.f(c));
+            let text = point_text(c, y(c));
             if minimum {
                 features.minima.push(text);
             } else {
@@ -908,7 +1088,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
                 if slope == 0.0 || slope.is_nan() {
                     continue;
                 }
-                let text = point_text(end, fun.f(end));
+                let text = point_text(end, y(end));
                 if (slope > 0.0) == (side > 0.0) {
                     features.minima.push(text);
                 } else {
@@ -931,7 +1111,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
             .iter()
             .map(|&c| {
                 let c = exact::snap(c, TIGHT);
-                point_text(c, fun.f(c))
+                point_text(c, y(c))
             })
             .collect();
     }
@@ -949,14 +1129,14 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
             .iter()
             .filter(|(c, _)| *c > i.lo && *c < i.hi)
             .map(|&(c, _)| End {
-                value: exact::snap(fun.f(c), TIGHT),
+                value: exact::snap(y(c), TIGHT),
                 attained: true,
             })
             .collect();
         for (x, closed, side) in [(i.lo, i.lo_closed, 1.0), (i.hi, i.hi_closed, -1.0)] {
             if closed {
                 ends.push(End {
-                    value: exact::snap(fun.f(x), TIGHT),
+                    value: exact::snap(y(x), TIGHT),
                     attained: true,
                 });
                 continue;
@@ -1244,10 +1424,12 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let defined = |x: f64| fun.defined(x);
     let slope: &dyn Fn(f64) -> f64 = &d1;
 
-    let roots: Vec<f64> = in_period(zeros(&f, Some(slope), &xs), p)
+    let mut roots: Vec<f64> = in_period(zeros(&f, Some(slope), &xs), p)
         .into_iter()
         .filter(|&x| defined(x))
         .collect();
+    // Not where f divides by 0: sin(x)/∛(sin x)² tends to 0 at πn, holes.
+    roots.retain(|&x| !divides_by_zero(fun, x));
     if !roots.is_empty() {
         let (step, firsts) = families(&roots, p, &|_, _| true);
         let parts: Vec<String> = firsts
@@ -1256,6 +1438,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
             .collect();
         features.x_intercepts = Some(format!("{{{}, n₁ ∈ ℤ}}", parts.join(", ")));
     }
+    let y = |x: f64| value_at(fun, &roots, x);
 
     // Turning points and their kind, in one period.
     let positions = in_period(
@@ -1279,10 +1462,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
         if points.is_empty() {
             continue;
         }
-        let values: Vec<f64> = points
-            .iter()
-            .map(|&x| exact::snap(fun.f(x), TIGHT))
-            .collect();
+        let values: Vec<f64> = points.iter().map(|&x| exact::snap(y(x), TIGHT)).collect();
         let (step, firsts) = families(&points, p, &|a, b| (values[a] - values[b]).abs() < 1e-9);
         let texts: Vec<String> = firsts
             .iter()
@@ -1314,10 +1494,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     if fun.d2.is_none() {
         features.too_complex.push(Feature::InflectionPoints);
     } else if !bends.is_empty() {
-        let values: Vec<f64> = bends
-            .iter()
-            .map(|&x| exact::snap(fun.f(x), TIGHT))
-            .collect();
+        let values: Vec<f64> = bends.iter().map(|&x| exact::snap(y(x), TIGHT)).collect();
         let (step, firsts) = families(&bends, p, &|a, b| (values[a] - values[b]).abs() < 1e-9);
         features.inflection_points = firsts
             .iter()
@@ -1335,7 +1512,7 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let mut ends: Vec<End> = turns
         .iter()
         .map(|t| End {
-            value: exact::snap(fun.f(t.0), TIGHT),
+            value: exact::snap(y(t.0), TIGHT),
             attained: true,
         })
         .collect();
@@ -1619,6 +1796,96 @@ mod tests {
                 ("(0, 5)", Direction::Decreasing)
             ]
         );
+    }
+
+    #[test]
+    fn vertical_tangent_zeros() {
+        // Next to √2 the radicand is a rounding error, 4.4e-16, whose cube root is 7.6e-6:
+        // far more than a millionth of the values around it, which a zero needed.
+        for text in ["y=cbrt(x^2-2)", "y=root(x^2-2,3)", "y=root(x^2-2,5)"] {
+            let f = analyze_text(text);
+            assert_eq!(f.x_intercepts.as_deref(), Some("−√2, √2"), "{text}");
+            assert_eq!(f.inflection_points, vec!["(−√2, 0)", "(√2, 0)"], "{text}");
+        }
+        let f = analyze_text("y=cbrt(x^3-2x)");
+        assert_eq!(f.x_intercepts.as_deref(), Some("−√2, 0, √2"));
+        assert_eq!(f.inflection_points, vec!["(−√2, 0)", "(0, 0)", "(√2, 0)"]);
+        // At the ends of the domain.
+        let f = analyze_text("y=sqrt(x^2-2)");
+        assert_eq!(f.x_intercepts.as_deref(), Some("−√2, √2"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [0, ∞)}"));
+        assert_eq!(f.minima, vec!["(−√2, 0)", "(√2, 0)"]);
+        // √x + 0.00001 shrinks towards 0.00001 there, not 0.
+        let f = analyze_text("y=sqrt(x)+0.00001");
+        assert_eq!(f.x_intercepts, None);
+        assert_eq!(f.minima, vec!["(0, 0.00001)"]);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [0.00001, ∞)}"));
+        // √(x² − 2) + 10⁻⁸ is 3.1e-8 at the double closest to √2, and tends to 10⁻⁸ there.
+        let f = analyze_text("y=sqrt(x^2-2)+10^(-8)");
+        assert_eq!(f.x_intercepts, None);
+        assert_eq!(f.minima.len(), 2);
+        assert!(
+            f.minima.iter().all(|m| !m.ends_with(", 0)")),
+            "{:?}",
+            f.minima
+        );
+        // Higher roots tend to their limit more slowly: root(x² − 2, 4) is 1.5e-4 at the
+        // double closest to √2, and root(x² − 2, 4) + 10⁻⁸ tends to 10⁻⁸.
+        for text in ["y=root(x^2-2,4)", "y=root(x^2-2,6)"] {
+            let f = analyze_text(text);
+            assert_eq!(f.x_intercepts.as_deref(), Some("−√2, √2"), "{text}");
+            assert_eq!(f.minima, vec!["(−√2, 0)", "(√2, 0)"], "{text}");
+        }
+        for text in ["y=root(x^2-2,4)+10^(-8)", "y=root(x^2-2,6)+10^(-8)"] {
+            let f = analyze_text(text);
+            assert_eq!(f.x_intercepts, None, "{text}");
+            assert!(f.minima.iter().all(|m| !m.ends_with(", 0)")), "{text}");
+        }
+        // 10⁶ times as large, the limit comes out as 4.7e-6 ± 4e-6: no telling 10⁻⁶ from 0.
+        let f = analyze_text("y=10^6 root(x^2-2,4)+10^(-6)");
+        assert_eq!(f.x_intercepts, None);
+        // An end at 0 can be off by rounding too: (√2)² − 2 is 4.4e-16.
+        let f = analyze_text("y=sqrt((x+sqrt(2))^2-2)");
+        assert_eq!(f.x_intercepts.as_deref(), Some("−2√2, 0"));
+        // A point next to a zero needn't be on it: √x − 10⁻⁸ is 0 at 10⁻¹⁶ but −10⁻⁸ at 0,
+        // x^(1/3) + 10⁻⁸ is 0 at −10⁻²⁴ but 10⁻⁸ at 0, and √(x + 10⁻¹⁴), whose domain starts
+        // at −10⁻¹⁴, is 10⁻⁷ at 0.
+        let f = analyze_text("y=sqrt(x)-10^(-8)");
+        assert_eq!(f.minima, vec!["(0, −0.00000001)"]);
+        let f = analyze_text("y=x^(1/3)+10^(-8)");
+        assert_eq!(f.inflection_points, vec!["(0, 0.00000001)"]);
+        let f = analyze_text("y=sqrt(x+10^(-14))");
+        assert_eq!(f.x_intercepts, None);
+        // cos(π/2) is 6.1e-17 in doubles.
+        let f = analyze_text("y=cbrt(cos(x))");
+        assert_eq!(f.x_intercepts.as_deref(), Some("{πn₁ + π/2, n₁ ∈ ℤ}"));
+        assert_eq!(f.inflection_points, vec!["{(πn₁ + π/2, 0), n₁ ∈ ℤ}"]);
+        // sin π is 1.2e-16 in doubles, but sin 0 is 0: only every other zero was found.
+        let f = analyze_text("y=cbrt(sin(x))");
+        assert_eq!(f.x_intercepts.as_deref(), Some("{πn₁, n₁ ∈ ℤ}"));
+        assert_eq!(f.inflection_points, vec!["{(πn₁, 0), n₁ ∈ ℤ}"]);
+        // A hole isn't a zero: (x² − 2)/∛(x² − 2)² is ∛(x² − 2) but for ±√2, where it
+        // divides by 0, and root(x² − 2, 4)³/root(x² − 2, 4)² has holes at the ends of its
+        // domain, as log(x² − 1, x² − 1) has at ±√2, where its base is 1 and it divides by
+        // ln 1. x/(x² + 10⁻¹⁴) only divides by 10⁻¹⁴ at its zero.
+        for text in [
+            "y=(x^2-2)/cbrt(x^2-2)^2",
+            "y=sin(x)/cbrt(sin(x))^2",
+            "y=root(x^2-2,4)^3/root(x^2-2,4)^2",
+            "y=cbrt(x^2-2)*log(x^2-1,x^2-1)",
+        ] {
+            assert_eq!(analyze_text(text).x_intercepts, None, "{text}");
+        }
+        for text in ["y=x/(x^2+10^(-14))", "y=x/(x^2+10^(-30))"] {
+            assert_eq!(
+                analyze_text(text).x_intercepts.as_deref(),
+                Some("0"),
+                "{text}"
+            );
+        }
+        // Nor by 1 + 10000·root(|x − 1|, 32), though it is 5234 a billionth away from 1.
+        let f = analyze_text("y=(x-1)/(1+10000*root(abs(x-1),32))");
+        assert_eq!(f.x_intercepts.as_deref(), Some("1"));
     }
 
     #[test]
