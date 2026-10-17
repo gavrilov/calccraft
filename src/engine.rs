@@ -3224,6 +3224,24 @@ mod tests {
     }
 
     #[test]
+    fn programmer_sums_are_not_snapped() {
+        // The Programmer mode's precision is 64 digits, so `rat_smallest` is 10^-64 and no
+        // difference of integers of a 64-bit word is small enough to snap. A build of
+        // Microsoft's CalcManager (d125246) gives the same results.
+        assert_eq!(
+            run_programmer("hex 7FFFFFFFFFFFFFFF - 7FFFFFFFFFFFFFFE =").0,
+            "1"
+        );
+        let mut calc = Calculator::programmer();
+        press_programmer(&mut calc, "hex 7FFFFFFFFFFFFFFF");
+        calc.execute(Command::MemoryStore);
+        press_programmer(&mut calc, "7FFFFFFFFFFFFFFE");
+        calc.execute(Command::MemorySubtract);
+        calc.execute(Command::MemoryRecall);
+        assert_eq!(calc.display(), "1");
+    }
+
+    #[test]
     fn logarithms_below_the_precision_snap_to_zero() {
         // Source: microsoft/calculator, CalcManager/Ratpack/exp.cpp: `lograt` ends with
         // `_snaprat(px, a, ...)` against its argument, so ln x is 0 where |ln x| < x · 10^-32,
