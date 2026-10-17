@@ -166,6 +166,20 @@ impl DateState {
         self.popup.is_some()
     }
 
+    /// Switches pages. Like Windows' `DateCalcOption_Changed` (`DateCalculator.xaml.cs`),
+    /// the From date goes along to the page switched to; the To date stays. Picking the page
+    /// that is already shown does nothing, as Windows' drop-down reports no change then.
+    fn set_page(&mut self, page: Page) {
+        if page == self.page {
+            return;
+        }
+        self.page = page;
+        match page {
+            Page::Difference => self.from = self.start,
+            Page::AddSubtract => self.start = self.from,
+        }
+    }
+
     /// The main result line; Ctrl+C copies it.
     pub(super) fn result_text(&self) -> String {
         match self.page {
@@ -534,7 +548,7 @@ impl CalculatorApp {
             let selected = page == self.date.page;
             let focus = self.take_popup_focus(selected);
             if list_item(p, ui, id, item, page.title(), selected, focus) {
-                self.date.page = page;
+                self.date.set_page(page);
                 self.date.popup = None;
             }
         }
@@ -1130,4 +1144,35 @@ fn decade_start(date: NaiveDate) -> i32 {
 
 fn today() -> NaiveDate {
     dates::clamp(Local::now().date_naive())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn date(year: i32, month: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(year, month, day).unwrap()
+    }
+
+    #[test]
+    fn from_date_carries_over_between_pages() {
+        // Windows copies the From date to the page switched to (`DateCalcOption_Changed`).
+        let mut state = DateState::new();
+        state.set_date(DateField::From, date(2020, 1, 15));
+        state.set_date(DateField::To, date(2021, 6, 1));
+        state.set_page(Page::AddSubtract);
+        assert_eq!(state.date(DateField::Start), date(2020, 1, 15));
+        assert_eq!(state.resulting_date(), Some(date(2020, 1, 15)));
+
+        state.set_date(DateField::Start, date(2024, 2, 29));
+        state.set_page(Page::Difference);
+        assert_eq!(state.date(DateField::From), date(2024, 2, 29));
+        // Only the From date is shared.
+        assert_eq!(state.date(DateField::To), date(2021, 6, 1));
+
+        // Picking the page that is already shown keeps its date.
+        state.set_date(DateField::From, date(2025, 5, 5));
+        state.set_page(Page::Difference);
+        assert_eq!(state.date(DateField::From), date(2025, 5, 5));
+    }
 }
