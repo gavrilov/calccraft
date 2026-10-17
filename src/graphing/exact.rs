@@ -41,14 +41,23 @@ fn near(v: f64, target: f64, tolerance: f64) -> bool {
     (v - target).abs() <= tolerance * v.abs().max(1.0)
 }
 
-/// p/q with q ≤ `max_q`, if `v` is one.
+/// How close `v` has to be to a fraction p/q, as a part of 1/q², the distance between
+/// neighbouring fractions with denominators near q. The tolerance grows with the number, so
+/// without this, fractions near a large number are within it by chance: within `LOOSE`,
+/// 992.8003 was 4964/5, and 99999.9 was 399999/4.
+const FRACTION_MARGIN: f64 = 1e-3;
+
+/// p/q with q ≤ `max_q`, if `v` is one: within `tolerance` of it, and much closer than the
+/// fractions around it are to each other.
 fn rational(v: f64, max_q: i64, tolerance: f64) -> Option<(i64, i64)> {
     if v.abs() > 1e12 {
         return None;
     }
     (1..=max_q).find_map(|q| {
         let p = (v * q as f64).round();
-        near(v, p / q as f64, tolerance).then(|| reduce(p as i64, q))
+        let off = (v - p / q as f64).abs();
+        (near(v, p / q as f64, tolerance) && off <= FRACTION_MARGIN / (q * q) as f64)
+            .then(|| reduce(p as i64, q))
     })
 }
 
@@ -257,5 +266,24 @@ mod tests {
         assert_eq!(coefficient_of_x(-1.0), "−x");
         assert_eq!(coefficient_of_x(-3.0000001), "−3x");
         assert_eq!(coefficient_of_x(0.5), "x/2");
+    }
+
+    #[test]
+    fn large_numbers_are_no_fractions() {
+        // The tolerance grows with the number, and fractions with denominators up to 12 lie
+        // about 1/q² apart: within LOOSE, 992.8003 was 4964/5, 12345.678 was 37037/3 and
+        // 99999.9 was 599999/6, and within TIGHT, 10⁶ + π/2 was 7000011/7 and 12345678.123
+        // was 98765425/8.
+        assert_eq!(rational(992.8003, 12, LOOSE), None);
+        assert_eq!(format_loose(12345.678), "12345.7");
+        assert_eq!(format_loose(99999.9), "999999/10");
+        assert_eq!(format(1e6 + PI / 2.0), "1000002");
+        assert_eq!(format(12345678.123), "12345678");
+        // Fractions that are what they look like stay, large or small: 661690.5 was 661690.
+        assert_eq!(format_loose(22.0 / 7.0), "22/7");
+        assert_eq!(format_loose(3.5 + 1e-9), "7/2");
+        assert_eq!(format_loose(1323381.0 / 2.0), "1323381/2");
+        assert_eq!(format(1e6 + 0.5), "2000001/2");
+        assert_eq!(format(-2000.0), "−2000");
     }
 }

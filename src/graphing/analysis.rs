@@ -750,6 +750,36 @@ fn limit_at_infinity(g: &dyn Fn(f64) -> f64, sign: f64) -> Limit {
     limit_of(&v)
 }
 
+/// The last of values `v` that tend to a limit, with the rest of their steps added if those
+/// shrink geometrically (like c/x): the limit, as `limit_of` takes it when they converge slowly.
+fn extrapolated(v: &[f64]) -> f64 {
+    let n = v.len();
+    let (before, last) = (v[n - 2] - v[n - 3], v[n - 1] - v[n - 2]);
+    let r = (last / before).abs();
+    if r < 0.5 {
+        v[n - 1] + last * r / (1.0 - r)
+    } else {
+        v[n - 1]
+    }
+}
+
+/// The limit at x → ±∞ of `g`, for an end of the range. The limits at −∞ and +∞ of 1/x + e
+/// are e ∓ 10⁻¹², the values 10¹² out: with the rest of the c/x added, they agree but for
+/// rounding, and are one value. A gap stays (3·10⁻¹⁰ for 1/x + 0.00001234567 + atan(x)/10¹⁰).
+fn end_limit_at_infinity(g: &dyn Fn(f64) -> f64, sign: f64) -> Limit {
+    let limit = limit_at_infinity(g, sign);
+    let settled = |s: f64| extrapolated(&[1e8, 1e10, 1e12].map(|x| g(s * x)));
+    if let (Limit::Value(a), Limit::Value(b)) = (limit, limit_at_infinity(g, -sign))
+        && a != b
+    {
+        let (a, b) = (settled(sign), settled(-sign));
+        if (a - b).abs() <= 8.0 * f64::EPSILON * a.abs().max(b.abs()) {
+            return Limit::Value(exact::snap((a + b) / 2.0, LOOSE));
+        }
+    }
+    limit
+}
+
 /// The one-sided limit at `p` from the side of `side` (−1 left, 1 right).
 fn limit_at(fun: &Fun, p: f64, side: f64) -> Limit {
     let scale = p.abs().max(1.0);
@@ -964,7 +994,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
             let limit = if x.is_finite() {
                 limit_at(fun, x, side)
             } else {
-                limit_at_infinity(&f, if x > 0.0 { 1.0 } else { -1.0 })
+                end_limit_at_infinity(&f, if x > 0.0 { 1.0 } else { -1.0 })
             };
             match limit_end(limit) {
                 Some(value) => ends.push(End {
@@ -1647,6 +1677,27 @@ mod tests {
                 ("(√3/3 + 1, ∞)", Direction::Decreasing),
             ]
         );
+    }
+
+    #[test]
+    fn large_values_are_no_fractions() {
+        // Within LOOSE, the limits of 12345.678 + 1/x were 37037/3, and those of 99999.9 + 1/x
+        // 599999/6, which the asymptote's text took for 399999/4 in turn. 99999.9 is 999999/10.
+        let f = analyze_text("y=12345.678+1/x");
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 12345.7"]);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ∖{12345.7}}"));
+        let f = analyze_text("y=99999.9+1/x");
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 999999/10"]);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ∖{999999/10}}"));
+        // Within TIGHT, the y-intercepts 10⁶ + π/2 and 12345678.123 were 7000011/7 and
+        // 98765425/8.
+        let f = analyze_text("y=10^6+acot(x)");
+        assert_eq!(f.y_intercept.as_deref(), Some("1000002"));
+        let f = analyze_text("y=x+12345678.123");
+        assert_eq!(f.y_intercept.as_deref(), Some("12345678"));
+        // A fraction a rational function tends to stays.
+        let f = analyze_text("y=(22x+1)/(7x)");
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 22/7"]);
     }
 
     #[test]
