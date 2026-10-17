@@ -2207,7 +2207,8 @@ pub(crate) fn operand_matches(operand: &str, scientific: bool) -> bool {
 fn number_matches(operand: &str, scientific: bool, exponent: bool) -> bool {
     let mut rest = operand.trim_start();
     if scientific {
-        if matches!(rest.trim_end(), "" | "+" | "-") {
+        // `[\s\x85]*[-+]?` up to the end: nothing, not even white space, follows the sign.
+        if matches!(rest, "" | "+" | "-") {
             return true;
         }
         while let Some(after) = rest
@@ -2985,6 +2986,32 @@ mod tests {
         assert!(calc.paste("3="));
         assert!(calc.notation());
         assert_eq!(calc.display(), "3.e+0");
+    }
+
+    #[test]
+    fn scientific_paste_refuses_white_space_after_a_sign() {
+        // Source: microsoft/calculator, Calculator.ViewModels/Common/CopyPasteManager.cs,
+        // `s_scientificModePatterns`: an operand that is just a sign matches `\A(?:[\s\x85]*[-+]?)`
+        // up to `\z`, so white space after the sign makes the whole paste invalid. A line-by-line
+        // port of `ValidatePasteExpression` (Python) agrees with `paste` on 700,000 random pastes
+        // except for these (the examples are its verdicts).
+        for text in [
+            "6++\t",
+            "2^+\n",
+            "6+-\n",
+            "-\n%6.5",
+            "7++\u{85}+5",
+            "2*-\n3",
+        ] {
+            let mut calc = Calculator::with_precedence();
+            assert!(!calc.paste(text), "{text:?}");
+            assert_eq!(calc.display(), "Invalid input", "{text:?}");
+        }
+        // White space before a sign, or alone after an operator, is fine.
+        for text in ["6+\n", "6+-", "6+\t", "6+ -", "2*\n-3", "6+(\n5)"] {
+            let mut calc = Calculator::with_precedence();
+            assert!(calc.paste(text), "{text:?}");
+        }
     }
 
     #[test]
