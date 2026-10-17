@@ -746,8 +746,167 @@ fn limit_of(v: &[f64]) -> Limit {
 
 /// The limit at x → ±∞ of `g`.
 fn limit_at_infinity(g: &dyn Fn(f64) -> f64, sign: f64) -> Limit {
-    let v: Vec<f64> = (1..=6).map(|k| g(sign * 10f64.powi(2 * k))).collect();
-    limit_of(&v)
+    far_limit(
+        &|x| {
+            let v = g(x);
+            (v, v.abs())
+        },
+        sign,
+        6,
+    )
+}
+
+/// The limit at x → ±∞ of the values `g` gives (with the size of the numbers each is
+/// computed from), from those at 10², 10⁴ … 10^(2·`count`) and at the same points divided
+/// by √2. Powers of ten alone alias with periodic terms: from 10⁴ on, they are whole turns
+/// of 400 grad and all lie 280° past a whole turn of 360°, so sin x has one value at all of
+/// them (and in radians sin πx is 0 at all of them). Divided by √2, they fall at unrelated
+/// angles in every unit. The limit of the powers of ten is kept if both sequences have
+/// `settled` on it, if both shrink geometrically and give the same limit, or if f's
+/// distance from it `shrinks` far out; ±∞ if both give it, or if f `grows` toward it.
+fn far_limit(g: &dyn Fn(f64) -> (f64, f64), sign: f64, count: i32) -> Limit {
+    let at = |scale: f64| -> (Vec<f64>, f64) {
+        let mut values = Vec::new();
+        let mut size: f64 = 0.0;
+        for k in 1..=count {
+            let (v, s) = g(sign * scale * 10f64.powi(2 * k));
+            values.push(v);
+            size = size.max(s);
+        }
+        (values, size)
+    };
+    let ((round, size), (other, other_size)) = (at(1.0), at(std::f64::consts::FRAC_1_SQRT_2));
+    match (limit_of(&round), limit_of(&other)) {
+        (Limit::Value(a), b) => {
+            // Steps shrinking geometrically along both converge (1/root(x, 5)'s by 0.4 at
+            // each step, slower than `settled` asks), if to the same limit. Values that
+            // have settled need no limit from the other sequence: in gradians, the powers
+            // of ten see 2000(sin x − 9 cos x)/x as −18000/x, and the other values shrink
+            // as fast but with factors `limit_of` can't extrapolate.
+            let agree = matches!(b, Limit::Value(b) if (a - b).abs() <= LOOSE * a.abs().max(1.0));
+            let geometric = shrinks_geometrically(&round) && shrinks_geometrically(&other);
+            let near = || far_values(g, sign, count).is_some_and(|v| shrinks(&v, a));
+            if settled(&round, &other, size.max(other_size)) || (geometric && agree) || near() {
+                Limit::Value(a)
+            } else {
+                Limit::Unknown
+            }
+        }
+        (a, b) if a == b => a,
+        (a @ (Limit::PlusInfinity | Limit::MinusInfinity), _) => {
+            let up = a == Limit::PlusInfinity;
+            if far_values(g, sign, count).is_some_and(|v| grows(&v, up)) {
+                a
+            } else {
+                Limit::Unknown
+            }
+        }
+        _ => Limit::Unknown,
+    }
+}
+
+/// f at 10^(2k) divided by 1, √2, √3, √5, √6, √7, √10, √11 and √13 for k = 1 … `count`: nine
+/// unrelated angles of each periodic term at every step. `None` if one isn't a number.
+fn far_values(g: &dyn Fn(f64) -> (f64, f64), sign: f64, count: i32) -> Option<Vec<Vec<f64>>> {
+    (1..=count)
+        .map(|k| {
+            [1.0, 2.0, 3.0, 5.0, 6.0, 7.0, 10.0, 11.0, 13.0f64]
+                .iter()
+                .map(|d| {
+                    let v = g(sign * 10f64.powi(2 * k) / d.sqrt()).0;
+                    v.is_finite().then_some(v)
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Whether the `far_values`' largest distance from `a` falls at each of the last three
+/// steps toward 0. With values on both sides of `a` at the end, it must fall to at most
+/// 60% of where it was: a decaying oscillation's does, however slowly its steps shrink
+/// (sin(x)/root(x, 10)'s by 10^(−0.2) at each), while one that doesn't decay comes close to
+/// `a` at one of the points now and then, not at all nine. A tail that stays on one side
+/// of `a` at all of them for four steps, as 1/ln(e(x² + 1)) does above 0, may fall more
+/// slowly, to 80%: an oscillation that does so can't fall that far.
+fn shrinks(values: &[Vec<f64>], a: f64) -> bool {
+    let far: Vec<f64> = values
+        .iter()
+        .map(|vs| vs.iter().fold(0.0, |m: f64, v| m.max((v - a).abs())))
+        .collect();
+    let n = far.len();
+    let falling =
+        n >= 4 && far[n - 1] < far[n - 2] && far[n - 2] < far[n - 3] && far[n - 3] < far[n - 4];
+    if !falling {
+        return false;
+    }
+    let above = |vs: &Vec<f64>| vs.iter().all(|&v| v > a);
+    let below = |vs: &Vec<f64>| vs.iter().all(|&v| v < a);
+    let tail = &values[n - 4..];
+    if tail.iter().all(&above) || tail.iter().all(&below) {
+        far[n - 1] <= 0.8 * far[n - 4]
+    } else {
+        let last = &values[n - 1];
+        !above(last) && !below(last) && far[n - 1] <= 0.6 * far[n - 4]
+    }
+}
+
+/// Whether the `far_values` grow toward +∞ (`up`) or −∞: at each of the last three steps,
+/// both the lowest and the highest of the nine rise. 0.2 ln x + sin(x/25)'s do in degrees,
+/// though a step adds less than the oscillation spans; x sin x's lowest falls. Or, where
+/// nine phases of a large oscillation jitter them from step to step, the lowest and the
+/// highest of the last two steps lie above those of the two before by more than a tenth
+/// of the band: ln x + 20 sin 2x's lowest are −6.1, 5.2, 2.2 and 9.1 in degrees. Those of
+/// an oscillation that stays within a band hardly move.
+fn grows(values: &[Vec<f64>], up: bool) -> bool {
+    let toward = |v: f64| if up { v } else { -v };
+    let low = |vs: &Vec<f64>| vs.iter().fold(f64::INFINITY, |m: f64, &v| m.min(toward(v)));
+    let high = |vs: &Vec<f64>| {
+        vs.iter()
+            .fold(f64::NEG_INFINITY, |m: f64, &v| m.max(toward(v)))
+    };
+    let n = values.len();
+    if n < 4 {
+        return false;
+    }
+    let rising = (n - 3..n)
+        .all(|k| low(&values[k]) > low(&values[k - 1]) && high(&values[k]) > high(&values[k - 1]));
+    let lowest = |vs: &[Vec<f64>]| vs.iter().map(low).fold(f64::INFINITY, f64::min);
+    let highest = |vs: &[Vec<f64>]| vs.iter().map(high).fold(f64::NEG_INFINITY, f64::max);
+    let (before, after) = (&values[n - 4..n - 2], &values[n - 2..]);
+    let margin = 0.1 * (high(&values[n - 1]) - low(&values[n - 1]));
+    rising || (lowest(after) - lowest(before) > margin && highest(after) - highest(before) > margin)
+}
+
+/// Whether the last steps of the values `v` shrink by more than half each time, as those
+/// `limit_of` extrapolates.
+fn shrinks_geometrically(v: &[f64]) -> bool {
+    let steps: Vec<f64> = v.windows(2).map(|p| (p[1] - p[0]).abs()).collect();
+    let n = steps.len();
+    n >= 3 && steps[n - 1] < 0.5 * steps[n - 2] && steps[n - 2] < 0.5 * steps[n - 3]
+}
+
+/// Whether values taken at 10^(2k)/√2 (`other`) and 10^(2k) (`round`) have settled: the
+/// last step of each, and of both taken in turn, is at most a thousandth of the largest
+/// step of the two in turn, or rounding (64 units in the last place of `size`, the largest
+/// number they're computed from). This measures how the values vary, not how large they
+/// are: 10¹² + 2000 sin x keeps changing by thousands, which `limit_of` and the agreement
+/// within `LOOSE` both allow next to 10¹². Each sequence counts on its own, as one can
+/// come close to the other's last value by chance: in gradians, 10¹² + 2000(sin x −
+/// 9 cos x) is 10¹² − 18000 at every 10^(2k) from 10⁴ on, and the other sequence still
+/// steps by 35337 at its end.
+fn settled(round: &[f64], other: &[f64], size: f64) -> bool {
+    let merged: Vec<f64> = other
+        .iter()
+        .zip(round)
+        .flat_map(|(&a, &b)| [a, b])
+        .collect();
+    let steps = |v: &[f64]| -> Vec<f64> { v.windows(2).map(|w| (w[1] - w[0]).abs()).collect() };
+    let in_turn = steps(&merged);
+    let largest = in_turn.iter().fold(0.0, |m: f64, &s| m.max(s));
+    let small = (64.0 * f64::EPSILON * size).max(largest / 1000.0);
+    [in_turn, steps(round), steps(other)]
+        .iter()
+        .all(|s| s.last().is_some_and(|&last| last <= small))
 }
 
 /// The one-sided limit at `p` from the side of `side` (−1 left, 1 right).
@@ -1082,9 +1241,14 @@ fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
                     continue;
                 }
                 let rest = |x: f64| fun.f(x) - m * x;
-                // Up to 10⁸: further out, f(x) − mx loses its digits.
-                let v: Vec<f64> = (1..=4).map(|k| rest(sign * 10f64.powi(2 * k))).collect();
-                let Limit::Value(c) = limit_of(&v) else {
+                // Up to 10⁸: further out, f(x) − mx loses its digits. Its rounding is that
+                // of the numbers f(x) goes through (10¹⁵ in x + 10¹⁵ − 10¹⁵ + 1/x) and of
+                // mx, not of the difference.
+                let sized = |x: f64| {
+                    let size = fun.e.magnitude(x, 0.0, &fun.env);
+                    (rest(x), size.max((m * x).abs()))
+                };
+                let Limit::Value(c) = far_limit(&sized, sign, 4) else {
                     continue;
                 };
                 // A line isn't its own asymptote.
@@ -1769,6 +1933,104 @@ mod tests {
         let f = analyze(&equation, Angle::Degrees).unwrap();
         assert_eq!(f.period, Period::Periodic("360".to_string()));
         assert_eq!(f.x_intercepts.as_deref(), Some("{180n₁, n₁ ∈ ℤ}"));
+    }
+
+    #[test]
+    fn periodic_terms_have_no_limit_at_infinity() {
+        let analyze_in = |text: &str, angle: Angle| {
+            let equation = Equation::parse(text, Syntax::default()).unwrap();
+            analyze(&equation, angle).unwrap()
+        };
+        // Powers of ten from 10⁴ on are whole turns of 400 grad and lie 280° past whole
+        // turns of 360°: sin x is the same at all of them, and sin πx is 0.
+        for (text, angle) in [
+            ("y=x+sin(x)", Angle::Degrees),
+            ("y=x+cos(x)", Angle::Degrees),
+            ("y=x+sin(x)", Angle::Gradians),
+            ("y=2x+3cos(x)", Angle::Gradians),
+            ("y=x+sin(πx)", Angle::Radians),
+        ] {
+            let f = analyze_in(text, angle);
+            assert_eq!(
+                f.oblique_asymptotes,
+                Vec::<String>::new(),
+                "{text} in {angle:?}"
+            );
+        }
+        assert_eq!(
+            analyze_in("y=x+sin(x)", Angle::Degrees).range.as_deref(),
+            Some("{y ∈ ℝ}")
+        );
+        // Its turning points go on past 1000, so the range can't be told, as in radians.
+        let f = analyze_in("y=x sin(x)", Angle::Degrees);
+        assert_eq!(f.range, None);
+        assert!(f.too_complex.contains(&Feature::Range));
+        // Next to 10¹², changes by thousands are below `limit_of`'s tolerance and `LOOSE`,
+        // but they don't stop.
+        for angle in [Angle::Radians, Angle::Degrees, Angle::Gradians] {
+            let f = analyze_in("y=1000000000000+2000sin(x)+1/x", angle);
+            assert_eq!(
+                f.horizontal_asymptotes,
+                Vec::<String>::new(),
+                "in {angle:?}"
+            );
+            let f = analyze_in("y=x+1000000000000+2000sin(x)", angle);
+            assert_eq!(f.oblique_asymptotes, Vec::<String>::new(), "in {angle:?}");
+        }
+        // In gradians this is 10¹² − 18000 at every 10^(2k) from 10⁴ on, and the values at
+        // 10^(2k)/√2 end 19 from it by chance, after a step of 35337.
+        let f = analyze_in(
+            "y=1000000000000+2000*(sin(x)-9*cos(x))+1/x",
+            Angle::Gradians,
+        );
+        assert_eq!(f.horizontal_asymptotes, Vec::<String>::new());
+        // True limits stay.
+        let f = analyze_in("y=sin(x)/x", Angle::Degrees);
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 0"]);
+        let f = analyze_in("y=x+sin(x)/x", Angle::Gradians);
+        assert_eq!(f.oblique_asymptotes, vec!["y = x"]);
+        let f = analyze_in("y=1000000000000+1/x", Angle::Degrees);
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 1000000000000"]);
+        let f = analyze_in("y=1/root(x,5)", Angle::Radians);
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 0"]);
+        let f = analyze_in("y=x+1/root(x,3)", Angle::Radians);
+        assert_eq!(f.oblique_asymptotes, vec!["y = x"]);
+        // So do those of decaying oscillations, whose values at 10^(2k)/√2 settle on it
+        // with factors that `limit_of` can't extrapolate.
+        let f = analyze_in("y=2000*(sin(x)-9*cos(x))/x", Angle::Gradians);
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 0"]);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ}"));
+        let f = analyze_in("y=x+100*(sin(x)-9*cos(x))/x", Angle::Degrees);
+        assert_eq!(f.oblique_asymptotes, vec!["y = x"]);
+        // f(x) − x varies by the rounding of 10¹⁵, which the value of f doesn't show.
+        let f = analyze_in("y=x+10^15-10^15+1/x", Angle::Radians);
+        assert_eq!(f.oblique_asymptotes, vec!["y = x"]);
+        // However slowly an oscillation decays: |sin(x)/root(x, 10)| ≤ x^(−0.1).
+        let f = analyze_in("y=sin(x)/root(x,10)", Angle::Gradians);
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 0"]);
+        let f = analyze_in("y=x+sin(x)/root(x,10)", Angle::Gradians);
+        assert_eq!(f.oblique_asymptotes, vec!["y = x"]);
+        let f = analyze_in("y=(sin(x)-9*cos(x))/root(x,3)", Angle::Degrees);
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 0"]);
+        // And f still goes to +∞ where an oscillation only sets it back early on.
+        let f = analyze_in("y=x+2000*(sin(x)+9*cos(x))/root(x,10)", Angle::Degrees);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [−10558.3, ∞)}"));
+        // Or where it rises by less than the oscillation spans at each step.
+        let f = analyze_in("y=0.2ln(x)+sin(x/25)", Angle::Degrees);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ}"));
+        // Even where nine phases of a large oscillation make the rise jitter.
+        for angle in [Angle::Degrees, Angle::Gradians] {
+            let f = analyze_in("y=ln(x)+20sin(2x)", angle);
+            assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ}"), "in {angle:?}");
+        }
+        // A tail from one side may shrink slowly: 1/ln(e(x² + 1)) by about half in three
+        // steps.
+        let f = analyze_in("y=1000000+1/ln(e*(x^2+1))", Angle::Radians);
+        assert_eq!(f.horizontal_asymptotes, vec!["y = 1000000"]);
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (1000000, 1000001]}"));
+        // f(x) − 0.015708x varies by less than f(x) rounds (1.6e6 at 10⁸): it has settled.
+        let f = analyze_in("y=x^2 sin(1/x)", Angle::Gradians);
+        assert_eq!(f.oblique_asymptotes, vec!["y = 0.015708x"]);
     }
 
     #[test]
