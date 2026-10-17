@@ -614,6 +614,23 @@ mod tests {
         }
     }
 
+    /// The radix list and the word size button show these texts in every language.
+    #[test]
+    fn radix_and_word_size_labels() {
+        let radixes = [Radix::Hex, Radix::Decimal, Radix::Octal, Radix::Binary];
+        assert_eq!(radixes.map(Radix::label), ["HEX", "DEC", "OCT", "BIN"]);
+        let words = [
+            WordSize::Qword,
+            WordSize::Dword,
+            WordSize::Word,
+            WordSize::Byte,
+        ];
+        assert_eq!(
+            words.map(WordSize::label),
+            ["QWORD", "DWORD", "WORD", "BYTE"]
+        );
+    }
+
     #[test]
     fn truncation_wraps_into_the_word() {
         let byte = mode(WordSize::Byte);
@@ -626,6 +643,14 @@ mod tests {
         assert_eq!(qword.format(&n(-5), Radix::Hex), "FFFFFFFFFFFFFFFB");
         assert_eq!(byte.format(&n(200), Radix::Decimal), "-56");
         assert_eq!(byte.format(&n(200), Radix::Octal), "310");
+    }
+
+    #[test]
+    fn clear_drops_the_carry_bit() {
+        let mut mode = mode(WordSize::Byte);
+        mode.carry = true;
+        mode.clear();
+        assert!(!mode.carry);
     }
 
     #[test]
