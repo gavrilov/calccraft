@@ -200,11 +200,11 @@ as in Windows.
   ([Fluent System Icons](https://github.com/microsoft/fluentui-system-icons)) are built into the
   executable, and so is [Inter](https://fonts.google.com/specimen/Inter), which takes Segoe UI's
   place where it's missing.
-- **Linux and macOS (x64)** get release builds too, with Inter, a plain title bar and en-US
-  regional formats, but Windows is the platform CalcCraft is made for. The Linux build needs X11 or
-  Wayland and OpenGL, as any desktop has. The macOS app isn't notarized: open it the first time
-  with right-click → Open (or remove the quarantine flag with `xattr -dr com.apple.quarantine
-  CalcCraft.app`).
+- **Linux (x64) and macOS (Apple silicon and Intel)** get release builds too, with Inter, a plain
+  title bar and en-US regional formats, but Windows is the platform CalcCraft is made for. The
+  Linux build needs X11 or Wayland and OpenGL, as any desktop has. The macOS app isn't notarized:
+  open it the first time with right-click → Open (or remove the quarantine flag with
+  `xattr -dr com.apple.quarantine CalcCraft.app`).
 - **Rust 1.95 or newer** (edition 2024; eframe 0.36 needs at least 1.95).
 - **Windows SDK** (on Windows) for `rc.exe`, which embeds the icon into the executable. It comes with the
   Visual Studio C++ build tools that Rust on Windows needs anyway.
@@ -262,15 +262,17 @@ git push origin v1.0.0
 
 The [release workflow](.github/workflows/release.yml) checks that the tag matches `Cargo.toml`
 and creates a draft release with generated release notes. Then it runs the tests and builds the
-app on Windows, Linux and macOS, all x64, and uploads each with its SHA-256 checksum:
+app on Windows and Linux (x64) and macOS (Apple silicon and Intel), and uploads each with its
+SHA-256 checksum:
 
 | Platform | File |
 | --- | --- |
 | Windows | `calculator-v1.0.0-windows-x64.exe` |
 | Linux | `calculator-v1.0.0-linux-x64.tar.gz` (the `calculator` executable) |
-| macOS | `calculator-v1.0.0-macos-x64.zip` (`CalcCraft.app`, signed ad hoc, cross-compiled on Apple silicon) |
+| macOS (Apple silicon) | `calculator-v1.0.0-macos-arm64.zip` (`CalcCraft.app`, signed ad hoc) |
+| macOS (Intel) | `calculator-v1.0.0-macos-x64.zip` (`CalcCraft.app`, signed ad hoc, cross-compiled on Apple silicon) |
 
-The draft is published only when all three are there. Tags with a suffix, such as
+The draft is published only when all four are there. Tags with a suffix, such as
 `v1.0.0-beta.1`, are published as pre-releases.
 
 ## Project layout

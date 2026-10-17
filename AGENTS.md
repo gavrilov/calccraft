@@ -719,6 +719,6 @@ Unit tests don't cover the UI. After visual or interaction changes:
   commit to one topic.
 - In the PR description, say what changed, why, and how you verified it (tests and manual
   checks). Include before/after screenshots for UI changes.
-- Pushing a `v*` tag publishes a GitHub release for Windows, Linux and macOS, all x64
-  (`.github/workflows/release.yml`, see "Releasing" in the README). The tag must match `version` in `Cargo.toml`. Don't create or push tags unless
+- Pushing a `v*` tag publishes a GitHub release for Windows and Linux (x64) and macOS (Apple
+  silicon and Intel) (`.github/workflows/release.yml`, see "Releasing" in the README). The tag must match `version` in `Cargo.toml`. Don't create or push tags unless
   a maintainer asks.
