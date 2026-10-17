@@ -296,10 +296,15 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   domain from the zeros of `boundary_functions` (denominators, radicands, cos of tan's argument …)
   checked by evaluating f. A function built from trigonometric functions of linear arguments
   has a `period` (verified, and shrunk to the smallest one); it's analyzed over one period and
-  written as families with `families` and `family_term`. Values go through `exact`: integers,
-  fractions, multiples of π and (p/q)√c + r/s, tried in that order with tight tolerances
-  (`TIGHT` for roots, `LOOSE` for limits), else 6 significant digits. Large counts (hundreds of
-  zeros of sin(x)/x) are "too complex" before any exact value is looked for: `recognize` is slow.
+  written as families with `families` and `family_term`. Values go through `exact`: integers
+  and fractions, else a short decimal (`1.05`, to the `ROUNDOFF` only), a multiple of π or
+  (p/q)√c + r/s, with tight tolerances (`TIGHT` for roots, `LOOSE` for limits), else 6
+  significant digits. Some long surd is within the tolerance of almost any number, so those
+  have to take `SAVED_DIGITS` fewer digits to write than a number to that tolerance (or be
+  exact to the `ROUNDOFF`), and the closest wins. Large counts (hundreds of zeros of sin(x)/x)
+  are "too complex" before any exact value is looked for: `recognize` is slow. A domain
+  boundary is moved to the exact value it is near only if a boundary function is zero there but
+  for roundoff, or, for a pole, if f is still a pole there (`snap_x`).
 
 ### `app/graphing_view.rs`, `app/graph_canvas.rs` and `app/graphing_keypad.rs`
 
