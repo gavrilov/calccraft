@@ -343,16 +343,31 @@ fn outer_derivative(f: Func, u: Expr, k: f64) -> Expr {
 impl Expr {
     /// The value at (x, y).
     pub fn eval(&self, x: f64, y: f64, env: &Env) -> f64 {
-        match self {
+        self.eval_checked(x, y, env, &|_, _| true)
+            .unwrap_or(f64::NAN)
+    }
+
+    /// The value at (x, y), or `None` if a part of the expression (the whole included)
+    /// fails `check` with its value there. An outer function can hide where a part has
+    /// no value: 1/x is ∞ at 0, and atan makes that π/2.
+    pub fn eval_checked(
+        &self,
+        x: f64,
+        y: f64,
+        env: &Env,
+        check: &impl Fn(&Expr, f64) -> bool,
+    ) -> Option<f64> {
+        let part = |e: &Expr| e.eval_checked(x, y, env, check);
+        let v = match self {
             Expr::Num(v) => *v,
             Expr::Pi => PI,
             Expr::E => std::f64::consts::E,
             Expr::X => x,
             Expr::Y => y,
             Expr::Var(name) => env.var(*name),
-            Expr::Neg(a) => -a.eval(x, y, env),
+            Expr::Neg(a) => -part(a)?,
             Expr::Bin(op, a, b) => {
-                let (a, b) = (a.eval(x, y, env), b.eval(x, y, env));
+                let (a, b) = (part(a)?, part(b)?);
                 match op {
                     BinOp::Add => a + b,
                     BinOp::Sub => a - b,
@@ -362,7 +377,7 @@ impl Expr {
                 }
             }
             Expr::Call(f, a) => {
-                let v = a.eval(x, y, env);
+                let v = part(a)?;
                 let k = radians_per_unit(env.angle);
                 if f.takes_angle() {
                     f.apply(v * k)
@@ -372,10 +387,11 @@ impl Expr {
                     f.apply(v)
                 }
             }
-            Expr::Root(a, n) => real_pow(a.eval(x, y, env), 1.0 / n.eval(x, y, env)),
-            Expr::LogBase(b, a) => a.eval(x, y, env).ln() / b.eval(x, y, env).ln(),
-            Expr::Factorial(a) => gamma(a.eval(x, y, env) + 1.0),
-        }
+            Expr::Root(a, n) => real_pow(part(a)?, 1.0 / part(n)?),
+            Expr::LogBase(b, a) => part(a)?.ln() / part(b)?.ln(),
+            Expr::Factorial(a) => gamma(part(a)? + 1.0),
+        };
+        check(self, v).then_some(v)
     }
 
     /// Whether `test` holds for this node or one inside it.
@@ -613,6 +629,19 @@ mod tests {
         assert!((gamma(5.0) - 24.0).abs() < 1e-9);
         assert!((gamma(0.5) - PI.sqrt()).abs() < 1e-12);
         assert!(gamma(-1.0).is_nan());
+    }
+
+    #[test]
+    fn checked_evaluation() {
+        // atan(1/x) is π/2 at 0, where 1/x is ∞.
+        let e = call(Func::Atan, bin(BinOp::Div, Expr::Num(1.0), x()));
+        let finite = |_: &Expr, v: f64| v.is_finite();
+        assert_eq!(e.eval(0.0, 0.0, &Env::RADIANS), PI / 2.0);
+        assert_eq!(e.eval_checked(0.0, 0.0, &Env::RADIANS, &finite), None);
+        assert_eq!(
+            e.eval_checked(1.0, 0.0, &Env::RADIANS, &finite),
+            Some(PI / 4.0)
+        );
     }
 
     #[test]

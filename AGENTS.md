@@ -294,7 +294,8 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   `sign_changes` (bisection; through poles for cusps when asked), touching zeros from f′,
   limits from far-away and nearby values (`limit_of`: converged, geometric, or growing), and the
   domain from the zeros of `boundary_functions` (denominators, radicands, cos of tan's argument …)
-  checked by evaluating f. A function built from trigonometric functions of linear arguments
+  checked by evaluating f and each part of it (`eval_checked`: atan(1/x) is π/2 at 0, though 1/x
+  has no value there). A function built from trigonometric functions of linear arguments
   has a `period` (verified, and shrunk to the smallest one); it's analyzed over one period and
   written as families with `families` and `family_term`. Values go through `exact`: integers,
   fractions, multiples of π and (p/q)√c + r/s, tried in that order with tight tolerances
@@ -638,7 +639,9 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
   sections don't map to characters; look a character's format up by byte range.
 - The graphing math is `f64` and the calculator engine's `BigRational`: don't mix them. `tan(π/2)`
   is 1.6e16 in doubles, not infinite, so the analysis treats values above 1e14 as poles
-  (`Fun::defined`).
+  (`Fun::defined`), and the zeros of divisors, logarithms' arguments, cos under tan … inside f
+  too (`boundary_functions` marks them; `root_at`: where they or a factor cross 0, or are exactly
+  0 by `is_exact`): atan(tan x) is finite at π/2, while x² + e^(−1000) is 0 at 0 only by rounding.
 - `arboard` reads the clipboard for the equation boxes' Paste menu item (keyboard pastes arrive
   as egui events); egui writes it, images included, through its own `arboard`.
 - `f32::clamp(min, max)` panics when `min > max`. Placing a popup with

@@ -167,9 +167,8 @@ pub fn analyze(equation: &Equation, angle: Angle) -> Result<Features, AnalysisEr
     // Windows' analysis fails, it shows `AnalysisCouldNotBePerformed`'s message, which isn't
     // among the strings here; "not supported" is the closest.
     if !e.has_x() {
-        let c = fun.f(0.0);
-        return if c.is_finite() {
-            Ok(constant(c))
+        return if fun.finite(0.0) {
+            Ok(constant(fun.f(0.0)))
         } else {
             Err(AnalysisError::NotSupported)
         };
@@ -248,20 +247,80 @@ impl<'a> Fun<'a> {
             .map_or(f64::NAN, |d| d.eval(x, 0.0, &self.env))
     }
 
-    /// Whether f is defined at x. A pole that doubles land next to (tan(π/2) is 1.6e16)
-    /// isn't.
-    fn defined(&self, x: f64) -> bool {
-        let v = self.f(x);
-        v.is_finite() && v.abs() < 1e14
+    /// Whether f has a finite value at x, and every part of it a value. An outer function
+    /// can hide where a part has none: 1/x is ∞ at 0, and atan(1/x) is π/2 there.
+    fn finite(&self, x: f64) -> bool {
+        let part = |e: &Expr, v: f64| !self.lacks_value(e, v, x);
+        self.e
+            .eval_checked(x, 0.0, &self.env, &part)
+            .is_some_and(f64::is_finite)
     }
 
-    /// `p`, or the smallest part of it that is a period too (|sin x| has π).
+    /// Whether f is defined at x: it has a finite value there and every part of it a
+    /// value (`finite`), and f isn't next to a pole (tan(π/2) is 1.6e16 in doubles). The
+    /// poles of its parts are the zeros that `boundary_functions` marks.
+    fn defined(&self, x: f64) -> bool {
+        let part = |e: &Expr, v: f64| !self.lacks_value(e, v, x);
+        self.e
+            .eval_checked(x, 0.0, &self.env, &part)
+            .is_some_and(|v| v.abs() < 1e14)
+    }
+
+    /// Whether the part `e` of f, whose value at x is `v`, has none there: NaN, an ∞ that
+    /// its own operation makes at a pole (1/0, ln 0, 0⁻¹, csc 0 …), a zeroth root, log's
+    /// base 0, or tan, sec, cot and csc at an exact pole in degrees or gradians. The
+    /// pole's 0 (or ±1, or log's base 1) has to be exact (`is_exact`): (1 + 10⁻²⁰) − 1 and e^(−1000)
+    /// are 0 only by rounding, and dividing by them overflows. An ∞ from overflow is a
+    /// value for the functions around it (atan(e^1000) is π/2, and e^(−e^1000) is 0), and
+    /// so is one a part only passes on (ln(e^1000)).
+    fn lacks_value(&self, e: &Expr, v: f64, x: f64) -> bool {
+        let at = |p: &Expr| p.eval(x, 0.0, &self.env);
+        let is = |p: &Expr, c: f64| at(p) == c && is_exact(p, x, &self.env);
+        let zero = |p: &Expr| is(p, 0.0);
+        if matches!(e, Expr::Root(_, n) if zero(n)) {
+            return true;
+        }
+        // Doubles round some exact poles to numbers: log(0, x) is ln(x)/ln(0), a 0, and
+        // tan(90°) is 1.6e16. The argument has to be exact (`is_exact`: 90 as written, not
+        // acos(0)). In radians the only multiple of π/2 the doubles hold is 0, where cot and
+        // csc are ∞.
+        let quarter = match self.env.angle {
+            Angle::Degrees => 90.0,
+            Angle::Gradians => 100.0,
+            Angle::Radians => f64::NAN,
+        };
+        let turns = |a: &Expr, from: f64| {
+            is_exact(a, x, &self.env) && (at(a) - from).rem_euclid(2.0 * quarter) == 0.0
+        };
+        match e {
+            Expr::LogBase(b, _) if zero(b) => return true,
+            Expr::Call(Func::Tan | Func::Sec, a) if turns(a, quarter) => return true,
+            Expr::Call(Func::Cot | Func::Csc, a) if turns(a, 0.0) => return true,
+            _ => {}
+        }
+        if !v.is_infinite() {
+            return v.is_nan();
+        }
+        match e {
+            Expr::Bin(BinOp::Div, _, b) => zero(b),
+            Expr::Bin(BinOp::Pow, a, _) | Expr::Root(a, _) => zero(a),
+            Expr::LogBase(b, a) => zero(a) || is(b, 1.0),
+            // The functions' poles are at 0 (ln, log, csc, cot, csch, coth, asech, acsch)
+            // and ±1 (atanh, acoth); anywhere else, ∞ is overflow (e^1000, csch(10⁻³¹⁰)).
+            Expr::Call(_, a) => zero(a) || is(a, 1.0) || is(a, -1.0),
+            _ => false,
+        }
+    }
+
+    /// `p`, or the smallest part of it that is a period too (|sin x| has π). Only values
+    /// count: sin(x) + atan(1/0) has none, though it is sin(x) + π/2 in doubles.
     fn verified_period(&self, p: f64) -> Option<f64> {
         let tests: Vec<f64> = (0..23).map(|k| -7.3 + 0.731 * k as f64).collect();
+        let value = |t: f64| if self.finite(t) { self.f(t) } else { f64::NAN };
         let repeats = |q: f64| {
             let mut compared = 0;
             for &t in &tests {
-                let (a, b) = (self.f(t), self.f(t + q));
+                let (a, b) = (value(t), value(t + q));
                 if a.is_finite() != b.is_finite() {
                     return false;
                 }
@@ -279,6 +338,181 @@ impl<'a> Fun<'a> {
         }
         (1..=12).rev().map(|k| p / k as f64).find(|&q| repeats(q))
     }
+}
+
+/// Whether `e` is exact at x: computed without rounding from x and the numbers as
+/// written, so that a 0 there is a true 0 (x² − 4 at 2), not one rounding made
+/// ((1 + 10⁻²⁰) − 1, e^(−1000)).
+fn is_exact(e: &Expr, x: f64, env: &Env) -> bool {
+    let at = |p: &Expr| p.eval(x, 0.0, env);
+    let part = |p: &Expr| is_exact(p, x, env);
+    let v = at(e);
+    match e {
+        Expr::Num(_) | Expr::Pi | Expr::E | Expr::X | Expr::Y | Expr::Var(_) => true,
+        Expr::Neg(a) => part(a),
+        Expr::Bin(op, a, b) => {
+            let (p, q) = (at(a), at(b));
+            let parts = || part(a) && part(b);
+            // 0 times a finite number, or over one, is 0 however that number was rounded.
+            let zero = |z: f64, of: &Expr, w: f64| z == 0.0 && w.is_finite() && part(of);
+            match op {
+                BinOp::Add => parts() && exact_sum(p, q, v),
+                BinOp::Sub => parts() && exact_sum(p, -q, v),
+                BinOp::Mul => zero(p, a, q) || zero(q, b, p) || (parts() && exact_product(p, q, v)),
+                BinOp::Div => q != 0.0 && (zero(p, a, q) || (parts() && exact_product(v, q, p))),
+                BinOp::Pow => {
+                    parts()
+                        && ((p == 0.0 && q > 0.0) || q == 0.0 || p == 1.0 || exact_power(p, q, v))
+                }
+            }
+        }
+        Expr::Root(a, n) => {
+            let (p, q) = (at(a), at(n));
+            part(a) && part(n) && ((p == 0.0 && q > 0.0) || p == 1.0 || exact_power(v, q, p))
+        }
+        // log_b 1 is 0 and log_b b is 1.
+        Expr::LogBase(b, a) => {
+            let (p, q) = (at(b), at(a));
+            part(b) && part(a) && (q == 1.0 || q == p)
+        }
+        Expr::Call(f, a) => {
+            let p = at(a);
+            part(a)
+                && match f {
+                    Func::Abs | Func::Floor | Func::Ceil | Func::Sign => true,
+                    Func::Sqrt => exact_power(v, 2.0, p),
+                    Func::Cbrt => exact_power(v, 3.0, p),
+                    // sin 0 = 0, cos 0 = 1, ln 1 = 0, acos 1 = 0 …
+                    _ => [p, v].iter().all(|w| [0.0, 1.0, -1.0].contains(w)),
+                }
+        }
+        Expr::Factorial(_) => false,
+    }
+}
+
+/// Whether p + q is exactly v (Fast2Sum: the larger minus the sum is exact).
+fn exact_sum(p: f64, q: f64, v: f64) -> bool {
+    let (big, small) = if p.abs() >= q.abs() { (p, q) } else { (q, p) };
+    v - big == small
+}
+
+/// Whether p·q is exactly v: a fused multiply-add's residual is, away from the smallest
+/// doubles, where it would round too (a product that underflows isn't exact).
+fn exact_product(p: f64, q: f64, v: f64) -> bool {
+    if v == 0.0 {
+        p == 0.0 || q == 0.0
+    } else {
+        v.abs() > 1e-280 && p.mul_add(q, -v) == 0.0
+    }
+}
+
+/// Whether a^n is exactly v for a whole n from 1 to 64: every product on the way is.
+fn exact_power(a: f64, n: f64, v: f64) -> bool {
+    if n.fract() != 0.0 || !(1.0..=64.0).contains(&n) {
+        return false;
+    }
+    let mut p = a;
+    for _ in 1..n as u32 {
+        let q = p * a;
+        if !exact_product(p, a, q) {
+            return false;
+        }
+        p = q;
+    }
+    p == v
+}
+
+/// e at t, and how far rounding can have moved it from its exact value: the parts' error
+/// carried through each operation (evaluated at the ends of the parts' ranges), plus four
+/// ULPs for the operation itself. x and the numbers as written are exact, π and e within
+/// an ULP (sin π is 1.2e−16 in doubles); ∞ when unknown.
+fn with_rounding_error(e: &Expr, t: f64, env: &Env) -> (f64, f64) {
+    let (a, b) = match e {
+        Expr::Neg(a) | Expr::Call(_, a) | Expr::Factorial(a) => (a, None),
+        Expr::Bin(_, a, b) | Expr::Root(a, b) | Expr::LogBase(a, b) => (a, Some(b)),
+        Expr::Pi | Expr::E => {
+            let v = e.eval(t, 0.0, env);
+            return (v, v.next_up() - v);
+        }
+        _ => return (e.eval(t, 0.0, env), 0.0),
+    };
+    let (a, da) = with_rounding_error(a, t, env);
+    let (b, db) = b.map_or((0.0, 0.0), |b| with_rounding_error(b, t, env));
+    let apply = |p: f64, q: f64| {
+        let (p, q) = (Box::new(Expr::Num(p)), Box::new(Expr::Num(q)));
+        match e {
+            Expr::Neg(_) => Expr::Neg(p),
+            Expr::Call(f, _) => Expr::Call(*f, p),
+            Expr::Factorial(_) => Expr::Factorial(p),
+            Expr::Bin(op, ..) => Expr::Bin(*op, p, q),
+            Expr::Root(..) => Expr::Root(p, q),
+            _ => Expr::LogBase(p, q),
+        }
+        .eval(t, 0.0, env)
+    };
+    let v = apply(a, b);
+    let carried = [(-da, -db), (-da, db), (da, -db), (da, db)]
+        .iter()
+        .map(|(ea, eb)| (apply(a + ea, b + eb) - v).abs())
+        .fold(
+            0.0,
+            |m: f64, d| if d.is_nan() { f64::INFINITY } else { m.max(d) },
+        );
+    (v, carried + 4.0 * (v.abs().next_up() - v.abs()))
+}
+
+/// The factors of g that are 0 where g is: those of products and quotients' numerators,
+/// the bases of positive powers, and the arguments of functions that are 0 at 0 (and sin
+/// and tan themselves, 0 at πn too).
+fn factors(g: &Expr, env: &Env, out: &mut Vec<Expr>) {
+    match g {
+        Expr::Bin(BinOp::Mul, a, b) => {
+            factors(a, env, out);
+            factors(b, env, out);
+        }
+        Expr::Bin(BinOp::Div, a, _) | Expr::Neg(a) => factors(a, env, out),
+        Expr::Bin(BinOp::Pow, a, n) if !n.has_x() && n.eval(0.0, 0.0, env) > 0.0 => {
+            factors(a, env, out)
+        }
+        Expr::Call(Func::Sin | Func::Tan, a) => {
+            out.push(g.clone());
+            factors(a, env, out);
+        }
+        Expr::Call(
+            Func::Asin
+            | Func::Atan
+            | Func::Sinh
+            | Func::Tanh
+            | Func::Asinh
+            | Func::Atanh
+            | Func::Sqrt
+            | Func::Cbrt
+            | Func::Abs
+            | Func::Sign,
+            a,
+        ) => factors(a, env, out),
+        _ => out.push(g.clone()),
+    }
+}
+
+/// Whether g has a root at x within the doubles' reach: it is exactly 0 there (x² at 0),
+/// or a factor of it crosses 0 right there by more than rounding (x² − 2 at √2, (3x − 1)²
+/// at 1/3), not at a jump (x² + ceil(x) − 1 near 0) or in rounding noise ((x + 0.1) − x −
+/// 0.1). x² + e^(−1000) and x² + 10⁻²⁰ only touch 0.
+fn root_at(g: &Expr, x: f64, env: &Env) -> bool {
+    if g.eval(x, 0.0, env) == 0.0 && is_exact(g, x, env) {
+        return true;
+    }
+    let mut parts = Vec::new();
+    factors(g, env, &mut parts);
+    let d = 1e-9 * x.abs().max(1.0);
+    parts.iter().any(|h| {
+        let (l, r) = (
+            with_rounding_error(h, x - d, env),
+            with_rounding_error(h, x + d, env),
+        );
+        (l.0 < 0.0) != (r.0 < 0.0) && l.0.abs() > l.1 && r.0.abs() > r.1
+    })
 }
 
 // ------------------------------------------------------------------ period
@@ -429,19 +663,31 @@ fn sign_changes(g: &dyn Fn(f64) -> f64, xs: &[f64], through_poles: bool) -> Vec<
 /// The zeros of `g`: sign changes, and touching zeros (zeros of `dg` where g is 0, like
 /// x² at 0). Runs of zeros, where a value underflows (e^(−x²) far out), don't count.
 fn zeros(g: &dyn Fn(f64) -> f64, dg: Option<&dyn Fn(f64) -> f64>, xs: &[f64]) -> Vec<f64> {
-    let mut out: Vec<f64> = sign_changes(g, xs, false)
+    let (mut out, touching) = zeros_by_kind(g, dg, xs);
+    out.extend(touching);
+    dedupe(out)
+}
+
+/// The zeros of `g` it crosses, and those it only touches.
+fn zeros_by_kind(
+    g: &dyn Fn(f64) -> f64,
+    dg: Option<&dyn Fn(f64) -> f64>,
+    xs: &[f64],
+) -> (Vec<f64>, Vec<f64>) {
+    let crossing = sign_changes(g, xs, false)
         .into_iter()
         .map(|c| c.0)
         .collect();
+    let mut touching = Vec::new();
     if let Some(dg) = dg {
         for (c, a, b) in sign_changes(dg, xs, true) {
             let scale = g(a).abs().max(g(b).abs());
             if g(c).abs() <= 1e-9 * scale.max(1e-12) || g(c) == 0.0 {
-                out.push(c);
+                touching.push(c);
             }
         }
     }
-    dedupe(out)
+    (crossing, touching)
 }
 
 /// The sign of `d` just left of `c`: whether a turning point there is a minimum.
@@ -484,50 +730,62 @@ pub fn key_points(
 
 // ------------------------------------------------------------------ domain
 
-/// Where the expression is undefined: the zeros of these functions bound or punch the
-/// domain (denominators, radicands, logarithms' arguments, cos of tan's argument …).
-fn boundary_functions(e: &Expr, out: &mut Vec<Expr>) {
+/// Where the expression is undefined or jumps: the zeros of these functions bound or punch
+/// the domain (denominators, radicands, logarithms' arguments, cos of tan's argument …), or
+/// split its range (acot's argument: acot(0) is π/2, next to −π/2). The zeros of those
+/// marked `true` are poles even where doubles land next to them: 1/(x² − 2) is 2.3e15 at
+/// √2 and ln(x² − 2) −35 (if the function crosses 0 there, or is exactly 0).
+fn boundary_functions(e: &Expr, env: &Env, out: &mut Vec<(Expr, bool)>) {
     use Expr::*;
     let sub = |a: &Expr, b: f64| Bin(BinOp::Sub, Box::new(a.clone()), Box::new(Num(b)));
     let square = |a: &Expr| Bin(BinOp::Pow, Box::new(a.clone()), Box::new(Num(2.0)));
+    // a^(−n) is 1/aⁿ.
+    let negative = |n: &Expr| !n.has_x() && n.eval(0.0, 0.0, env) < 0.0;
     match e {
         Bin(op, a, b) => {
             match op {
-                BinOp::Div => out.push((**b).clone()),
-                BinOp::Pow => out.push((**a).clone()),
+                BinOp::Div => out.push(((**b).clone(), true)),
+                BinOp::Pow => out.push(((**a).clone(), negative(b))),
                 _ => {}
             }
-            boundary_functions(a, out);
-            boundary_functions(b, out);
+            boundary_functions(a, env, out);
+            boundary_functions(b, env, out);
         }
         Call(f, a) => {
             match f {
-                Func::Tan | Func::Sec => out.push(Call(Func::Cos, a.clone())),
-                Func::Cot | Func::Csc => out.push(Call(Func::Sin, a.clone())),
-                Func::Asin | Func::Acos | Func::Atanh | Func::Acoth | Func::Asec | Func::Acsc => {
-                    out.push(sub(&square(a), 1.0))
+                Func::Tan | Func::Sec => out.push((Call(Func::Cos, a.clone()), true)),
+                Func::Cot | Func::Csc => out.push((Call(Func::Sin, a.clone()), true)),
+                Func::Atanh | Func::Acoth => out.push((sub(&square(a), 1.0), true)),
+                Func::Asin | Func::Acos | Func::Asec | Func::Acsc => {
+                    out.push((sub(&square(a), 1.0), false))
                 }
                 Func::Acosh | Func::Asech => {
-                    out.push(sub(a, 1.0));
-                    out.push((**a).clone());
+                    out.push((sub(a, 1.0), false));
+                    out.push(((**a).clone(), *f == Func::Asech));
                 }
-                Func::Sqrt | Func::Ln | Func::Log | Func::Coth | Func::Csch | Func::Acsch => {
-                    out.push((**a).clone())
+                Func::Ln | Func::Log | Func::Coth | Func::Csch | Func::Acsch => {
+                    out.push(((**a).clone(), true))
                 }
+                Func::Sqrt | Func::Acot => out.push(((**a).clone(), false)),
                 _ => {}
             }
-            boundary_functions(a, out);
+            boundary_functions(a, env, out);
         }
-        Root(a, n) | LogBase(n, a) => {
-            out.push((**a).clone());
-            if matches!(e, LogBase(..)) {
-                out.push((**n).clone());
-                out.push(sub(n, 1.0));
-            }
-            boundary_functions(a, out);
-            boundary_functions(n, out);
+        Root(a, n) => {
+            out.push(((**a).clone(), negative(n)));
+            // root(a, n) is a^(1/n).
+            out.push(((**n).clone(), true));
+            boundary_functions(a, env, out);
+            boundary_functions(n, env, out);
         }
-        Neg(a) | Factorial(a) => boundary_functions(a, out),
+        LogBase(b, a) => {
+            out.push(((**a).clone(), true));
+            out.push(((**b).clone(), true));
+            out.push((sub(b, 1.0), true));
+            boundary_functions(a, env, out);
+            boundary_functions(b, env, out);
+        }
+        Neg(a) | Factorial(a) => boundary_functions(a, env, out),
         _ => {}
     }
 }
@@ -541,23 +799,68 @@ struct Interval {
     hi_closed: bool,
 }
 
-/// The points where `fun` may start, stop or be punched out.
-fn domain_candidates(fun: &Fun, xs: &[f64]) -> Vec<f64> {
+/// The points where `fun` may start, stop or be punched out, those of them that are
+/// poles of a part of it, and those where a part may break, the only ones where f can
+/// jump though it has a value: the zeros of acot's argument, and those a pole's
+/// function crosses (x² + ceil(x) − 1 at 0, not x² + e^(−1000), which only touches 0).
+fn domain_candidates(fun: &Fun, xs: &[f64]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let mut functions = Vec::new();
-    boundary_functions(fun.e, &mut functions);
-    let mut candidates = Vec::new();
-    for (i, g) in functions.iter().enumerate() {
-        // A polynomial lists x once for each power.
-        if !g.has_x() || functions[..i].contains(g) {
-            continue;
+    boundary_functions(fun.e, &fun.env, &mut functions);
+    // A pole's factors make poles too: (x² − 2)² only touches 0 at ±√2, where doubles
+    // can't make it exactly 0, but x² − 2 crosses it there.
+    let mut parts = Vec::new();
+    for (g, pole) in &functions {
+        if *pole {
+            factors(g, &fun.env, &mut parts);
         }
+    }
+    functions.extend(parts.into_iter().map(|h| (h, true)));
+    // A polynomial lists x once for each power.
+    let mut unique: Vec<(Expr, bool)> = Vec::new();
+    for (g, pole) in functions {
+        match unique.iter_mut().find(|(h, _)| *h == g) {
+            Some((_, marked)) => *marked |= pole,
+            None if g.has_x() => unique.push((g, pole)),
+            None => {}
+        }
+    }
+    let (mut candidates, mut poles, mut breaks) = (Vec::new(), Vec::new(), Vec::new());
+    for (g, pole) in &unique {
         let dg = g.derivative(fun.env.angle);
         let gf = |x: f64| g.eval(x, 0.0, &fun.env);
         let dgf = |x: f64| dg.as_ref().map_or(f64::NAN, |d| d.eval(x, 0.0, &fun.env));
         let dgf: &dyn Fn(f64) -> f64 = &dgf;
-        candidates.extend(zeros(&gf, dg.as_ref().map(|_| dgf), xs));
+        let (crossing, touching) = zeros_by_kind(&gf, dg.as_ref().map(|_| dgf), xs);
+        if *pole {
+            // Only a root within the doubles' reach (`root_at`) is a pole: x² − 2 at √2 and
+            // x² at 0 are, x² + e^(−1000) only touches 0 by rounding.
+            poles.extend(
+                crossing
+                    .iter()
+                    .chain(&touching)
+                    .filter(|&&c| root_at(g, c, &fun.env)),
+            );
+        }
+        let acot = fun
+            .e
+            .any(&|h| matches!(h, Expr::Call(Func::Acot, a) if **a == *g));
+        if *pole || acot {
+            breaks.extend(&crossing);
+        }
+        if acot {
+            breaks.extend(&touching);
+        }
+        candidates.extend(crossing);
+        candidates.extend(touching);
     }
-    dedupe(candidates)
+    (dedupe(candidates), dedupe(poles), dedupe(breaks))
+}
+
+/// Whether `x` is one of `points`, as `dedupe` tells them apart.
+fn among(points: &[f64], x: f64) -> bool {
+    points
+        .iter()
+        .any(|&p| (p - x).abs() <= 1e-9 * x.abs().max(1.0))
 }
 
 /// Points snapped to the exact values they are near, without repeats. `recognize` is
@@ -567,13 +870,14 @@ fn snapped(points: Vec<f64>) -> Vec<f64> {
 }
 
 /// The domain of an aperiodic function, as intervals, or `None` if it has too many
-/// pieces to tell.
+/// pieces to tell. Where f jumps, one interval ends and the next starts (with the point
+/// itself between them if f's value there is on neither side).
 fn domain(fun: &Fun, xs: &[f64]) -> Option<Vec<Interval>> {
-    let points = domain_candidates(fun, xs);
+    let (points, poles, breaks) = domain_candidates(fun, xs);
     if points.len() > 40 {
         return None;
     }
-    let points = snapped(points);
+    let (points, poles, breaks) = (snapped(points), snapped(poles), snapped(breaks));
     let defined_between = |a: f64, b: f64| {
         let probes: Vec<f64> = match (a.is_finite(), b.is_finite()) {
             (true, true) => vec![a + (b - a) * 0.25, (a + b) / 2.0, a + (b - a) * 0.75],
@@ -592,7 +896,7 @@ fn domain(fun: &Fun, xs: &[f64]) -> Option<Vec<Interval>> {
         if !defined_between(a, b) {
             continue;
         }
-        let closed = |x: f64| x.is_finite() && fun.defined(x);
+        let closed = |x: f64| x.is_finite() && !among(&poles, x) && fun.defined(x);
         let piece = Interval {
             lo: a,
             hi: b,
@@ -600,14 +904,65 @@ fn domain(fun: &Fun, xs: &[f64]) -> Option<Vec<Interval>> {
             hi_closed: closed(b),
         };
         match intervals.last_mut() {
+            // A point between two pieces where f is defined joins them, unless f jumps
+            // there: then it belongs to the side f tends to its value from (acot(0) is
+            // π/2, the right side's limit), or stands alone (acot(−x²) at 0). Only a
+            // part's break can make a jump: root(x, 45) − root(x, 99) is 0.21 from its
+            // value at 10⁻¹², but continuous.
             Some(last) if last.hi == a && last.hi_closed => {
-                last.hi = b;
-                last.hi_closed = piece.hi_closed;
+                let jumps = among(&breaks, a);
+                match (
+                    !jumps || continuous_from(fun, a, -1.0),
+                    !jumps || continuous_from(fun, a, 1.0),
+                ) {
+                    (true, true) => {
+                        last.hi = b;
+                        last.hi_closed = piece.hi_closed;
+                    }
+                    (left, right) => {
+                        last.hi_closed = left;
+                        if !left && !right {
+                            intervals.push(Interval {
+                                lo: a,
+                                hi: a,
+                                lo_closed: true,
+                                hi_closed: true,
+                            });
+                        }
+                        intervals.push(Interval {
+                            lo_closed: right,
+                            ..piece
+                        });
+                    }
+                }
             }
             _ => intervals.push(piece),
         }
     }
     Some(intervals)
+}
+
+/// Whether f tends to its value at x from the side `side` (−1 left, 1 right), as it
+/// does unless it jumps there. The limit is that of f(t) − f(x), so that a jump is as wide
+/// on 10⁶ + acot(x) as on acot(x). An unknown limit counts as continuous, and so do
+/// differences that shrink however slowly: acot(root(x, 27)) is 0.70 below π/2 at 10⁻²
+/// right of 0, and 0.35 at 10⁻¹².
+fn continuous_from(fun: &Fun, x: f64, side: f64) -> bool {
+    let v = fun.f(x);
+    let scale = x.abs().max(1.0);
+    let rest: Vec<f64> = (1..=6)
+        .map(|k| fun.f(x + side * scale * 10f64.powi(-2 * k)) - v)
+        .collect();
+    match limit_of(&rest) {
+        // Limits snap to 0 within `LOOSE`, and f(t) − f(x) is rounded to the doubles next
+        // to f(x): a few of their spacings are allowed, not a jump (10^15 + acot(x) jumps
+        // by 26 spacings of 0.125).
+        Limit::Value(l) => l.abs() <= LOOSE + 8.0 * (v.abs().next_up() - v.abs()),
+        Limit::PlusInfinity | Limit::MinusInfinity => {
+            rest.windows(2).all(|p| p[1].abs() < p[0].abs())
+        }
+        Limit::Unknown => true,
+    }
 }
 
 fn bound(v: f64) -> String {
@@ -756,7 +1111,123 @@ fn limit_at(fun: &Fun, p: f64, side: f64) -> Limit {
     let v: Vec<f64> = (1..=6)
         .map(|k| fun.f(p + side * scale * 10f64.powi(-2 * k)))
         .collect();
-    limit_of(&v)
+    match limit_of(&v) {
+        Limit::Value(l) => Limit::Value(l),
+        l => absorbed_limit(fun, p, side).map_or(l, Limit::Value),
+    }
+}
+
+/// The limit at p from `side` where parts of f have a pole at p that outer functions
+/// absorb: f with those parts at ±∞ (signed as next to p), if the rest of f is continuous
+/// there. atan(atanh(x)) nears π/2 at 1 as slowly as 1/ln(x) nears 0, too slowly for
+/// `limit_of`, atan(atanh(x)/1000) seems to grow without bound, and ln|tan(x)|, whose
+/// poles are at πn/2, is −37 at π and 37 at π/2 in doubles. Only parts with a pole at p
+/// count (`pole_functions`): 1 − root(1 − x, 30) grows next to 1 as slowly as atanh(x),
+/// but toward 1; and the rest decides, not f's values, which may rise and fall
+/// (atan(atanh(x)) + atan(root(1 − x, 30))). An acot whose argument has a root at p takes
+/// the value of the side, −π/2 left of 1 in atan(atanh(x)) + acot(x − 1).
+fn absorbed_limit(fun: &Fun, p: f64, side: f64) -> Option<f64> {
+    let near: Vec<f64> = (1..=6)
+        .map(|k| p + side * p.abs().max(1.0) * 10f64.powi(-2 * k))
+        .collect();
+    let mut parts = Vec::new();
+    proper_parts(fun.e, &mut parts);
+    // The innermost first: atan(atanh(x)/1000) seems to grow as well.
+    parts.sort_by_key(|q| q.size());
+    let mut e = fun.e.clone();
+    let mut absorbed = false;
+    let mut jumps = Vec::new();
+    for q in parts {
+        if let Expr::Call(Func::Acot, a) = q
+            && root_at(a, p, &fun.env)
+        {
+            jumps.push((q, a.eval(near[5], 0.0, &fun.env)));
+            continue;
+        }
+        let pole = pole_functions(q, &fun.env)
+            .iter()
+            .any(|g| root_at(g, p, &fun.env));
+        if !pole {
+            continue;
+        }
+        let w: Vec<f64> = near.iter().map(|&t| q.eval(t, 0.0, &fun.env)).collect();
+        let grows = w
+            .iter()
+            .all(|y| !y.is_nan() && *y != 0.0 && y.signum() == w[5].signum())
+            && w.windows(2)
+                .all(|y| y[1].abs() > y[0].abs() || y[1].is_infinite())
+            && matches!(limit_of(&w), Limit::PlusInfinity | Limit::MinusInfinity);
+        if grows && e.any(&|h| h == q) {
+            e = substituted(&e, q, &Expr::Num(f64::INFINITY.copysign(w[5])));
+            absorbed = true;
+        }
+    }
+    for (q, sign) in jumps {
+        let side = std::f64::consts::FRAC_PI_2.copysign(sign) / radians_per_unit(fun.env.angle);
+        if sign != 0.0 && !sign.is_nan() && e.any(&|h| h == q) {
+            e = substituted(&e, q, &Expr::Num(side));
+        }
+    }
+    let l = e.eval(p, 0.0, &fun.env);
+    // The rest tends to its value at p: at once, or steadily.
+    let rest: Vec<f64> = near.iter().map(|&t| e.eval(t, 0.0, &fun.env) - l).collect();
+    let steady = rest
+        .iter()
+        .all(|g| g.is_finite() && *g != 0.0 && g.signum() == rest[0].signum())
+        && rest.windows(2).all(|w| w[1].abs() <= w[0].abs())
+        && rest[5].abs() < rest[0].abs();
+    let continuous = steady || matches!(limit_of(&rest), Limit::Value(r) if r == 0.0);
+    (absorbed && l.is_finite() && continuous).then(|| exact::snap(l, TIGHT))
+}
+
+/// The parts `e` is made of.
+fn children(e: &Expr) -> Vec<&Expr> {
+    match e {
+        Expr::Neg(a) | Expr::Call(_, a) | Expr::Factorial(a) => vec![a],
+        Expr::Bin(_, a, b) | Expr::Root(a, b) | Expr::LogBase(a, b) => vec![a, b],
+        _ => Vec::new(),
+    }
+}
+
+/// The parts of `e`, and theirs, without `e` itself.
+fn proper_parts<'a>(e: &'a Expr, out: &mut Vec<&'a Expr>) {
+    for c in children(e) {
+        out.push(c);
+        proper_parts(c, out);
+    }
+}
+
+/// The functions whose roots are poles of `e`'s own operation, not of its parts': u of
+/// 1/u and ln(u), cos(u) of tan(u), u² − 1 of atanh(u) … `boundary_functions` lists them
+/// before its parts'.
+fn pole_functions(e: &Expr, env: &Env) -> Vec<Expr> {
+    let (mut own, mut theirs) = (Vec::new(), Vec::new());
+    boundary_functions(e, env, &mut own);
+    for c in children(e) {
+        boundary_functions(c, env, &mut theirs);
+    }
+    own.truncate(own.len() - theirs.len());
+    own.into_iter()
+        .filter(|(_, pole)| *pole)
+        .map(|(g, _)| g)
+        .collect()
+}
+
+/// `e` with `part` replaced by `by` wherever it occurs.
+fn substituted(e: &Expr, part: &Expr, by: &Expr) -> Expr {
+    if e == part {
+        return by.clone();
+    }
+    let s = |a: &Expr| Box::new(substituted(a, part, by));
+    match e {
+        Expr::Neg(a) => Expr::Neg(s(a)),
+        Expr::Call(f, a) => Expr::Call(*f, s(a)),
+        Expr::Factorial(a) => Expr::Factorial(s(a)),
+        Expr::Bin(op, a, b) => Expr::Bin(*op, s(a), s(b)),
+        Expr::Root(a, n) => Expr::Root(s(a), s(n)),
+        Expr::LogBase(b, a) => Expr::LogBase(s(b), s(a)),
+        _ => e.clone(),
+    }
 }
 
 // ------------------------------------------------------------------ text
@@ -828,7 +1299,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
     if intervals.is_empty() {
         return None;
     }
-    features.domain = Some(set_text('x', &intervals));
+    features.domain = Some(set_text('x', &union(intervals.clone())));
     if intervals.iter().any(|i| contains(i, 0.0)) && fun.defined(0.0) {
         features.y_intercept = Some(exact::format(fun.f(0.0)));
     }
@@ -843,7 +1314,13 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
     }
     asymptotes(fun, &intervals, &mut features);
 
-    let inside = |x: f64| intervals.iter().any(|i| x > i.lo && x < i.hi);
+    // Inside a piece, and not at one of its ends: bisection finds the bend of
+    // tanh(1/(x − 2)) at 2 plus an ulp, where 1/(x − 2) is huge but finite.
+    let inside = |x: f64| {
+        intervals
+            .iter()
+            .any(|i| x > i.lo && x < i.hi && !among(&[i.lo, i.hi], x))
+    };
     let f = |x: f64| fun.f(x);
     let d1 = |x: f64| fun.d1(x);
     let d2 = |x: f64| fun.d2(x);
@@ -898,10 +1375,12 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
                 features.maxima.push(text);
             }
         }
-        // The closed ends of the domain are extrema too.
+        // The closed ends of the domain are extrema too, but not where f jumps (acot at
+        // 0): the values on the other side count there as well.
+        let jump = |x: f64| intervals.windows(2).any(|w| w[0].hi == x && w[1].lo == x);
         for i in &intervals {
             for (end, closed, side) in [(i.lo, i.lo_closed, 1.0), (i.hi, i.hi_closed, -1.0)] {
-                if !closed {
+                if !closed || jump(end) {
                     continue;
                 }
                 let slope = d1(end + side * 1e-9 * end.abs().max(1.0));
@@ -998,8 +1477,8 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
         features.too_complex.push(Feature::Range);
     }
 
-    // Monotonicity between the turning points.
-    for i in &intervals {
+    // Monotonicity between the turning points, on the pieces that aren't single points.
+    for i in intervals.iter().filter(|i| i.lo < i.hi) {
         let mut cuts = vec![i.lo];
         cuts.extend(turns.iter().map(|t| t.0).filter(|&c| c > i.lo && c < i.hi));
         cuts.push(i.hi);
@@ -1042,12 +1521,28 @@ fn direction_between(fun: &Fun, a: f64, b: f64) -> Direction {
 fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
     let f = |x: f64| fun.f(x);
     let infinite = |l: Limit| matches!(l, Limit::PlusInfinity | Limit::MinusInfinity);
+    // Where f jumps, at a point of the domain, its steps must not shrink: acot(root(x, 27))
+    // nears −π/2 from the left of 0 as slowly as a pole grows.
+    let grows = |p: f64, side: f64| {
+        let scale = p.abs().max(1.0);
+        let v: Vec<f64> = (1..=6)
+            .map(|k| fun.f(p + side * scale * 10f64.powi(-2 * k)))
+            .collect();
+        (v[5] - v[4]).abs() >= (v[1] - v[0]).abs()
+    };
+    let in_domain = |p: f64| {
+        intervals.iter().any(|i| {
+            (i.lo < p && p < i.hi) || (i.lo == p && i.lo_closed) || (i.hi == p && i.hi_closed)
+        })
+    };
+    let pole =
+        |p: f64, side: f64| infinite(limit_at(fun, p, side)) && (!in_domain(p) || grows(p, side));
     let mut vertical = Vec::new();
     for i in intervals {
-        if i.lo.is_finite() && !i.lo_closed && infinite(limit_at(fun, i.lo, 1.0)) {
+        if i.lo.is_finite() && !i.lo_closed && pole(i.lo, 1.0) {
             vertical.push(i.lo);
         }
-        if i.hi.is_finite() && !i.hi_closed && infinite(limit_at(fun, i.hi, -1.0)) {
+        if i.hi.is_finite() && !i.hi_closed && pole(i.hi, -1.0) {
             vertical.push(i.hi);
         }
     }
@@ -1195,18 +1690,23 @@ fn periodic(fun: &Fun, p: f64) -> Features {
     let d1 = |x: f64| fun.d1(x);
     let d2 = |x: f64| fun.d2(x);
 
-    // The domain: ℝ but for poles (tan's π/2 + πn). Gaps can't be written here.
-    let candidates = in_period(snapped(domain_candidates(fun, &xs)), p);
-    let excluded: Vec<f64> = candidates
-        .iter()
-        .copied()
-        .filter(|&x| !fun.defined(x))
+    // The domain: ℝ but for poles (tan's π/2 + πn) and holes. Gaps can't be written here.
+    let (candidates, poles, _) = domain_candidates(fun, &xs);
+    let poles = in_period(snapped(poles), p);
+    let excluded: Vec<f64> = in_period(snapped(candidates), p)
+        .into_iter()
+        .filter(|&x| among(&poles, x) || !fun.defined(x))
         .collect();
-    if (0..400).any(|i| !fun.f(p * (i as f64 + 0.5) / 400.0).is_finite()) {
+    // Samples on a pole (csc(x − 0.45°) at 0.45°) are no gap.
+    if (0..400).any(|i| {
+        let x = p * (i as f64 + 0.5) / 400.0;
+        !among(&excluded, x) && !fun.finite(x)
+    }) {
         features.too_complex.extend(SMOOTH_FEATURES);
         return features;
     }
-    if fun.defined(0.0) {
+    let defined = |x: f64| fun.defined(x) && !among(&excluded, x);
+    if defined(0.0) {
         features.y_intercept = Some(exact::format(fun.f(0.0)));
     }
     if excluded.is_empty() {
@@ -1218,11 +1718,12 @@ fn periodic(fun: &Fun, p: f64) -> Features {
             .map(|&i| format!("x ≠ {}", family_term(step, excluded[i])))
             .collect();
         features.domain = Some(format!("{{{}, ∀n₁ ∈ ℤ}}", parts.join(", ")));
-        let vertical: Vec<usize> = firsts
+        // The poles, in families of their own: the holes between them aren't asymptotes
+        // (1/tan(x) has poles at πn and holes at πn + π/2).
+        let vertical: Vec<f64> = excluded
             .iter()
             .copied()
-            .filter(|&i| {
-                let x = excluded[i];
+            .filter(|&x| {
                 matches!(
                     limit_at(fun, x, 1.0),
                     Limit::PlusInfinity | Limit::MinusInfinity
@@ -1232,16 +1733,16 @@ fn periodic(fun: &Fun, p: f64) -> Features {
                 )
             })
             .collect();
-        features.vertical_asymptotes = vertical
+        let (step, firsts) = families(&vertical, p, &|_, _| true);
+        features.vertical_asymptotes = firsts
             .iter()
-            .map(|&i| format!("x = {}, n₁ ∈ ℤ", family_term(step, excluded[i])))
+            .map(|&i| format!("x = {}, n₁ ∈ ℤ", family_term(step, vertical[i])))
             .collect();
     }
     if fun.rough || fun.d1.is_none() {
         features.too_complex.extend(SMOOTH_FEATURES);
         return features;
     }
-    let defined = |x: f64| fun.defined(x);
     let slope: &dyn Fn(f64) -> f64 = &d1;
 
     let roots: Vec<f64> = in_period(zeros(&f, Some(slope), &xs), p)
@@ -1729,6 +2230,266 @@ mod tests {
                 ("(0, ∞)", Direction::Constant)
             ]
         );
+    }
+
+    #[test]
+    fn hidden_discontinuities() {
+        // 1/x is ∞ at 0 in doubles, and atan, e^ and tanh make that a number again: the
+        // pole still splits the domain and the range.
+        let f = analyze_text("y=atan(1/x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 0}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−π/2, 0) ∪ (0, π/2)}"));
+        assert_eq!(f.y_intercept, None);
+        assert!(f.vertical_asymptotes.is_empty());
+        let f = analyze_text("y=e^(-1/x^2)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 0}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (0, 1)}"));
+        assert_eq!(f.y_intercept, None);
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, 0)", Direction::Decreasing),
+                ("(0, ∞)", Direction::Increasing)
+            ]
+        );
+        let f = analyze_text("y=tanh(1/x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 0}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−1, 0) ∪ (0, 1)}"));
+        // No inflection point at the pole, which bisection finds an ulp away from 2.
+        let f = analyze_text("y=tanh(1/(x-2))");
+        assert_eq!(
+            f.inflection_points,
+            vec!["(1.16644, −0.833557)", "(2.83356, 0.833557)"]
+        );
+        // Doubles land next to the pole at √2: 1/(x² − 2) is 2.3e15 there.
+        let f = analyze_text("y=atan(1/(x^2-2))");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ −√2, x ≠ √2}"));
+        let f = analyze_text("y=atan((x^2-2)^(-1))");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ −√2, x ≠ √2}"));
+        let f = analyze_text("y=ln(x^2-2)");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ (−∞, −√2) ∪ (√2, ∞)}"));
+        // x² − 2 crosses 0 there; x² + e^(−1000) and x² + 10⁻²⁰ only touch it by rounding
+        // and have no pole, as on main.
+        let f = analyze_text("y=atan(1/(x^2+e^(-1000)))");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        let f = analyze_text("y=atan(1/(x^2+10^(-20)))");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        // A factor's crossing counts, also inside |…|: 3x − 1 crosses 0 at 1/3, which
+        // doubles can't hit.
+        for text in ["y=atan(1/(3*x-1)^2)", "y=atan(1/abs(3*x-1))"] {
+            assert_eq!(
+                analyze_text(text).domain.as_deref(),
+                Some("{x ≠ 1/3}"),
+                "{text}"
+            );
+        }
+        // A jump through 0 is no root: x² + ceil(x) − 1 is −1 at 0 and x² right of it.
+        let f = analyze_text("y=atan(1/(x^2+ceil(x)-1))");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ −√2}"));
+        // root(2, x) is 2^(1/x): the index's zero is a pole too.
+        let f = analyze_text("y=atan(root(2,x))");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 0}"));
+        // A huge quotient is no pole where its denominator isn't 0.
+        let f = analyze_text("y=atan(10^15/e^x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        // A constant without a value.
+        let equation = Equation::parse("y=atan(1/0)", Syntax::default()).unwrap();
+        assert_eq!(
+            analyze(&equation, Angle::Radians),
+            Err(AnalysisError::NotSupported)
+        );
+        // Nor do log's base 0 and tan's poles in degrees or gradians, though doubles make
+        // numbers of them: log(0, x) is ln(x)/ln(0), a 0, and tan(90°) is 1.6e16.
+        let analyzed = |text: &str, angle: Angle| {
+            analyze(&Equation::parse(text, Syntax::default()).unwrap(), angle)
+        };
+        for (text, angle) in [
+            ("y=log(0,x)", Angle::Radians),
+            ("y=x+atan(tan(90))", Angle::Degrees),
+            ("y=x+atan(tan(100))", Angle::Gradians),
+            ("y=x+atan(cot(180))", Angle::Degrees),
+            ("y=tan(x)+tan(90)", Angle::Degrees),
+            ("y=sin(x)+atan(1/0)", Angle::Radians),
+        ] {
+            assert_eq!(
+                analyzed(text, angle),
+                Err(AnalysisError::NotSupported),
+                "{text}"
+            );
+        }
+        let f = analyzed("y=x+atan(tan(45))", Angle::Degrees).unwrap();
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        // But an ∞ from overflow is a value: atan(∞) is π/2, e^(−∞) is 0.
+        let f = analyze_text("y=atan(e^1000)");
+        assert_eq!(f.range.as_deref(), Some("{y = π/2}"));
+        let f = analyze_text("y=atan(e^(1000+x))");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        assert_eq!(f.y_intercept.as_deref(), Some("π/2"));
+        let f = analyze_text("y=e^(-e^(x+1000))");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        // So is a 0 that was a number too small for doubles, and an ∞ that a function
+        // makes away from its poles: 1/e^(−1000) is e^1000, csch(10^(−310)) is 10^310.
+        let f = analyze_text("y=atan(1/e^(-1000))");
+        assert_eq!(f.range.as_deref(), Some("{y = π/2}"));
+        let f = analyze_text("y=atan(1/e^(-x^2-1000))");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        let f = analyze_text("y=atan(ln(e^(-1000)))");
+        assert_eq!(f.range.as_deref(), Some("{y = −π/2}"));
+        let f = analyze_text("y=atan(csch(10^(-310)))");
+        assert_eq!(f.range.as_deref(), Some("{y = π/2}"));
+        // And a 0 or ±1 only by rounding: (1 + 10⁻²⁰) − 1 is 10⁻²⁰, not 0.
+        let f = analyze_text("y=atan(1/((1+10^(-20))-1))");
+        assert_eq!(f.range.as_deref(), Some("{y = π/2}"));
+        let f = analyze_text("y=atan(atanh(1-10^(-20)))");
+        assert_eq!(f.range.as_deref(), Some("{y = π/2}"));
+        let f = analyze_text("y=atan(log(1+10^(-20),2))");
+        assert_eq!(f.range.as_deref(), Some("{y = π/2}"));
+        // An exact 0 is a pole however it's made, and a zeroth root divides by 0.
+        for text in [
+            "y=atan(1/(2^2-4))",
+            "y=atan(root(2,0))",
+            "y=atan(root(0.5,0))",
+        ] {
+            let equation = Equation::parse(text, Syntax::default()).unwrap();
+            assert_eq!(
+                analyze(&equation, Angle::Radians),
+                Err(AnalysisError::NotSupported),
+                "{text}"
+            );
+        }
+        // 0^∞ is 0.
+        let f = analyze_text("y=x^(1/x)");
+        assert_eq!(f.domain.as_deref(), Some("{x > 0}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (0, 1.44467]}"));
+        assert_eq!(f.x_intercepts, None);
+        assert_eq!(f.y_intercept, None);
+        // acot(0) is π/2 (Windows' acot is atan(1/x)), next to −π/2 on the left.
+        let f = analyze_text("y=acot(x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ∈ ℝ}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−π/2, 0) ∪ (0, π/2]}"));
+        assert_eq!(f.y_intercept.as_deref(), Some("π/2"));
+        assert!(f.inflection_points.is_empty());
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, 0)", Direction::Decreasing),
+                ("(0, ∞)", Direction::Decreasing)
+            ]
+        );
+        // Odd roots of a high order shrink slowly near 0 but don't jump: root(x, 27) is 0.84
+        // at 10⁻² and 0.36 at 10⁻¹². (root(x, 101) is real for x ≥ 0 only, as on main.)
+        for text in ["y=root(x,15)", "y=root(x,27)"] {
+            let f = analyze_text(text);
+            assert_eq!(f.inflection_points, vec!["(0, 0)"], "{text}");
+            assert_eq!(
+                directions(&f),
+                vec![("(−∞, ∞)", Direction::Increasing)],
+                "{text}"
+            );
+        }
+        let f = analyze_text("y=root(x,101)");
+        assert_eq!(directions(&f), vec![("(0, ∞)", Direction::Increasing)]);
+        // Differences of such roots drift away from 0 down to 10⁻¹² but don't jump either:
+        // only where a part breaks (acot's argument, a pole's zero) can f jump.
+        for text in ["y=root(x,45)-root(x,99)", "y=atan(root(x,49)-root(x,93))"] {
+            let f = analyze_text(text);
+            assert_eq!(f.inflection_points, vec!["(0, 0)"], "{text}");
+            assert_eq!(
+                directions(&f),
+                vec![("(−∞, ∞)", Direction::Increasing)],
+                "{text}"
+            );
+        }
+        // acot(root(x, 27)) does jump at 0, as slowly, and has no pole there.
+        let f = analyze_text("y=acot(root(x,27))");
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, 0)", Direction::Decreasing),
+                ("(0, ∞)", Direction::Decreasing)
+            ]
+        );
+        assert!(f.vertical_asymptotes.is_empty());
+        // acot(−x²) tends to −π/2 from both sides of 0.
+        let f = analyze_text("y=acot(-x^2)");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−π/2, 0) ∪ {π/2}}"));
+        // A jump is as wide whatever f's size.
+        let f = analyze_text("y=10^6+acot(x)");
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, 0)", Direction::Decreasing),
+                ("(0, ∞)", Direction::Decreasing)
+            ]
+        );
+        // Even where the doubles are 0.0078 apart; at 10^15 (0.125 apart) the whole
+        // function is beyond 1e14, a pole's size, but the jump is still seen.
+        let f = analyze_text("y=5*10^13+acot(x)");
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, 0)", Direction::Decreasing),
+                ("(0, ∞)", Direction::Decreasing)
+            ]
+        );
+        let equation = Equation::parse("y=10^15+acot(x)", Syntax::default()).unwrap();
+        let Shape::Function(e) = equation.shape else {
+            unreachable!()
+        };
+        let fun = Fun::new(&e, Env::RADIANS);
+        assert!(!continuous_from(&fun, 0.0, -1.0));
+        assert!(continuous_from(&fun, 0.0, 1.0));
+    }
+
+    #[test]
+    fn hidden_periodic_poles() {
+        // tan(π/2) is 1.6e16 in doubles, and atan makes that π/2.
+        let f = analyze_text("y=atan(2tan(x))");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ πn₁ + π/2, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−π/2, π/2)}"));
+        assert!(f.vertical_asymptotes.is_empty());
+        // Holes between the poles are no asymptotes.
+        let f = analyze_text("y=1/tan(x)");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ πn₁/2, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.vertical_asymptotes, vec!["x = πn₁, n₁ ∈ ℤ"]);
+        // A pole on a sample is no gap: 0.45° is the first of 400 in 360°, π/400 in 2π.
+        let equation = Equation::parse("y=atan(csc(x-0.45))", Syntax::default()).unwrap();
+        let f = analyze(&equation, Angle::Degrees).unwrap();
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ 180n₁ + 0.45, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.y_intercept.as_deref(), Some("−89.55"));
+        let f = analyze_text("y=atan(csc(x-0.007853981633974483))");
+        assert_eq!(f.domain.as_deref(), Some("{x ≠ πn₁ + 0.00785398, ∀n₁ ∈ ℤ}"));
+        assert_eq!(f.y_intercept.as_deref(), Some("−1.56294"));
+    }
+
+    #[test]
+    fn absorbed_limits() {
+        // Next to a pole that atan absorbs, f nears ±π/2 as slowly as 1/ln(x) nears 0: the
+        // range ends there, open (main closed it, taking atan(∞) for a value).
+        for (text, range) in [
+            ("y=atan(atanh(x))", "{y ∈ (−π/2, π/2)}"),
+            ("y=atan(acoth(x))", "{y ∈ (−π/2, 0) ∪ (0, π/2)}"),
+            ("y=atan(asech(x))", "{y ∈ [0, π/2)}"),
+            ("y=atan(acsch(x))", "{y ∈ (−π/2, 0) ∪ (0, π/2)}"),
+            ("y=atan(acsch(x-1))", "{y ∈ (−π/2, 0) ∪ (0, π/2)}"),
+        ] {
+            assert_eq!(analyze_text(text).range.as_deref(), Some(range), "{text}");
+        }
+        // So slowly here that it looks like growth, but it is no pole.
+        let f = analyze_text("y=atan(atanh(x)/1000)");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−π/2, π/2)}"));
+        assert!(f.vertical_asymptotes.is_empty());
+        // Only the parts with a pole there go to ∞: 1 − root(1 − x, 30) nears 1 as slowly as
+        // atanh(x) grows, and acot(x − 1) is −π/2 left of 1.
+        for (text, range) in [
+            (
+                "y=atan(atanh(x))+atan(1-root(1-x,30))",
+                "{y ∈ (−1.59417, 3π/4)}",
+            ),
+            ("y=atan(atanh(x))+acot(x-1)", "{y ∈ (−2.03444, 0)}"),
+        ] {
+            assert_eq!(analyze_text(text).range.as_deref(), Some(range), "{text}");
+        }
     }
 
     #[test]
