@@ -306,11 +306,13 @@ UI code and is covered by unit tests.*
 - **Status:** `[x] COMPLETED`
 - **Priority:** `P2`
 - **Depends On:** `FEAT-STD-001`
-- **Windows ref:** `src/Calculator.ViewModels/Common/CopyPasteManager.cs`
-- **Rust:** `src/engine.rs` (`copy_text`, `paste`)
+- **Windows ref:** `src/Calculator.ViewModels/Common/CopyPasteManager.cs`,
+  `src/Calculator.ViewModels/StandardCalculatorViewModel.cs` (`GetRawDisplayValue`)
+- **Rust:** `src/engine.rs` (`copy_text`, `paste`), `src/app.rs` (`clipboard_text`)
 - **Description:** `Ctrl+C` copies the displayed value; `Ctrl+V` pastes a number.
 - **Acceptance Criteria:**
-  - Copy leaves out the grouping commas (`1234.5`); nothing is copied in the error state.
+  - Copy leaves out the grouping commas (`1234.5`). In the error state it copies the message
+    as the display shows it (`Cannot divide by zero`, in the interface's language).
   - Paste ignores spaces, grouping commas, quotes and currency signs, and accepts up to 16
     digits: `"1,234.5"` → `1,234.5`, `"-007"` → `-7`, `"$12"` → `12`. Invalid text shows
     `Invalid input` (see `FEAT-STD-007`).

@@ -1134,7 +1134,8 @@ impl Calculator {
     }
 
     /// Text to copy to the clipboard (without thousands separators, and in the
-    /// Programmer mode without the spaces between digit groups).
+    /// Programmer mode without the spaces between digit groups). `None` in the error
+    /// state, where the UI copies the message as its display shows it.
     pub fn copy_text(&self) -> Option<String> {
         if self.error.is_some() {
             None

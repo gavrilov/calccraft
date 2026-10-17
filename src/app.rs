@@ -25,7 +25,7 @@ use eframe::egui::{
 };
 
 use crate::converter::Category;
-use crate::engine::{Angle, Calculator, Command, Func, Op, Radix};
+use crate::engine::{Angle, CalcError, Calculator, Command, Func, Op, Radix};
 use icons::{
     ICON_BACK, ICON_BACK_TO_FULL, ICON_BACKSPACE, ICON_CALCULATOR, ICON_CALENDAR,
     ICON_CHEVRON_DOWN, ICON_CHEVRON_UP, ICON_CODE, ICON_COPY, ICON_DELETE, ICON_DIVIDE,
@@ -733,9 +733,7 @@ impl CalculatorApp {
                     self.handle_key(ctx, key, modifiers, now);
                 }
                 Event::Copy if !covered => {
-                    if let Some(text) = self.engine().copy_text() {
-                        ctx.copy_text(numbers().localize_plain(&text));
-                    }
+                    ctx.copy_text(clipboard_text(self.engine()));
                 }
                 Event::Paste(text) if !covered => {
                     self.engine_mut().paste(&numbers().delocalize(&text));
@@ -1053,7 +1051,7 @@ impl CalculatorApp {
     /// The display's text: the number, or the error message in the interface's language.
     fn display_text(&self) -> String {
         match self.engine().error() {
-            Some(error) => tr(&format!("CEngine.{}", error.resource_id())).to_string(),
+            Some(error) => error_message(error).to_string(),
             None => self.localize_number(&self.engine().display()),
         }
     }
@@ -2696,6 +2694,20 @@ fn numbers() -> &'static crate::locale::NumberFormat {
     &region::formats().numbers
 }
 
+/// An engine error's message in the interface's language, as the display shows it.
+fn error_message(error: CalcError) -> &'static str {
+    tr(&format!("CEngine.{}", error.resource_id()))
+}
+
+/// What `Ctrl+C` copies, like Windows' `GetRawDisplayValue`: the number without its digit
+/// groups, or in the error state the message just as the display shows it.
+fn clipboard_text(calc: &Calculator) -> String {
+    match calc.error() {
+        Some(error) => error_message(error).to_string(),
+        None => numbers().localize_plain(&calc.copy_text().unwrap_or_default()),
+    }
+}
+
 fn semibold() -> FontFamily {
     FontFamily::Name("semibold".into())
 }
@@ -3305,5 +3317,31 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn copy_takes_the_error_message_as_shown() {
+        // In the error state Windows' `GetRawDisplayValue` copies the message on the display.
+        let mut standard = Calculator::default();
+        standard.paste("1/0=");
+        assert_eq!(clipboard_text(&standard), "Cannot divide by zero");
+        let mut scientific = Calculator::with_precedence();
+        scientific.execute(Command::Digit(0));
+        scientific.execute(Command::Function(Func::Ln));
+        assert_eq!(clipboard_text(&scientific), "Invalid input");
+        let mut programmer = Calculator::programmer();
+        for command in [
+            Command::Digit(1),
+            Command::Operator(Op::LeftShift),
+            Command::Digit(6),
+            Command::Digit(4),
+            Command::Equals,
+        ] {
+            programmer.execute(command);
+        }
+        assert_eq!(clipboard_text(&programmer), "Result not defined");
+        // A number goes without its digit groups.
+        standard.paste("1234");
+        assert_eq!(clipboard_text(&standard), "1234");
     }
 }
