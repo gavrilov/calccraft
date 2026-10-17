@@ -10,7 +10,7 @@
 
 use eframe::egui::{
     self, Context, Id, LayerId, Order, Rect, Response, Sense, Stroke, StrokeKind, Ui, WidgetInfo,
-    WidgetType, accesskit,
+    WidgetType, accesskit, scroll_area::ScrollSource,
 };
 
 use super::palette::Palette;
@@ -22,7 +22,10 @@ fn covered_id() -> Id {
 
 /// Marks the controls drawn from now on as covered by a popup, or not. Covered controls
 /// leave the `Tab` order, so the keyboard stays in the popup, like in WinUI's
-/// light-dismiss popups and menus.
+/// light-dismiss popups and menus, and sense only hovers. The popup's backdrop takes the
+/// pointer's clicks but not its drags, and egui takes a screen reader's (AccessKit's
+/// `Click` action) for a real click. Covered scroll areas don't scroll either
+/// (`scroll_source`).
 pub(super) fn set_covered(ctx: &Context, covered: bool) {
     ctx.data_mut(|data| data.insert_temp(covered_id(), covered));
 }
@@ -33,7 +36,7 @@ fn covered(ui: &Ui) -> bool {
         .unwrap_or(false)
 }
 
-/// Registers a control drawn in `rect`: clickable when enabled, focusable unless a
+/// Registers a control drawn in `rect`: clickable and focusable when enabled, unless a
 /// popup covers it, and described by `info`. Draws the focus visual when it has the
 /// keyboard focus, with corners of `radius`.
 pub(super) fn control(
@@ -54,7 +57,7 @@ pub(super) fn control(
 }
 
 /// Like `control`, for a control that senses more than clicks (the graph and the sliders
-/// are dragged): focusable unless covered or only hovered.
+/// are dragged): focusable unless it only senses hovers, as it does under a popup.
 pub(super) fn interact(
     ui: &Ui,
     p: &Palette,
@@ -65,7 +68,9 @@ pub(super) fn interact(
     info: impl Fn() -> WidgetInfo,
 ) -> Response {
     let covered = covered(ui);
-    let sense = if covered || sense == Sense::hover() {
+    let sense = if covered {
+        Sense::hover()
+    } else if sense == Sense::hover() {
         sense
     } else {
         sense | Sense::FOCUSABLE
@@ -83,6 +88,16 @@ pub(super) fn interact(
     }
     focus_ring(ui, p, &response, radius);
     response
+}
+
+/// How a scroll area drawn now scrolls: with `source`, but not at all under a popup, as egui
+/// scrolls an area under the pointer with the wheel whatever covers it in its layer.
+pub(super) fn scroll_source(ui: &Ui, source: ScrollSource) -> ScrollSource {
+    if covered(ui) {
+        ScrollSource::NONE
+    } else {
+        source
+    }
 }
 
 /// A button's description.

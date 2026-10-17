@@ -197,7 +197,18 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   are `access::text(…, live: true)`. `Enter` presses the focused control, except on the keypad
   and the memory row (`is_calculator_key`), where it stays `=` like Windows' `CalculatorButton`.
 - Popups: `popup_covers` is true while the menu, a context menu, a drop-down or the calendar is
-  open; the controls drawn under it are "covered" and leave the Tab order, and the popup calls
+  open; the controls drawn under it are "covered": they leave the Tab order and sense only
+  hovers, so neither a screen reader's click (egui takes AccessKit's `Click` for a real one) nor
+  a drag on the graph or a slider (the popup's backdrop senses only clicks) reaches them. A
+  scroll area under it doesn't scroll (`access::scroll_source`: egui scrolls the area under the
+  pointer whatever covers it in its layer). Text boxes (`TextEdit`) aren't covered: a screen
+  reader or a drag can still focus one under a popup. The graph options' and line options' own
+  drop-downs cover the rest of their flyout but not their combo, which keeps the keyboard
+  focus. A click elsewhere on the flyout or Esc closes only the drop-down (the repeats of a
+  held Esc close nothing more until its key-up, `swallow_held_escape`), and its combo gets the
+  focus back if the focus was in it (`drop_down_closed`), as in WinUI. The Graphing mode's
+  zoom keys (Ctrl + plus, minus and 0) still work under a popup or the menu: Windows' are
+  unscoped `KeyboardAccelerator`s, which WinUI runs whatever has the focus. The popup calls
   `access::set_covered(ctx, false)` before drawing its own. A popup opened with the keyboard
   (`opened_from`) focuses its selected item (`take_popup_focus`) and the opener gets the focus
   back when it closes (`focus_return`).
@@ -211,7 +222,9 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   dates through `region::formats()`.
 - Right-clicking a history or memory item opens its context menu (`draw_context_menu`, state in
   `context_menu`). It's drawn last in the panel over a full-window backdrop that closes it, like
-  the date mode's popups, and uses their `popup_*` colors and `popup_frame`.
+  the date mode's popups, and uses their `popup_*` colors and `popup_frame`. A history item's
+  menu also closes if the history changes under it (`history_key`): its index would then name
+  another entry.
 - `Mode` (`Standard`, `Scientific`, `Graphing`, `Programmer`, `DateCalculation`,
   `Converter(Category)`) is picked in the ☰ menu (`draw_navigation`), which lists
   `Mode::CALCULATORS` and `Category::ALL` under two headings and scrolls when the window is

@@ -243,6 +243,16 @@ pub(super) enum Popup {
     ShareError,
 }
 
+/// The graph options' line thickness combo, which opens `Popup::Settings`'s list.
+fn width_combo_id() -> Id {
+    Id::new("graph-settings-width")
+}
+
+/// The line options' line style combo, which opens `Popup::Style`'s list.
+fn style_combo_id() -> Id {
+    Id::new("graph-style-combo")
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum KeypadMenu {
     Trigonometry,
@@ -298,6 +308,8 @@ pub(super) struct GraphingState {
     show_equations: bool,
     pub(super) analysis: Option<Analysis>,
     pub(super) popup: Option<Popup>,
+    /// An Esc that closed a drop-down of the popup is still held (`swallow_held_escape`).
+    esc_held: bool,
     /// The keypad's `2nd`, and the Trigonometry menu's `2nd` and `hyp`.
     pub(super) shift: bool,
     pub(super) trig_inverse: bool,
@@ -338,6 +350,7 @@ impl GraphingState {
             show_equations: false,
             analysis: None,
             popup: None,
+            esc_held: false,
             shift: false,
             trig_inverse: false,
             trig_hyperbolic: false,
@@ -361,6 +374,22 @@ impl GraphingState {
 
     pub(super) fn close_popup(&mut self) -> bool {
         self.popup.take().is_some()
+    }
+
+    /// Closes the line thickness or line style list, if one is open over its flyout, and
+    /// returns its combo.
+    pub(super) fn close_drop_down(&mut self) -> Option<Id> {
+        match &mut self.popup {
+            Some(Popup::Settings { widths_open, .. }) if *widths_open => {
+                *widths_open = false;
+                Some(width_combo_id())
+            }
+            Some(Popup::Style { styles_open, .. }) if *styles_open => {
+                *styles_open = false;
+                Some(style_combo_id())
+            }
+            _ => None,
+        }
     }
 
     /// Adds an empty box at the end (`AddNewEquation`): the next number, and the first
@@ -754,6 +783,18 @@ impl CalculatorApp {
         if pressed(Key::Num0) {
             self.toggle_graph_view();
         }
+        self.swallow_held_escape(ctx);
+        // Under the menu, an open drop-down of the graph options or the line options is the
+        // topmost thing: Esc closes it alone, and its combo takes the focus, as WinUI's
+        // ComboBox handles Esc itself.
+        if self.flyout == super::Flyout::None
+            && ctx.input(|i| i.key_pressed(Key::Escape))
+            && let Some(combo) = self.graphing.close_drop_down()
+        {
+            ctx.memory_mut(|m| m.request_focus(combo));
+            ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape));
+            self.graphing.esc_held = ctx.input(|i| i.key_down(Key::Escape));
+        }
         // One Esc closes one thing, the topmost: the menu, a popup, active tracing, then
         // the function analysis (in `draw_analysis`). A used Esc is consumed, so it
         // doesn't close the next one too.
@@ -948,7 +989,8 @@ impl CalculatorApp {
     fn draw_equation_list(&mut self, ui: &mut Ui, rect: Rect) {
         let mut area = egui::ScrollArea::vertical()
             .id_salt("graph-equations")
-            .auto_shrink(false);
+            .auto_shrink(false)
+            .scroll_source(access::scroll_source(ui, Default::default()));
         area = area.max_height(rect.height());
         ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
             area.show(ui, |ui| {
@@ -1741,7 +1783,8 @@ impl CalculatorApp {
         let items = analysis_items(&analysis.result);
         let area = egui::ScrollArea::vertical()
             .id_salt("graph-analysis")
-            .auto_shrink(false);
+            .auto_shrink(false)
+            .scroll_source(access::scroll_source(ui, Default::default()));
         ui.scope_builder(UiBuilder::new().max_rect(list), |ui| {
             area.show(ui, |ui| {
                 let width = ui.available_width();
@@ -1807,6 +1850,8 @@ impl CalculatorApp {
         let rect = Rect::from_min_size(pos2(left, top), size);
         popup_frame(p, ui.painter(), rect, p.popup);
         ui.interact(rect, Id::new("graph-settings-panel"), Sense::CLICK);
+        // Under the line thickness list, the flyout's other controls take no input.
+        access::set_covered(ui.ctx(), widths_open);
         let painter = ui.painter().clone();
         let inner = rect.shrink2(vec2(20.0, 15.0));
         painter.text(
@@ -1980,15 +2025,18 @@ impl CalculatorApp {
         );
         let combo = Rect::from_min_size(pos2(inner.left(), y + 22.0), vec2(inner.width(), 32.0));
         let width_name = line_width_name(self.graphing.line_width);
+        // The combo keeps the keyboard focus that opened its list.
+        access::set_covered(ui.ctx(), false);
         let response = access::control(
             ui,
             p,
             combo,
-            Id::new("graph-settings-width"),
+            width_combo_id(),
             true,
             RADIUS,
             access::combo_box(thickness, width_name),
         );
+        access::set_covered(ui.ctx(), widths_open);
         let fill = if response.is_pointer_button_down_on() {
             p.control_pressed
         } else if response.hovered() {
@@ -2053,7 +2101,15 @@ impl CalculatorApp {
             self.graphing.match_app_theme = true;
         }
         if open_widths {
-            // The line thickness list, over the flyout.
+            // The line thickness list, over the flyout. A click elsewhere on the flyout closes
+            // only the list, as a drop-down's light-dismiss layer does.
+            access::set_covered(ui.ctx(), false);
+            if ui
+                .interact(rect, Id::new("graph-width-backdrop"), Sense::CLICK)
+                .clicked()
+            {
+                open_widths = false;
+            }
             let list = drop_down_rect(combo, 4, full);
             popup_frame(p, &painter, list, p.popup);
             // Its edges don't click the controls under it.
@@ -2105,6 +2161,10 @@ impl CalculatorApp {
             }
         }
         if open_widths != widths_open {
+            if !open_widths {
+                let item = Id::new("graph-width-item");
+                self.drop_down_closed(ui.ctx(), width_combo_id(), item, 4);
+            }
             self.graphing.popup = Some(Popup::Settings {
                 anchor,
                 widths_open: open_widths,
@@ -2200,6 +2260,8 @@ impl CalculatorApp {
         let rect = Rect::from_min_size(pos2(left, top.max(full.top() + 4.0)), size);
         popup_frame(p, ui.painter(), rect, p.popup);
         ui.interact(rect, Id::new("graph-style-panel"), Sense::CLICK);
+        // Under the line style list, the flyout's other controls take no input.
+        access::set_covered(ui.ctx(), styles_open);
         let painter = ui.painter().clone();
         let inner = rect.shrink(16.0);
         painter.text(
@@ -2260,15 +2322,18 @@ impl CalculatorApp {
         let combo = Rect::from_min_size(pos2(inner.left(), style_top + 22.0), vec2(200.0, 32.0));
         let style = self.graphing.rows[index].style;
         let enabled = !inequality;
+        // The combo keeps the keyboard focus that opened its list.
+        access::set_covered(ui.ctx(), false);
         let response = access::control(
             ui,
             p,
             combo,
-            Id::new("graph-style-combo"),
+            style_combo_id(),
             enabled,
             RADIUS,
             access::combo_box(style_label, line_style_name(style)),
         );
+        access::set_covered(ui.ctx(), styles_open);
         let fill = if !enabled {
             p.control.gamma_multiply(0.5)
         } else if response.is_pointer_button_down_on() {
@@ -2307,6 +2372,15 @@ impl CalculatorApp {
             open = !styles_open;
         }
         if open {
+            // A click elsewhere on the flyout closes only the list, as a drop-down's
+            // light-dismiss layer does.
+            access::set_covered(ui.ctx(), false);
+            if ui
+                .interact(rect, Id::new("graph-style-backdrop"), Sense::CLICK)
+                .clicked()
+            {
+                open = false;
+            }
             let list = drop_down_rect(combo, 3, full);
             popup_frame(p, &painter, list, p.popup);
             // Its edges don't click the controls under it.
@@ -2352,6 +2426,10 @@ impl CalculatorApp {
             }
         }
         if open != styles_open {
+            if !open {
+                let item = Id::new("graph-style-item");
+                self.drop_down_closed(ui.ctx(), style_combo_id(), item, 3);
+            }
             self.graphing.popup = Some(Popup::Style {
                 row: id,
                 anchor,
@@ -2359,6 +2437,51 @@ impl CalculatorApp {
             });
         }
         false
+    }
+
+    /// Gives the keyboard focus back to a closing drop-down's `combo` if it was on the combo
+    /// or one of its `items` (`item.with(k)`), as WinUI's ComboBox does when it holds the
+    /// focus (`FinishClosingDropDown`), so that Enter and Tab go on from there. It looks at
+    /// last frame's focus, which a click elsewhere has already taken from a list item. After
+    /// the mouse alone nothing has the focus and nothing changes, as WinUI's pointer focus
+    /// shows no focus visual.
+    fn drop_down_closed(&self, ctx: &Context, combo: Id, item: Id, items: usize) {
+        let in_it = |id: Id| id == combo || (0..items).any(|k| id == item.with(k));
+        if self.last_focus.is_some_and(in_it) {
+            ctx.memory_mut(|m| m.request_focus(combo));
+        }
+    }
+
+    /// While the Esc that closed a drop-down is held, takes its repeats (egui's
+    /// `key_pressed` counts them too) until its key-up, so that they don't close the flyout
+    /// as well, as WinUI's ComboBox does (`m_ignoreCancelKeyDowns`). egui's Esc rule has
+    /// already taken the focus from the combo for each, so last frame's focus comes back.
+    fn swallow_held_escape(&mut self, ctx: &Context) {
+        if !self.graphing.esc_held {
+            return;
+        }
+        let mut held = true;
+        let mut swallowed = false;
+        ctx.input_mut(|i| {
+            i.events.retain(|event| match event {
+                egui::Event::Key {
+                    key: Key::Escape,
+                    pressed,
+                    ..
+                } if held => {
+                    held = *pressed;
+                    swallowed |= *pressed;
+                    !*pressed
+                }
+                _ => true,
+            });
+            // A window that loses the focus lets go of every key without a key-up.
+            held &= i.key_down(Key::Escape);
+        });
+        if swallowed && let Some(id) = self.last_focus {
+            ctx.memory_mut(|m| m.request_focus(id));
+        }
+        self.graphing.esc_held = held;
     }
 
     /// An equation box's context menu (`MathRichEditContextMenu`).
