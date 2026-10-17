@@ -447,7 +447,8 @@ pinned by the `scientific_*`, `exponent_entry`, `angle_units` and `degrees_*` te
 - `F4`, `F5` and `F3` pick radians, gradians and degrees: each is the key of the unit button that
   shows before it, and that button switches to the next unit.
 - `→deg` after `=` hides the expression line (`2 + 3 =` then `→deg` shows only `5`), and it
-  doesn't count as a function: a new number replaces it instead of logging it.- `→deg` writes its operand as it was typed (`30.50` is `degrees(30.50)`, `5 exp 3` is
+  doesn't count as a function: a new number replaces it instead of logging it.
+- `→deg` writes its operand as it was typed (`30.50` is `degrees(30.50)`, `5 exp 3` is
   `degrees(5.e+3)`): Windows' `IDC_DEGREES` doesn't finish the typed number before the operand
   goes to the expression line. The other functions write the finished number.
 
