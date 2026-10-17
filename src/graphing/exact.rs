@@ -201,11 +201,26 @@ pub fn decimal(v: f64) -> String {
     s.replace('-', &MINUS.to_string())
 }
 
-/// `k·x`, the slope part of a line: `x`, `−x`, `2x`, `x/2`, `−3x`.
+/// `k·x`, the slope part of a line: `x`, `−x`, `2x`, `x/2`, `−3x`, with x before the
+/// denominator as there (`3πx/2`, `√3x/3`), and a slope of two terms as one factor:
+/// `(√2 + 1)x`, not `√2 + 1x`.
 pub fn coefficient_of_x(m: f64) -> String {
     match recognize(m, LOOSE) {
         Exact::Rational(p, q) => times(p, q, "x"),
+        Exact::Pi(p, q) => times(p, q, "πx"),
+        Exact::Surd { p, q, c, r: 0, .. } => times(p, q, &format!("√{c}x")),
+        other @ Exact::Surd { .. } => format!("({})x", format_exact(other)),
         other => format!("{}x", format_exact(other)),
+    }
+}
+
+/// `text` as a term after another: ` + text`, or ` − rest` if `text` is `−rest`, so that a
+/// value of two terms adds with its own signs: x + (1 − √2), whose value is written
+/// `−√2 + 1`, is `x − √2 + 1`.
+pub fn plus_term(text: &str) -> String {
+    match text.strip_prefix(MINUS) {
+        Some(rest) => format!(" {MINUS} {rest}"),
+        None => format!(" + {text}"),
     }
 }
 
@@ -257,5 +272,10 @@ mod tests {
         assert_eq!(coefficient_of_x(-1.0), "−x");
         assert_eq!(coefficient_of_x(-3.0000001), "−3x");
         assert_eq!(coefficient_of_x(0.5), "x/2");
+        // x before the denominator, as in x/2, and a slope of two terms in parentheses.
+        assert_eq!(coefficient_of_x(1.5 * PI), "3πx/2");
+        assert_eq!(coefficient_of_x(-PI / 4.0), "−πx/4");
+        assert_eq!(coefficient_of_x(3f64.sqrt() / 3.0), "√3x/3");
+        assert_eq!(coefficient_of_x(2f64.sqrt() + 1.0), "(√2 + 1)x");
     }
 }

@@ -292,13 +292,20 @@ impl CalculatorApp {
 
         let center_y = result.center().y - result.height() * 0.14;
         self.draw_display_sized(ui, display, expression.bottom() - 15.0, font, center_y);
-        self.draw_angle_row(ui, angle_row);
         if matches!(self.flyout, Flyout::History | Flyout::Memory) {
             // Windows makes the list as high as the keys (`RowHeight =
-            // NumpadPanel.ActualHeight`): the unit, F-E and memory rows stay in view, the
-            // memory buttons disabled, and a click on them closes it (`OnHistoryFlyOutTapped`).
-            self.draw_memory_row(ui, memory_row, now, false);
-            let above = Rect::from_min_max(area.min, memory_row.right_bottom());
+            // NumpadPanel.ActualHeight`) and lays the rest of its flyout over the whole window:
+            // the unit, F-E and memory rows stay in view, out of the Tab order, the memory
+            // buttons disabled, and a click anywhere above the list (from the top of the
+            // window, header included) closes it (`OnHistoryFlyOutTapped`).
+            access::draw_covered(ui, || {
+                self.draw_angle_row(ui, angle_row);
+                self.draw_memory_row(ui, memory_row, now, false);
+            });
+            let above = Rect::from_min_max(
+                pos2(area.left(), ui.max_rect().top()),
+                memory_row.right_bottom(),
+            );
             if ui
                 .interact(above, Id::new("display"), Sense::CLICK)
                 .clicked()
@@ -313,6 +320,7 @@ impl CalculatorApp {
             self.draw_flyout(ui, area.with_min_y(keypad.top()), panel);
             return;
         }
+        self.draw_angle_row(ui, angle_row);
         if !self.docked {
             self.context_menu = None;
         }

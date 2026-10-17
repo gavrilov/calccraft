@@ -447,6 +447,7 @@ FeedbackButton.Content=ສົ່ງຄຳຕິຊົມ
 60=ທີ 60
 61=ທີ 61
 62=ທີ 62
+63=ທີ 63
 UnitAbbreviation_Acre=ac
 UnitAbbreviation_Angstrom=A
 UnitAbbreviation_Atmosphere=atm

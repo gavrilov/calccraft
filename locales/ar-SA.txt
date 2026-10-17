@@ -447,6 +447,7 @@ FeedbackButton.Content=إرسال ملاحظات
 60=الستون
 61=الحادي والستون
 62=الثاني والستون
+63=الثالث والستون
 UnitAbbreviation_Acre=التيار المتردد
 UnitAbbreviation_Angstrom=أنغ
 UnitAbbreviation_Atmosphere=جهاز صراف آلي

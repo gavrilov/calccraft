@@ -444,9 +444,79 @@ fn zeros(g: &dyn Fn(f64) -> f64, dg: Option<&dyn Fn(f64) -> f64>, xs: &[f64]) ->
     dedupe(out)
 }
 
-/// The sign of `d` just left of `c`: whether a turning point there is a minimum.
-fn falls_before(d: &dyn Fn(f64) -> f64, c: f64) -> bool {
-    d(c - 1e-7 * c.abs().max(1.0)) < 0.0
+/// The ends of the flat pieces of f, where f′ is exactly 0 at two samples or more in a
+/// row (|x − 1| + |x + 1| on [−1, 1]), which `sign_changes` doesn't see. Each end comes
+/// with whether it's a minimum (`Some(true)`), a maximum (`Some(false)`) or neither
+/// (`None`, a step: f rises, or falls, on both sides of the piece). A side without a
+/// slope doesn't count: where f′ is undefined (but for a cusp, past which the next
+/// sample counts) or below 1e-12 (rounding noise, or e^(−x²)′ underflowing beyond
+/// |x| ≈ 27), beyond a pole, and past the end of `xs`, where an `open` piece stays
+/// flat; without `open`, pieces that reach the end of `xs` are left out.
+fn flat_ends(fun: &Fun, xs: &[f64], open: bool) -> Vec<(f64, Option<bool>)> {
+    let values: Vec<f64> = xs.iter().map(|&x| fun.d1(x)).collect();
+    // The end between sample `slope`, where f′ isn't 0, and sample `flat`, by
+    // bisection, with whether f rises at `slope`; `None` if that side doesn't count.
+    let side = |slope: usize, flat: usize| {
+        let mut v = values[slope];
+        // A cusp has no slope at its sample (x^(1/3) − |x^(1/3)| at 0): take the next.
+        if !v.is_finite() && fun.defined(xs[slope]) {
+            let next = if slope < flat {
+                slope.checked_sub(1)
+            } else {
+                Some(slope + 1).filter(|&k| k < xs.len())
+            };
+            v = next.map_or(f64::NAN, |k| values[k]);
+        }
+        if !v.is_finite() || v.abs() < 1e-12 {
+            return None;
+        }
+        let (mut a, mut b) = (xs[slope], xs[flat]);
+        for _ in 0..80 {
+            let m = (a + b) / 2.0;
+            if m == a || m == b {
+                break;
+            }
+            if fun.d1(m) == 0.0 {
+                b = m;
+            } else {
+                a = m;
+            }
+        }
+        (fun.defined(a) && fun.defined(b)).then_some((b, v > 0.0))
+    };
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < xs.len() {
+        if values[i] != 0.0 {
+            i += 1;
+            continue;
+        }
+        let first = i;
+        while i + 1 < xs.len() && values[i + 1] == 0.0 {
+            i += 1;
+        }
+        let last = i;
+        i += 1;
+        // A single zero is a turning point or a touching zero of f′ (x³ at 0); zeros
+        // with slopes between them aren't flat either.
+        if last == first
+            || (!open && (first == 0 || last + 1 == xs.len()))
+            || (first..last).any(|k| fun.d1((xs[k] + xs[k + 1]) / 2.0) != 0.0)
+        {
+            continue;
+        }
+        let before = (first > 0).then(|| side(first - 1, first)).flatten();
+        let after = (last + 1 < xs.len())
+            .then(|| side(last + 1, last))
+            .flatten();
+        let kind = match (before.map(|b| b.1), after.map(|a| a.1)) {
+            (Some(false) | None, Some(true) | None) => Some(true),
+            (Some(true) | None, Some(false) | None) => Some(false),
+            _ => None,
+        };
+        out.extend(before.iter().chain(&after).map(|&(x, _)| (x, kind)));
+    }
+    out
 }
 
 fn dedupe(mut v: Vec<f64>) -> Vec<f64> {
@@ -804,6 +874,26 @@ struct End {
     attained: bool,
 }
 
+/// The values on one piece of the domain: from the lowest to the highest of its ends.
+fn span(ends: &[End]) -> Option<Interval> {
+    if ends.is_empty() {
+        return None;
+    }
+    let lo = ends.iter().map(|e| e.value).fold(f64::INFINITY, f64::min);
+    let hi = ends
+        .iter()
+        .map(|e| e.value)
+        .fold(f64::NEG_INFINITY, f64::max);
+    // Constant on the piece (x/x): the value is taken inside it.
+    let attained = |v: f64| lo == hi || ends.iter().any(|e| e.value == v && e.attained);
+    Some(Interval {
+        lo,
+        hi,
+        lo_closed: attained(lo) && lo.is_finite(),
+        hi_closed: attained(hi) && hi.is_finite(),
+    })
+}
+
 // ------------------------------------------------------------------ aperiodic
 
 /// Features that need the derivatives (or none of floor's jumps).
@@ -870,17 +960,32 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
         features.x_intercepts = Some(parts.join(", "));
     }
 
-    // Turning points, where f′ changes sign (through ∞ at a cusp).
+    // Turning points, where f′ changes sign (through ∞ at a cusp), and the ends of flat
+    // pieces; `steps` are the ends of the flat pieces that f rises (or falls) across. A
+    // turning point is a minimum if f falls at the sample before it (right before it, f
+    // may be flat).
     let mut turns: Vec<(f64, bool)> = sign_changes(&d1, &xs, true)
         .into_iter()
-        .map(|(c, _, _)| (c, falls_before(&d1, c)))
+        .map(|(c, before, _)| (c, d1(before) < 0.0))
         .filter(|&(c, _)| inside(c) && fun.defined(c))
         .collect();
-    let too_many_turns = turns.len() > 20;
+    let mut steps = Vec::new();
+    for (c, minimum) in flat_ends(fun, &xs, true)
+        .into_iter()
+        .filter(|&(c, _)| inside(c))
+    {
+        match minimum {
+            Some(minimum) => turns.push((c, minimum)),
+            None => steps.push(c),
+        }
+    }
+    turns.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let too_many_turns = turns.len() + steps.len() > 20;
     if !too_many_turns {
         for turn in &mut turns {
             turn.0 = exact::snap(turn.0, TIGHT);
         }
+        steps = snapped(steps);
     }
     if too_many_turns {
         features.too_complex.extend([
@@ -974,22 +1079,7 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
                 None => known = false,
             }
         }
-        if ends.is_empty() {
-            continue;
-        }
-        let lo = ends.iter().map(|e| e.value).fold(f64::INFINITY, f64::min);
-        let hi = ends
-            .iter()
-            .map(|e| e.value)
-            .fold(f64::NEG_INFINITY, f64::max);
-        // Constant on the piece (x/x): the value is taken inside it.
-        let attained = |v: f64| lo == hi || ends.iter().any(|e| e.value == v && e.attained);
-        pieces.push(Interval {
-            lo,
-            hi,
-            lo_closed: attained(lo) && lo.is_finite(),
-            hi_closed: attained(hi) && hi.is_finite(),
-        });
+        pieces.extend(span(&ends));
     }
     if known {
         let pieces = union(pieces);
@@ -998,10 +1088,11 @@ fn aperiodic(fun: &Fun) -> Option<Features> {
         features.too_complex.push(Feature::Range);
     }
 
-    // Monotonicity between the turning points.
+    // Monotonicity between the turning points and steps.
     for i in &intervals {
+        let inner = turns.iter().map(|t| t.0).chain(steps.iter().copied());
         let mut cuts = vec![i.lo];
-        cuts.extend(turns.iter().map(|t| t.0).filter(|&c| c > i.lo && c < i.hi));
+        cuts.extend(dedupe(inner.filter(|&c| c > i.lo && c < i.hi).collect()));
         cuts.push(i.hi);
         for pair in cuts.windows(2) {
             let direction = direction_between(fun, pair[0], pair[1]);
@@ -1029,9 +1120,11 @@ fn direction_between(fun: &Fun, a: f64, b: f64) -> Direction {
         .map(|&x| fun.d1(x))
         .filter(|s| s.is_finite())
         .collect();
+    // A slope of 0 votes for neither (f64::signum(0.0) is 1).
+    let vote = |s: &f64| (*s > 0.0) as i32 - (*s < 0.0) as i32;
     if slopes.iter().all(|s| s.abs() < 1e-12) {
         Direction::Constant
-    } else if slopes.iter().map(|s| s.signum()).sum::<f64>() > 0.0 {
+    } else if slopes.iter().map(vote).sum::<i32>() > 0 {
         Direction::Increasing
     } else {
         Direction::Decreasing
@@ -1108,8 +1201,9 @@ fn asymptotes(fun: &Fun, intervals: &[Interval], features: &mut Features) {
         .map(|&(m, c)| {
             let mut s = format!("y = {}", exact::coefficient_of_x(m));
             if c != 0.0 {
-                s.push_str(if c > 0.0 { " + " } else { " − " });
-                s.push_str(&exact::format_loose(c.abs()));
+                // c with its own signs: |c| after a minus would need parentheses when it
+                // has two terms (x − (√2 − 1)).
+                s.push_str(&exact::plus_term(&exact::format_loose(c)));
             }
             s
         })
@@ -1128,7 +1222,7 @@ fn family_term(step: f64, offset: f64) -> String {
     if offset == 0.0 {
         n
     } else {
-        format!("{n} + {}", exact::format(offset))
+        n + &exact::plus_term(&exact::format(offset))
     }
 }
 
@@ -1257,19 +1351,27 @@ fn periodic(fun: &Fun, p: f64) -> Features {
         features.x_intercepts = Some(format!("{{{}, n₁ ∈ ℤ}}", parts.join(", ")));
     }
 
-    // Turning points and their kind, in one period.
-    let positions = in_period(
-        sign_changes(&d1, &xs, true)
-            .into_iter()
-            .map(|c| c.0)
-            .collect(),
-        p,
-    );
-    let turns: Vec<(f64, bool)> = positions
-        .iter()
-        .map(|&x| (x, falls_before(&d1, x)))
+    // Turning points and their kind (as in `aperiodic`), in one period, and the ends of
+    // flat pieces (|sin x| + sin x on [π, 2π]), found on three periods so that every
+    // piece is seen whole.
+    let mut turns: Vec<(f64, bool)> = sign_changes(&d1, &xs, true)
+        .into_iter()
+        .map(|(c, before, _)| (in_period(vec![c], p)[0], d1(before) < 0.0))
         .filter(|&(x, _)| defined(x))
         .collect();
+    let wide: Vec<f64> = (0..=3 * N)
+        .map(|i| p * (i as f64 / N as f64 - 1.0))
+        .collect();
+    let mut steps = Vec::new();
+    for (x, minimum) in flat_ends(fun, &wide, false) {
+        let x = in_period(vec![x], p)[0];
+        match minimum {
+            Some(minimum) => turns.push((x, minimum)),
+            None => steps.push(x),
+        }
+    }
+    turns.sort_by(|a, b| a.0.total_cmp(&b.0));
+    turns.dedup_by(|a, b| (a.0 - b.0).abs() <= 1e-9 * p);
     for minimum in [true, false] {
         let points: Vec<f64> = turns
             .iter()
@@ -1331,17 +1433,31 @@ fn periodic(fun: &Fun, p: f64) -> Features {
             .collect();
     }
 
-    // The range over a period: the turning values, or ±∞ next to a pole.
-    let mut ends: Vec<End> = turns
-        .iter()
-        .map(|t| End {
-            value: exact::snap(fun.f(t.0), TIGHT),
-            attained: true,
-        })
-        .collect();
+    // The range: on each piece of the period between the points outside the domain (all of
+    // it if there are none), from the lowest to the highest of its turning values and the
+    // limits at its ends, as on the pieces of an aperiodic domain. One interval for the
+    // whole period would fill the gap between the branches of sec x, which has no values in
+    // (−1, 1).
+    let turning = |x: f64| End {
+        value: exact::snap(fun.f(x), TIGHT),
+        attained: true,
+    };
+    let mut pieces = Vec::new();
     let mut known = true;
-    for &x in &excluded {
-        for side in [-1.0, 1.0] {
+    if excluded.is_empty() {
+        let ends: Vec<End> = turns.iter().map(|t| turning(t.0)).collect();
+        pieces.extend(span(&ends));
+    }
+    for (i, &a) in excluded.iter().enumerate() {
+        // To the next point: after the last one, the first one of the next period.
+        let next = excluded.get(i + 1).copied().unwrap_or(excluded[0]);
+        let b = if next > a { next } else { next + p };
+        let mut ends: Vec<End> = turns
+            .iter()
+            .filter(|t| (t.0 > a && t.0 < b) || (t.0 + p > a && t.0 + p < b))
+            .map(|t| turning(t.0))
+            .collect();
+        for (x, side) in [(a, 1.0), (next, -1.0)] {
             match limit_end(limit_at(fun, x, side)) {
                 Some(value) => ends.push(End {
                     value,
@@ -1350,31 +1466,21 @@ fn periodic(fun: &Fun, p: f64) -> Features {
                 None => known = false,
             }
         }
+        pieces.extend(span(&ends));
     }
-    if known && !ends.is_empty() {
-        let lo = ends.iter().map(|e| e.value).fold(f64::INFINITY, f64::min);
-        let hi = ends
-            .iter()
-            .map(|e| e.value)
-            .fold(f64::NEG_INFINITY, f64::max);
-        let attained = |v: f64| ends.iter().any(|e| e.value == v && e.attained);
-        let range = Interval {
-            lo,
-            hi,
-            lo_closed: attained(lo) && lo.is_finite(),
-            hi_closed: attained(hi) && hi.is_finite(),
-        };
-        features.range = Some(set_text('y', &[range]));
+    if known && !pieces.is_empty() {
+        features.range = Some(set_text('y', &union(pieces)));
     } else {
         features.too_complex.push(Feature::Range);
     }
 
-    // Monotonicity between the turning points and poles, from the first one at or
+    // Monotonicity between the turning points, steps and poles, from the first one at or
     // after 0, around one period.
     let mut cuts: Vec<f64> = turns
         .iter()
         .map(|t| t.0)
         .chain(excluded.iter().copied())
+        .chain(steps)
         .collect();
     cuts = dedupe(cuts);
     if cuts.is_empty() {
@@ -1650,6 +1756,27 @@ mod tests {
     }
 
     #[test]
+    fn compound_terms_keep_their_signs() {
+        // An offset of two terms is added with its own signs: x + (1 − √2) is x − √2 + 1,
+        // which x − (√2 − 1) without the parentheses, x − √2 − 1, is not.
+        for (text, asymptote) in [
+            ("y=x+1-sqrt(2)+1/x", "y = x − √2 + 1"),
+            ("y=x-(2+sqrt(3))+1/x", "y = x − √3 − 2"),
+            ("y=-x-(sqrt(2)-1)+1/x", "y = −x − √2 + 1"),
+            ("y=x+2-sqrt(3)+1/x", "y = x − √3 + 2"),
+            ("y=x+sqrt(3)-2+1/x", "y = x + √3 − 2"),
+            // A slope of two terms is one factor.
+            ("y=(1+sqrt(2))x+1/x", "y = (√2 + 1)x"),
+        ] {
+            let f = analyze_text(text);
+            assert_eq!(f.oblique_asymptotes, vec![asymptote], "{text}");
+        }
+        // The offset of a family too.
+        let f = analyze_text("y=sin(x-1+sqrt(3)/3)");
+        assert_eq!(f.x_intercepts.as_deref(), Some("{πn₁ − √3/3 + 1, n₁ ∈ ℤ}"));
+    }
+
+    #[test]
     fn unsupported() {
         let error = |text| {
             let equation = Equation::parse(text, Syntax::default()).unwrap();
@@ -1732,6 +1859,117 @@ mod tests {
     }
 
     #[test]
+    fn flat_pieces() {
+        // f′ is exactly 0 on [−1, 1]: the ends of the flat piece are its minima.
+        let f = analyze_text("y=|x-1|+|x+1|");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [2, ∞)}"));
+        assert_eq!(f.minima, vec!["(−1, 2)", "(1, 2)"]);
+        assert!(f.maxima.is_empty());
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, −1)", Direction::Decreasing),
+                ("(−1, 1)", Direction::Constant),
+                ("(1, ∞)", Direction::Increasing)
+            ]
+        );
+        let f = analyze_text("y=|x|+|x-2|");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [2, ∞)}"));
+        assert_eq!(f.minima, vec!["(0, 2)", "(2, 2)"]);
+        let f = analyze_text("y=|x^2-1|+|x^2-4|");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [3, ∞)}"));
+        assert_eq!(f.minima, vec!["(−2, 3)", "(−1, 3)", "(1, 3)", "(2, 3)"]);
+        assert_eq!(f.maxima, vec!["(0, 5)"]);
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, −2)", Direction::Decreasing),
+                ("(−2, −1)", Direction::Constant),
+                ("(−1, 0)", Direction::Increasing),
+                ("(0, 1)", Direction::Decreasing),
+                ("(1, 2)", Direction::Constant),
+                ("(2, ∞)", Direction::Increasing)
+            ]
+        );
+        // Flat out to ±∞: the values −4 and 4 are taken, not only approached.
+        let f = analyze_text("y=|x+2|-|x-2|");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [−4, 4]}"));
+        assert_eq!(f.minima, vec!["(−2, −4)"]);
+        assert_eq!(f.maxima, vec!["(2, 4)"]);
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, −2)", Direction::Constant),
+                ("(−2, 2)", Direction::Increasing),
+                ("(2, ∞)", Direction::Constant)
+            ]
+        );
+        // A flat step on the way up is no extremum.
+        let f = analyze_text("y=x+(|x-1|-|x+1|)/2");
+        assert!(f.minima.is_empty() && f.maxima.is_empty());
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, −1)", Direction::Increasing),
+                ("(−1, 1)", Direction::Constant),
+                ("(1, ∞)", Direction::Increasing)
+            ]
+        );
+        // Flat between two samples: f′ is 0 right before the minimum.
+        let f = analyze_text("y=|x-0.001|+|x+0.001|");
+        assert_eq!(f.minima, vec!["(0, 0.002)"]);
+        assert!(f.maxima.is_empty());
+        // Flat from a cusp on, where f′ is undefined.
+        let f = analyze_text("y=x^(1/3)-|x^(1/3)|");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−∞, 0]}"));
+        assert_eq!(f.maxima, vec!["(0, 0)"]);
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, 0)", Direction::Increasing),
+                ("(0, ∞)", Direction::Constant)
+            ]
+        );
+        // e^(−x²)′ underflows to 0 beyond |x| ≈ 27, which isn't a flat piece.
+        let f = analyze_text("y=e^(-x^2)");
+        assert!(f.minima.is_empty());
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("(−∞, 0)", Direction::Increasing),
+                ("(0, ∞)", Direction::Decreasing)
+            ]
+        );
+        // Flat on (π, 2π) in every period.
+        let f = analyze_text("y=|sin(x)|+sin(x)");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [0, 2]}"));
+        assert_eq!(f.minima, vec!["{(πn₁, 0), n₁ ∈ ℤ}"]);
+        assert_eq!(f.maxima, vec!["{(2πn₁ + π/2, 2), n₁ ∈ ℤ}"]);
+        assert_eq!(
+            directions(&f),
+            vec![
+                ("{(2πn₁, 2πn₁ + π/2), n₁ ∈ ℤ}", Direction::Increasing),
+                ("{(2πn₁ + π/2, 2πn₁ + π), n₁ ∈ ℤ}", Direction::Decreasing),
+                ("{(2πn₁ + π, 2πn₁ + 2π), n₁ ∈ ℤ}", Direction::Constant)
+            ]
+        );
+    }
+
+    #[test]
+    fn zero_slopes_dont_vote() {
+        // Falling, then flat: f64::signum(0.0) is 1, which made it rising.
+        let equation = Equation::parse("y=|x-2|-|x+2|", Syntax::default()).unwrap();
+        let Shape::Function(e) = &equation.shape else {
+            unreachable!()
+        };
+        let fun = Fun::new(e, Env::RADIANS);
+        assert_eq!(
+            direction_between(&fun, 1.0, f64::INFINITY),
+            Direction::Decreasing
+        );
+    }
+
+    #[test]
     fn no_real_values() {
         let error = |text| {
             let equation = Equation::parse(text, Syntax::default()).unwrap();
@@ -1769,6 +2007,30 @@ mod tests {
         let f = analyze(&equation, Angle::Degrees).unwrap();
         assert_eq!(f.period, Period::Periodic("360".to_string()));
         assert_eq!(f.x_intercepts.as_deref(), Some("{180n₁, n₁ ∈ ℤ}"));
+    }
+
+    #[test]
+    fn periodic_ranges_between_poles() {
+        // sec x and csc x have no values between −1 and 1: each branch between two poles has
+        // a range of its own.
+        for text in ["y=sec(x)", "y=csc(x)", "y=1/cos(x)"] {
+            let f = analyze_text(text);
+            assert_eq!(
+                f.range.as_deref(),
+                Some("{y ∈ (−∞, −1] ∪ [1, ∞)}"),
+                "{text}"
+            );
+        }
+        let f = analyze_text("y=1/(1-2sin(x))");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−∞, −1] ∪ [1/3, ∞)}"));
+        let equation = Equation::parse("y=2sec(x)+1", Syntax::default()).unwrap();
+        let f = analyze(&equation, Angle::Degrees).unwrap();
+        assert_eq!(f.range.as_deref(), Some("{y ∈ (−∞, −1] ∪ [3, ∞)}"));
+        // Branches that overlap make one range.
+        let f = analyze_text("y=sec(x)+csc(x)");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ ℝ}"));
+        let f = analyze_text("y=sec(x)^2");
+        assert_eq!(f.range.as_deref(), Some("{y ∈ [1, ∞)}"));
     }
 
     #[test]

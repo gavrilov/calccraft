@@ -205,15 +205,75 @@ pub fn real_pow(b: f64, e: f64) -> f64 {
     f64::NAN
 }
 
-/// The gamma function (Lanczos approximation), for x!.
+/// x!: n! for the whole numbers up to 170 (the largest that fits in a double), and
+/// Γ(x + 1) for the rest.
+pub fn factorial(x: f64) -> f64 {
+    if x.fract() == 0.0 && (0.0..=170.0).contains(&x) {
+        whole_factorial(x as u32)
+    } else {
+        gamma(x + 1.0)
+    }
+}
+
+/// n!, rounded once. The product is kept as hi + lo, two doubles, and each hi · k is
+/// exact as the sum of two products: hi's first 45 bits times k (k ≤ 170 has 8 bits) and
+/// its last 8 bits times k. Multiplying doubles one by one would end up to 6 ulps off.
+fn whole_factorial(n: u32) -> f64 {
+    let (mut hi, mut lo) = (1.0_f64, 0.0_f64);
+    for k in 2..=n {
+        let k = f64::from(k);
+        let top = f64::from_bits(hi.to_bits() & !0xff);
+        let (a, b) = (top * k, (hi - top) * k);
+        // s + e is a + b exactly (|a| ≥ |b|), as hi + lo is s + t below.
+        let s = a + b;
+        let e = b - (s - a);
+        let t = e + lo * k;
+        hi = s + t;
+        lo = t - (hi - s);
+    }
+    hi
+}
+
+/// The gamma function (Lanczos approximation), for the factorials of fractions.
 pub fn gamma(x: f64) -> f64 {
     if x <= 0.0 && x.fract() == 0.0 {
         return f64::NAN;
     }
     if x < 0.5 {
-        // Reflection: Γ(x) Γ(1 − x) = π / sin(πx).
-        return PI / ((PI * x).sin() * gamma(1.0 - x));
+        // Reflection: Γ(x) Γ(1 − x) = π / sin(πx), dividing by Γ(1 − x)'s factors one by
+        // one: Γ(1 − x) is beyond doubles from 1 − x = 171.62 on, while Γ(x) is still a
+        // double beside its poles down to about −183, and a zero of its sign below.
+        let s = sin_pi(x);
+        if x < -200.0 {
+            // Below every double even beside a pole, where the factors would turn into
+            // ∞ · 0: a zero with the sign of sin(πx), NaN for −∞.
+            return 0.0 * s;
+        }
+        let [a, b, c] = lanczos(1.0 - x);
+        return PI / s / a / b / c;
     }
+    // Γ(x) is beyond doubles from 171.62 on, and much further out the power in `lanczos`
+    // would be ∞ and e^−t 0.
+    if x > 172.0 {
+        return f64::INFINITY;
+    }
+    let [a, b, c] = lanczos(x);
+    a * b * c
+}
+
+/// sin(πx) without rounding πx, which next to an integer would be most of what's left of
+/// it (π · 0.9999999999999998 is off by a third of its distance to π): the sine of πd for
+/// the distance d to the nearest integer n, which is exact, with the sign of (−1)ⁿ.
+fn sin_pi(x: f64) -> f64 {
+    let n = x.round();
+    let s = (PI * (x - n)).sin();
+    if n % 2.0 == 0.0 { s } else { -s }
+}
+
+/// Γ(x) for x ≥ 0.5 as the product of three factors (Lanczos approximation), each a double
+/// well beyond Γ's own range: t^(x − 0.5) alone overflows from Γ(143) on, before e^−t
+/// brings it back down, so it's taken in two halves.
+fn lanczos(x: f64) -> [f64; 3] {
     const G: f64 = 7.0;
     #[allow(clippy::excessive_precision)]
     const C: [f64; 9] = [
@@ -233,7 +293,8 @@ pub fn gamma(x: f64) -> f64 {
     for (i, c) in C.iter().enumerate().skip(1) {
         a += c / (x + i as f64);
     }
-    (2.0 * PI).sqrt() * t.powf(x + 0.5) * (-t).exp() * a
+    let half = t.powf((x + 0.5) / 2.0);
+    [(2.0 * PI).sqrt() * (half * (-t).exp()), half, a]
 }
 
 fn bin(op: BinOp, a: Expr, b: Expr) -> Expr {
@@ -374,7 +435,7 @@ impl Expr {
             }
             Expr::Root(a, n) => real_pow(a.eval(x, y, env), 1.0 / n.eval(x, y, env)),
             Expr::LogBase(b, a) => a.eval(x, y, env).ln() / b.eval(x, y, env).ln(),
-            Expr::Factorial(a) => gamma(a.eval(x, y, env) + 1.0),
+            Expr::Factorial(a) => factorial(a.eval(x, y, env)),
         }
     }
 
@@ -613,6 +674,62 @@ mod tests {
         assert!((gamma(5.0) - 24.0).abs() < 1e-9);
         assert!((gamma(0.5) - PI.sqrt()).abs() < 1e-12);
         assert!(gamma(-1.0).is_nan());
+    }
+
+    #[test]
+    fn exact_factorials() {
+        let factorial =
+            |n: f64| Expr::Factorial(Box::new(Expr::Num(n))).eval(0.0, 0.0, &Env::RADIANS);
+        // Whole numbers are exact (the tracer showed 3! as 6.000000000000007), and rounded
+        // once up to 170!, the largest factorial in doubles: multiplying doubles one by one
+        // is 1 ulp off at 28!.
+        assert_eq!(factorial(3.0), 6.0);
+        assert_eq!(factorial(5.0), 120.0);
+        assert_eq!(factorial(17.0), 355_687_428_096_000.0);
+        assert_eq!(factorial(28.0), 3.0488834461171387e29);
+        assert_eq!(factorial(142.0), 2.695364137888163e245);
+        assert_eq!(factorial(170.0), 7.257415615307999e306);
+        assert_eq!(factorial(171.0), f64::INFINITY);
+        // Fractions stay finite as long as they fit in a double.
+        assert!((factorial(142.5) / 3.2203704817308093e246 - 1.0).abs() < 1e-12);
+        assert!(factorial(170.6).is_finite());
+        assert_eq!(factorial(170.7), f64::INFINITY);
+        assert_eq!(factorial(1000.5), f64::INFINITY);
+        // A negative fraction's factorial is tiny where Γ(1 − x) is beyond doubles:
+        // (−172.1)! = Γ(−171.1) is 4.897e−309.
+        let tiny = factorial(-172.1) * 1e308;
+        assert!((tiny / 0.489722739514055 - 1.0).abs() < 1e-9, "{tiny}");
+        // 150!/150! is a line at 1, not a gap.
+        let ratio = bin(
+            BinOp::Div,
+            Expr::Factorial(Box::new(Expr::Num(150.0))),
+            Expr::Factorial(Box::new(Expr::Num(150.0))),
+        );
+        assert_eq!(ratio.eval(0.0, 0.0, &Env::RADIANS), 1.0);
+    }
+
+    #[test]
+    fn negative_factorials() {
+        let factorial =
+            |n: f64| Expr::Factorial(Box::new(Expr::Num(n))).eval(0.0, 0.0, &Env::RADIANS);
+        let check = |n: f64, want: f64, tolerance: f64| {
+            let got = factorial(n);
+            assert!(
+                (got / want - 1.0).abs() < tolerance,
+                "{n}! is {got}, not {want}"
+            );
+        };
+        // Next to the poles, where πx has lost most of the distance to the integer.
+        check(-1.9999999999999998, -4503599627370496.0, 1e-12);
+        check(-2.0000000000000004, 2251799813685247.5, 1e-12);
+        check(-2.9999999999999996, 1125899906842624.5, 1e-12);
+        check(-3.0000000000000004, -1125899906842623.5, 1e-12);
+        check(-100.00000000000001, 7.54008333488311e-143, 1e-12);
+        // Below −180, down to the smallest doubles, then zeros with Γ's sign.
+        check(-181.00000000000003, -1.7513719e-316, 1e-6);
+        check(-183.00000000000003, -5.316e-321, 1e-3);
+        assert_eq!(1.0 / factorial(-181.1), f64::NEG_INFINITY);
+        assert_eq!(1.0 / factorial(-1000.5), f64::INFINITY);
     }
 
     #[test]
