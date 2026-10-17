@@ -1123,7 +1123,7 @@ impl CalculatorApp {
     // ------------------------------------------------------------ memory row
 
     /// The memory row, with its buttons disabled when `all_enabled` is false (while a
-    /// Scientific flyout covers the keys, Windows' `EnableMemoryControls(false)`).
+    /// flyout covers the keys, Windows' `EnableMemoryControls(false)`).
     fn draw_memory_row(&mut self, ui: &Ui, rect: Rect, now: f64, all_enabled: bool) {
         let buttons = [
             ("MC", Command::MemoryClear),
@@ -2614,7 +2614,14 @@ impl CalculatorApp {
 
         if matches!(self.mode, Mode::Programmer | Mode::Scientific) {
             let header = Rect::from_min_size(main.min, vec2(main.width(), HEADER_HEIGHT));
-            self.draw_header(ui, header);
+            // The Programmer mode's flyout lies over the header too (see `draw_programmer`).
+            if self.mode == Mode::Programmer
+                && matches!(self.flyout, Flyout::History | Flyout::Memory)
+            {
+                access::draw_covered(ui, || self.draw_header(ui, header));
+            } else {
+                self.draw_header(ui, header);
+            }
             let below = main.with_min_y(header.bottom());
             if self.mode == Mode::Programmer {
                 self.draw_programmer(ui, below, now);
@@ -2652,12 +2659,26 @@ impl CalculatorApp {
             main.max - vec2(MARGIN, MARGIN),
         );
 
-        self.draw_header(ui, header);
+        // An open history or memory flyout lies over the whole window, header included
+        // (Windows' `Placement="Full"`), so the controls under it stay in view, out of reach.
+        if matches!(self.flyout, Flyout::History | Flyout::Memory) {
+            access::draw_covered(ui, || self.draw_header(ui, header));
+        } else {
+            self.draw_header(ui, header);
+        }
         self.draw_display(ui, display);
         match self.flyout {
             Flyout::History | Flyout::Memory => {
+                // Windows makes the list as tall as the keys (`RowHeight =
+                // NumpadPanel.ActualHeight`): the memory row stays in view too, its buttons
+                // disabled (`EnableControls(false)`), and a click anywhere above the list
+                // closes it (`OnHistoryFlyOutTapped`).
+                if !self.compact {
+                    access::draw_covered(ui, || self.draw_memory_row(ui, memory_row, now, false));
+                }
+                let above = main.with_max_y(memory_row.bottom());
                 if ui
-                    .interact(display, Id::new("display"), Sense::CLICK)
+                    .interact(above, Id::new("display"), Sense::CLICK)
                     .clicked()
                 {
                     self.flyout = Flyout::None;
@@ -2667,7 +2688,7 @@ impl CalculatorApp {
                 } else {
                     Panel::Memory
                 };
-                self.draw_flyout(ui, below.with_min_y(display.bottom()), panel);
+                self.draw_flyout(ui, below.with_min_y(memory_row.bottom()), panel);
             }
             Flyout::None | Flyout::Navigation => {
                 if dock.is_none() {
@@ -3305,5 +3326,241 @@ mod tests {
         let mut events = vec![key(Key::Num5, Modifiers::NONE), Event::Text("5".into())];
         assert_eq!(take_mode_shortcut(&mut events), None);
         assert_eq!(events.len(), 2);
+    }
+
+    /// What eframe saves in `app.ron`, in memory.
+    #[derive(Default)]
+    struct MemoryStorage(std::collections::BTreeMap<String, String>);
+
+    impl eframe::Storage for MemoryStorage {
+        fn get_string(&self, key: &str) -> Option<String> {
+            self.0.get(key).cloned()
+        }
+
+        fn set_string(&mut self, key: &str, value: String) {
+            self.0.insert(key.to_owned(), value);
+        }
+
+        fn remove_string(&mut self, key: &str) {
+            self.0.remove(key);
+        }
+
+        fn flush(&mut self) {}
+    }
+
+    /// The app as eframe starts it in `ctx`. In English, which other tests expect of `tr`,
+    /// whatever the Windows display language.
+    fn start_in(ctx: &Context) -> CalculatorApp {
+        let mut storage = MemoryStorage::default();
+        storage.0.insert(LANGUAGE_KEY.into(), "en-US".into());
+        let mut cc = eframe::CreationContext::_new_kittest(ctx.clone());
+        cc.storage = Some(&storage);
+        CalculatorApp::new(&cc)
+    }
+
+    /// Runs a frame of `app` in a window of `size` with `events`, as eframe does.
+    fn run(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, events: Vec<Event>) {
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            events,
+            ..Default::default()
+        };
+        let mut frame = eframe::Frame::_new_kittest();
+        let mut output = ctx.run_ui(input, |ui| eframe::App::ui(app, ui, &mut frame));
+        // There's no renderer to take the textures.
+        output.textures_delta.clear();
+    }
+
+    /// Clicks at `pos`: the pointer moves there, presses and releases, a frame each.
+    fn click(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, pos: Pos2) {
+        let button = |pressed| Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        for event in [Event::PointerMoved(pos), button(true), button(false)] {
+            run(ctx, app, size, vec![event]);
+        }
+    }
+
+    /// A screen reader's click on the control `id`, as Narrator sends it (AccessKit's
+    /// `Click` action), which egui takes for a real click.
+    fn screen_reader_click(id: Id) -> Event {
+        Event::AccessKitActionRequest(egui::accesskit::ActionRequest {
+            action: egui::accesskit::Action::Click,
+            target_node: id.accesskit_id(),
+            target_tree: egui::accesskit::TreeId::ROOT,
+            data: None,
+        })
+    }
+
+    #[test]
+    fn flyouts_cover_only_the_keys() {
+        for mode in [Mode::Standard, Mode::Programmer] {
+            // MS, and the Programmer mode's radix list (its BIN row).
+            let ms = match mode {
+                Mode::Programmer => programmer_view::memory_store_id(),
+                _ => Id::new("memory").with(4),
+            };
+            let mut ids = vec![ms];
+            if mode == Mode::Programmer {
+                ids.push(Id::new("radix").with(3));
+            }
+            let ctx = Context::default();
+            let mut app = start_in(&ctx);
+            app.set_mode(mode);
+            app.engine_mut().execute(Command::MemoryStore);
+            // The smallest window, Windows' 320 × 500.
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let rect = |id| ctx.read_response(id).map(|response| response.rect);
+            let rows: Vec<_> = ids.into_iter().map(|id| (id, rect(id).unwrap())).collect();
+            app.flyout = Flyout::Memory;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let flyout = rect(Id::new("flyout")).unwrap();
+            for (id, row) in rows {
+                assert!(
+                    row.bottom() <= flyout.top(),
+                    "{mode:?}: the flyout from y = {} covers {row:?}",
+                    flyout.top()
+                );
+                // Still drawn, out of the Tab order under the flyout.
+                let covered = ctx.read_response(id.with("covered"));
+                assert_eq!(covered.as_ref().map(|r| r.rect), Some(row), "{mode:?}");
+                // MS is disabled, like the keys (`EnableControls(false)`).
+                if id == ms {
+                    assert!(!covered.unwrap().sense.senses_click(), "{mode:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn flyouts_lie_over_the_header() {
+        // The header's buttons: the menu, and in the Standard mode keep on top and history.
+        let standard = ["menu", "keep-on-top", "history"];
+        let cases = [
+            (Mode::Standard, Flyout::History, &standard[..]),
+            (Mode::Standard, Flyout::Memory, &standard[..]),
+            (Mode::Programmer, Flyout::Memory, &standard[..1]),
+        ];
+        for (mode, flyout, buttons) in cases {
+            // With a calculation in the history (not in the Programmer mode) and in memory.
+            let start = |ctx: &Context| {
+                let mut app = start_in(ctx);
+                app.set_mode(mode);
+                for command in [
+                    Command::Digit(2),
+                    Command::Operator(Op::Add),
+                    Command::Digit(3),
+                    Command::Equals,
+                    Command::MemoryStore,
+                ] {
+                    app.engine_mut().execute(command);
+                }
+                run(ctx, &mut app, MIN_SIZE, vec![]);
+                app
+            };
+            // A click on a header button only closes the flyout (`OnHistoryFlyOutTapped`).
+            for name in buttons {
+                let ctx = Context::default();
+                let mut app = start(&ctx);
+                let button = ctx.read_response(Id::new(name)).unwrap().rect;
+                app.flyout = flyout;
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                click(&ctx, &mut app, MIN_SIZE, button.center());
+                assert!(
+                    app.flyout == Flyout::None && !app.compact,
+                    "{mode:?}: a click on {name} did more than close the flyout"
+                );
+            }
+            // Tab only reaches the list.
+            let ctx = Context::default();
+            let mut app = start(&ctx);
+            app.flyout = flyout;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            let list = ctx.read_response(Id::new("flyout")).unwrap().rect;
+            let tab = key(Key::Tab, Modifiers::NONE);
+            for _ in 0..6 {
+                run(&ctx, &mut app, MIN_SIZE, vec![tab.clone()]);
+                run(&ctx, &mut app, MIN_SIZE, vec![]);
+                let focused = access::focused(&ctx).unwrap();
+                let rect = ctx.read_response(focused).unwrap().rect;
+                assert!(
+                    rect.top() >= list.top(),
+                    "{mode:?}: Tab reached {focused:?}"
+                );
+            }
+        }
+
+        // Docked there's no flyout, and none opens in keep-on-top mode: the header works.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        let docked = vec2(DOCK_WIDTH, 600.0);
+        app.flyout = Flyout::Memory;
+        run(&ctx, &mut app, docked, vec![]);
+        let menu = ctx.read_response(Id::new("menu")).unwrap().rect;
+        click(&ctx, &mut app, docked, menu.center());
+        assert!(app.flyout == Flyout::Navigation);
+        app.set_compact(&ctx, true);
+        run(&ctx, &mut app, COMPACT_SIZE, vec![]);
+        let full = ctx.read_response(Id::new("full")).unwrap().rect;
+        click(&ctx, &mut app, COMPACT_SIZE, full.center());
+        assert!(!app.compact);
+    }
+
+    #[test]
+    fn covered_controls_ignore_screen_reader_clicks() {
+        // What the flyouts lie over: the header and the memory row, and in the Programmer
+        // mode the radix list and the row under it.
+        let standard = [
+            ("menu", Id::new("menu")),
+            ("keep on top", Id::new("keep-on-top")),
+            ("History", Id::new("history")),
+            ("MS", Id::new("memory").with(4)),
+            ("M˅", Id::new("memory-list")),
+        ];
+        let programmer = [
+            ("menu", Id::new("menu")),
+            ("HEX", Id::new("radix").with(0)),
+            (
+                "bit toggling keypad",
+                Id::new("programmer-keypad-switch").with(1),
+            ),
+            ("word size", Id::new("programmer-word-size")),
+            ("MS", programmer_view::memory_store_id()),
+            ("M˅", Id::new("memory-list")),
+        ];
+        let cases = [
+            (Mode::Standard, Flyout::History, &standard[..]),
+            (Mode::Standard, Flyout::Memory, &standard[..]),
+            (Mode::Programmer, Flyout::Memory, &programmer[..]),
+        ];
+        for (mode, flyout, controls) in cases {
+            let ctx = Context::default();
+            let mut app = start_in(&ctx);
+            app.set_mode(mode);
+            app.engine_mut().execute(Command::MemoryStore);
+            app.flyout = flyout;
+            run(&ctx, &mut app, MIN_SIZE, vec![]);
+            // Nothing may change: egui takes AccessKit's `Click` for a real click, so the
+            // controls must not sense clicks at all.
+            let state = |app: &CalculatorApp| {
+                let calc = app.engine();
+                let programmer = (app.programmer.bit_flip, calc.radix(), calc.word_size());
+                (app.flyout, app.compact, programmer, calc.memory().len())
+            };
+            let before = state(&app);
+            for &(name, id) in controls {
+                let covered = id.with("covered");
+                run(&ctx, &mut app, MIN_SIZE, vec![screen_reader_click(covered)]);
+                assert!(
+                    state(&app) == before,
+                    "{mode:?}: a screen reader's click on {name} went through"
+                );
+                let response = ctx.read_response(covered).unwrap();
+                assert!(!response.sense.senses_click(), "{mode:?}: {name}");
+            }
+        }
     }
 }

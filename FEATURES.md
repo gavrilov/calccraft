@@ -262,7 +262,9 @@ UI code and is covered by unit tests.*
 - **Rust:** `src/app.rs` (`draw_flyout`, `history_item`, `memory_item`, `draw_context_menu`)
 - **Description:** History (header button, `Ctrl+H`) and memory (`M˅`) panels.
 - **Acceptance Criteria:**
-  - The panel covers the keypad; clicking the display or pressing `Esc` closes it.
+  - The panel covers the keys only, as tall as Windows' `NumpadPanel`: the memory row stays in
+    view with its buttons disabled. Clicking anywhere above the panel, header included, or
+    pressing `Esc` closes it.
   - Memory items show `MC`, `M+` and `M−` on hover; clicking an item recalls it.
   - Right-clicking an item opens its context menu (`FEAT-STD-007`).
   - Empty panels show "There’s no history yet." / "There’s nothing saved in memory."
@@ -648,7 +650,8 @@ mode of `CCalcEngine`, run by `Calculator::programmer()` in `src/engine.rs`), UI
   - Sizes from `Calculator.xaml`'s star rows; the result font is 26, 46 or 72 px by window
     height, and the keys grow in the `Medium` and `Large` states, as in Windows.
   - Memory is shared with the Standard mode and shown in the current radix; the memory list
-    docks from 560 px (without a History tab); there is no history.
+    docks from 560 px (without a History tab), and narrower its flyout covers the keys only, so
+    the radix list stays in view; there is no history.
   - Switching between Standard and Programmer resets the mode switched to, as in Windows.
   - Paste checks the text with `CopyPasteManager`'s Programmer rules (`0x1F`, `1Fh`, `0b101`,
     `255u`, `1_000`, the word size's limits) and types it in.

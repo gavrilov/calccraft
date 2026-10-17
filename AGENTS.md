@@ -230,6 +230,14 @@ tools/icon-font.py       builds assets/fonts/CalcCraftIcons.ttf from Fluent Syst
   `draw_list`, the same list the flyouts use; the Programmer mode has only the Memory tab). The
   header's history button and `M˅` disappear, and `Ctrl+H` does nothing then. The lists wrap
   long expressions and numbers (`layout_wrapped_right`), as Windows' `TextWrapping="Wrap"` does.
+- Narrower, history and memory open as flyouts over the keys only, as tall as Windows'
+  `NumpadPanel` (`RowHeight = NumpadPanel.ActualHeight`): the rows above them (the memory row,
+  the Scientific mode's unit and F-E row, the Programmer mode's radix list and the row under it)
+  stay in view with the memory buttons disabled, and a click there closes the flyout. In the
+  Standard and Programmer modes the flyout lies over the whole window, as Windows' does
+  (`Placement="Full"`): the header and those rows are drawn covered (`access::draw_covered`),
+  out of the Tab order and not clickable, not even by a screen reader, and a click anywhere
+  above the list closes it.
 
 ### `app/scientific_view.rs`
 
