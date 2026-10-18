@@ -6,7 +6,9 @@ desktop with OpenGL ES. There is no Java or Kotlin code. `docs/mobile-apps-resea
 the `research/mobile-apps` branch) explains the choices and what a store release still needs.
 
 **Status:** builds for 64-bit ARM (`arm64-v8a`), Android 7.0 (API 24) and later, targeting
-Android 16 (API 36). Not tried on a device yet.
+Android 16 (API 36). Tried on a Samsung Galaxy with Android 17: the layout clears the status
+bar and the gesture bar, back closes the menu and then leaves the app, and the app comes back
+after it.
 
 ## Install
 
@@ -45,13 +47,18 @@ pages (as Google Play requires), and `apksigner` signs the APK (v2 and v3).
   glow, as in egui's `hello_android` example, without wgpu and `arboard`.
 - `AndroidManifest.xml`: the app handles every configuration change itself, since winit allows
   one event loop per process; phones stay upright, because the layouts need some 500 points of
-  height; and the keyboard pans the screen instead of shrinking it.
+  height; the keyboard pans the screen instead of shrinking it; and the app opts out of
+  predictive back (`enableOnBackInvokedCallback="false"`), without which Android 16 and later
+  handle the back button themselves and the app never sees it.
 - `res/`: the launcher icon (adaptive from Android 8; `cargo test write_android_icons --
   --ignored` writes the PNGs from `src/icon.rs`) and a light and a dark theme for the system
   bars and the start-up background.
-- `src/app/android.rs` (JNI): the system bars' and camera cutout's part of the screen becomes
-  egui's safe area, which the layout keeps clear (Android 15 and later draw apps under them);
-  the back button acts as Esc; and the interface follows the phone's languages.
+- `src/app/android.rs` (JNI on the NativeActivity that `android_main` gets; ndk-context's
+  context is the Application, which has no window): the system bars' and camera cutout's part
+  of the screen becomes egui's safe area, which the layout keeps clear (NativeActivity always
+  draws under them); the back button closes the open menu, popup, flyout or Settings page as
+  Esc does, and with nothing open moves the app to the background (Esc would clear the
+  calculator, as in Windows); and the interface follows the phone's languages.
 
 ## Not done yet
 

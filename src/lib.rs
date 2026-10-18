@@ -83,6 +83,7 @@ fn android_main(android_app: winit::platform::android::activity::AndroidApp) {
             .with_tag("CalcCraft"),
     );
     std::panic::set_hook(Box::new(|info| log::error!("{info}")));
+    app::android::init(&android_app);
     let options = eframe::NativeOptions {
         persistence_path: android_app
             .internal_data_path()

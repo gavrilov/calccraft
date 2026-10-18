@@ -5,8 +5,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.gavrilov.calccraft">
 
+    <!-- enableOnBackInvokedCallback: without it, Android 16 and later handle the back button
+         themselves (predictive back) and the app never sees it; android.rs makes it close
+         what is open, or else leave the app. -->
     <application
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="false"
         android:extractNativeLibs="false"
         android:hasCode="false"
         android:icon="@mipmap/ic_launcher"

@@ -42,7 +42,6 @@ eframe = { version = "0.36.2", default-features = false, features = [
 ] }
 jni = "0.21"
 log = "0.4"
-ndk-context = "0.1"
 # eframe's `NativeOptions::android_app` is winit's `AndroidApp`; the version eframe uses.
 winit = { version = "0.30", default-features = false }
 

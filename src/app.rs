@@ -2,7 +2,7 @@
 
 mod access;
 #[cfg(target_os = "android")]
-mod android;
+pub(crate) mod android;
 mod converter_view;
 mod date_view;
 mod graph_canvas;
@@ -2702,10 +2702,12 @@ impl eframe::App for CalculatorApp {
     }
 
     /// On Android: the system bars' part of the screen as egui's safe area, and the back
-    /// button as Esc.
+    /// button, which closes what is open (as Esc does) or else leaves the app.
     #[cfg(target_os = "android")]
     fn raw_input_hook(&mut self, ctx: &Context, raw_input: &mut egui::RawInput) {
-        android::input_hook(ctx, raw_input);
+        let back_closes =
+            self.popup_covers() || self.flyout != Flyout::None || self.page == Page::Settings;
+        android::input_hook(ctx, raw_input, back_closes);
     }
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
