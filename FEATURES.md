@@ -1160,6 +1160,9 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
   - Every control is reachable; `Tab` goes in drawing order and the arrows to the nearest control
     in their direction. The focused control has WinUI's focus visual (2 px outer and 1 px inner
     ring, 3 px outside) and scrolls into view.
+  - In the calendar, the arrow keys move the focus by date, like WinUI's `CalendarView`: a day or
+    a week, a month or four months (year view), a year or four years (decade view), on to the
+    page of the new date and not beyond 1601-01-01 or 9999-12-31.
   - `Space` and `Enter` press the focused control, but `Enter` stays `=` on the keypad and the
     memory row, as with Windows' `CalculatorButton`. `Esc` is still `C` and keeps the focus.
   - Popups keep the focus inside. Opened with the keyboard, the menu, the drop-downs, the

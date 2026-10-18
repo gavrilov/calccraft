@@ -708,7 +708,9 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
   after it overlap (the Graphing mode's `text_ui`).
 - A `TextEdit` inside a list keeps the arrow keys only for itself; a hand-made control that
   uses them (the variable slider, the graph while tracing) sets `set_focus_lock_filter`, or
-  egui moves the focus on the next arrow.
+  egui moves the focus on the next arrow. The calendar, whose arrow keys move the focus from cell
+  to cell, cancels egui's move in that frame instead (`move_focus(FocusDirection::None)`): a
+  cell that has just got the focus can't set a lock filter yet.
 - `LayoutJob::append` merges a section into the previous one when the format is the same, so
   sections don't map to characters; look a character's format up by byte range.
 - The graphing math is `f64` and the calculator engine's `BigRational`: don't mix them. `tan(π/2)`
