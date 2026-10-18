@@ -193,6 +193,9 @@ In the converters, the digits, `.` or `,`, `Backspace` and `Delete` (`CE`) work 
 value, `Ctrl+V` pastes a number, and `Esc` closes an open unit list or menu, or else is `CE` too,
 as in Windows.
 
+In an open unit list or a focused unit picker, typing the first letters of a unit's name goes
+to that unit, as in Windows.
+
 ## Requirements
 
 - **Windows 10 or 11.** The app was developed and tested on Windows 11. It loads Segoe UI

@@ -35,6 +35,8 @@ pub(super) struct ConverterState {
     popup: Option<UnitPopup>,
     /// A key pressed on the keyboard and when, to highlight its button.
     flash: Option<(ConverterCommand, f64)>,
+    /// What is being typed in the bottom (`[0]`) and top (`[1]`) unit pickers.
+    type_ahead: [TypeAhead; 2],
 }
 
 #[derive(Clone, Copy)]
@@ -45,6 +47,8 @@ struct UnitPopup {
     anchor: Rect,
     /// Scroll the selected unit into view on the first frame.
     scroll_pending: bool,
+    /// A unit typed ahead to, to scroll to and focus.
+    jump: Option<usize>,
 }
 
 impl ConverterState {
@@ -53,6 +57,7 @@ impl ConverterState {
             converter: Converter::new(Region::new(&user_region())),
             popup: None,
             flash: None,
+            type_ahead: Default::default(),
         }
     }
 
@@ -63,6 +68,102 @@ impl ConverterState {
 
     pub(super) fn popup_open(&self) -> bool {
         self.popup.is_some()
+    }
+
+    /// Lets the unit pickers use a typed text or an Enter press (`event`), with `focused`
+    /// the control that has the keyboard focus. Typing in a focused picker or its open list
+    /// goes to the unit whose name starts with what was typed (see `TypeAhead`): a closed
+    /// picker takes that unit at once, as WinUI's `ComboBox` does; in an open list it takes
+    /// the focus, so that Enter picks it, as after the arrow keys there. Returns the key that
+    /// egui must no longer see: a space typed into a search, or an Enter used here.
+    fn unit_picker_key(&mut self, event: &Event, focused: Option<Id>, now: f64) -> Option<Key> {
+        match event {
+            Event::Text(text) => self.type_ahead(text, focused, now),
+            Event::Key {
+                key: Key::Enter,
+                pressed: true,
+                ..
+            } => self.enter(focused, now),
+            _ => None,
+        }
+    }
+
+    /// Enter after typing. In an open list it picks the unit typed to even before the list
+    /// has focused it (which happens when the list is drawn, after the frame's keys), as
+    /// WinUI's Enter picks the unit its search moved to (`ComboBox::PopupKeyDown`). A closed
+    /// picker that is still searching ignores it: WinUI opens the list only when it isn't
+    /// (`ComboBox::MainKeyDown`, `IsInSearchingMode`).
+    fn enter(&mut self, focused: Option<Id>, now: f64) -> Option<Key> {
+        match self.popup {
+            Some(UnitPopup {
+                top,
+                jump: Some(index),
+                ..
+            }) => {
+                self.set_unit(top, index);
+                self.popup = None;
+                Some(Key::Enter)
+            }
+            Some(_) => None,
+            None => {
+                let (top, _) = self.search_target(focused)?;
+                let searching = self.type_ahead[usize::from(top)].searching(now);
+                searching.then_some(Key::Enter)
+            }
+        }
+    }
+
+    /// The picker being typed into (`true` for the top one) and the unit its search goes on
+    /// from: in an open list the focused unit, else the selected one.
+    fn search_target(&self, focused: Option<Id>) -> Option<(bool, usize)> {
+        let converter = &self.converter;
+        match self.popup {
+            Some(popup) => {
+                let selected = if popup.top {
+                    converter.unit1()
+                } else {
+                    converter.unit2()
+                };
+                let item = (0..converter.units().len())
+                    .find(|&i| focused == Some(Id::new("converter-unit-item").with(i)));
+                Some((popup.top, item.unwrap_or(selected)))
+            }
+            None if focused == Some(unit_picker_id(true)) => Some((true, converter.unit1())),
+            None if focused == Some(unit_picker_id(false)) => Some((false, converter.unit2())),
+            None => None,
+        }
+    }
+
+    fn type_ahead(&mut self, text: &str, focused: Option<Id>, now: f64) -> Option<Key> {
+        let (top, mut current) = self.search_target(focused)?;
+        let units = self.converter.units();
+        let names: Vec<&str> = units.iter().map(|unit| unit_name(unit.key)).collect();
+        let search = &mut self.type_ahead[usize::from(top)];
+        let (mut found, mut space) = (None, false);
+        for c in text.chars() {
+            if search.takes(c, now) {
+                // A space in a name ("Square f…") doesn't press the focused control.
+                space |= c == ' ';
+                if let Some(index) = search.find(c, now, current, &names) {
+                    (current, found) = (index, Some(index));
+                }
+            }
+        }
+        if let Some(index) = found {
+            match &mut self.popup {
+                Some(popup) => popup.jump = Some(index),
+                None => self.set_unit(top, index),
+            }
+        }
+        space.then_some(Key::Space)
+    }
+
+    fn set_unit(&mut self, top: bool, index: usize) {
+        if top {
+            self.converter.set_unit1(index);
+        } else {
+            self.converter.set_unit2(index);
+        }
     }
 }
 
@@ -188,6 +289,56 @@ pub(super) fn star_rows(total: f32, rows: &[(f32, f32)]) -> Vec<f32> {
     }
 }
 
+/// Typing a unit's name in a unit picker or its open list, like the text search of the
+/// WinUI `ComboBox`es Windows uses for them (`IsTextSearchEnabled` stays on, and a unit's
+/// text is its name). The characters typed within a second make one search, which keeps the
+/// current unit while its name still starts with them; a search after a pause starts at the
+/// next unit, so the same letter again goes on to the next unit with it. Case is ignored.
+#[derive(Default)]
+struct TypeAhead {
+    /// What was typed, and when the last character came.
+    text: String,
+    at: f64,
+}
+
+impl TypeAhead {
+    /// A pause this long (in seconds) starts a new search (`HasSearchStringTimedOut`).
+    const TIMEOUT: f64 = 1.0;
+    /// WinUI stops adding characters at 256.
+    const MAX_CHARS: usize = 256;
+
+    fn searching(&self, now: f64) -> bool {
+        !self.text.is_empty() && now - self.at <= Self::TIMEOUT
+    }
+
+    /// Whether `c`, typed at `now`, is part of a search. A space only continues one: on
+    /// its own it opens the list or picks the focused unit.
+    fn takes(&self, c: char, now: f64) -> bool {
+        !c.is_control() && (c != ' ' || self.searching(now))
+    }
+
+    /// Adds `c`, typed at `now`, to the search and returns the unit of `names` it finds,
+    /// going on from the unit at `current` (WinUI's `ComboBox::SearchItemSourceIndex`).
+    fn find(&mut self, c: char, now: f64, current: usize, names: &[&str]) -> Option<usize> {
+        let new = !self.searching(now);
+        if new {
+            self.text.clear();
+        }
+        if self.text.chars().count() < Self::MAX_CHARS {
+            self.text.push(c);
+        }
+        self.at = now;
+        let text = self.text.to_lowercase();
+        let start = current + usize::from(new);
+        (0..names.len())
+            .map(|i| (start + i) % names.len())
+            .find(|&i| {
+                let name = names[i].trim_start_matches(' ').to_lowercase();
+                name.starts_with(&text)
+            })
+    }
+}
+
 impl CalculatorApp {
     // -------------------------------------------------------------- keyboard
 
@@ -208,9 +359,14 @@ impl CalculatorApp {
                 ) && !self.converter.close_popup()
                 {
                     self.flyout = Flyout::None;
+                } else if self.flyout != Flyout::Navigation {
+                    // Typing in an open unit list finds a unit, and Enter picks it.
+                    self.unit_picker_key(ctx, &event, now);
                 }
                 continue;
             }
+            // Typing in a focused unit picker finds a unit; Enter waits for the search to end.
+            self.unit_picker_key(ctx, &event, now);
             match event {
                 Event::Text(text) => {
                     for command in text.chars().filter_map(char_command) {
@@ -255,6 +411,17 @@ impl CalculatorApp {
         if !hidden {
             self.converter.converter.execute(command);
             self.converter.flash = Some((command, now));
+        }
+    }
+
+    /// Lets the unit pickers use `event` (see `ConverterState::unit_picker_key`), and hides
+    /// from egui a key they used.
+    fn unit_picker_key(&mut self, ctx: &Context, event: &Event, now: f64) {
+        if let Some(key) = self
+            .converter
+            .unit_picker_key(event, access::focused(ctx), now)
+        {
+            ctx.input_mut(|i| i.consume_key(Modifiers::NONE, key));
         }
     }
 
@@ -329,6 +496,7 @@ impl CalculatorApp {
                     top,
                     anchor,
                     scroll_pending: true,
+                    jump: None,
                 });
                 self.opened_from(ui.ctx(), unit_picker_id(top));
             }
@@ -635,6 +803,9 @@ impl CalculatorApp {
                 .auto_shrink(false);
             if popup.scroll_pending {
                 area = area.vertical_scroll_offset(offset);
+            } else if let Some(jump) = popup.jump {
+                // Typed ahead: the unit found goes to the top of the list, as in Settings.
+                area = area.vertical_scroll_offset(jump as f32 * LIST_ITEM_HEIGHT);
             }
             area.show_rows(ui, LIST_ITEM_HEIGHT, units.len(), |ui, range| {
                 for index in range {
@@ -643,7 +814,8 @@ impl CalculatorApp {
                     let item = row.shrink2(vec2(0.0, 2.0));
                     let id = Id::new("converter-unit-item").with(index);
                     let name = unit_name(units[index].key);
-                    let focus = self.take_popup_focus(index == selected);
+                    let focus =
+                        self.take_popup_focus(index == selected) || popup.jump == Some(index);
                     if list_item(p, ui, id, item, name, index == selected, focus) {
                         chosen = Some(index);
                     }
@@ -653,6 +825,7 @@ impl CalculatorApp {
 
         if let Some(open) = &mut self.converter.popup {
             open.scroll_pending = false;
+            open.jump = None;
         }
         if let Some(index) = chosen {
             if popup.top {
@@ -728,6 +901,111 @@ impl CalculatorApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unit_lists_find_what_is_typed() {
+        let mut converter = Converter::new(Region::new("US"));
+        converter.set_category(crate::converter::Category::Length);
+        let names: Vec<&str> = converter.units().iter().map(|unit| unit.name).collect();
+        let at = |name: &str| names.iter().position(|n| *n == name);
+        let mut search = TypeAhead::default();
+        let mut find = |c, now, current: &str| search.find(c, now, at(current).unwrap(), &names);
+        // A new search starts after the current unit, ignoring case, as in WinUI.
+        assert_eq!(find('k', 10.0, "Centimeters"), at("Kilometers"));
+        assert_eq!(find('K', 12.0, "Centimeters"), at("Kilometers"));
+        // Letters typed within a second add up and keep the unit while it matches.
+        assert_eq!(find('m', 14.0, "Kilometers"), at("Miles"));
+        assert_eq!(find('i', 14.5, "Miles"), at("Miles"));
+        assert_eq!(find('c', 15.0, "Miles"), at("Microns"));
+        // After a pause, the same letter goes on to the next unit, round to the top.
+        assert_eq!(find('m', 17.0, "Microns"), at("Millimeters"));
+        assert_eq!(find('m', 19.0, "Nautical miles"), at("Microns"));
+        // Nothing matches: the unit stays.
+        assert_eq!(find('q', 19.5, "Microns"), None);
+    }
+
+    #[test]
+    fn a_space_only_continues_a_search() {
+        let mut converter = Converter::new(Region::new("US"));
+        converter.set_category(crate::converter::Category::Area);
+        let names: Vec<&str> = converter.units().iter().map(|unit| unit.name).collect();
+        let at = |name: &str| names.iter().position(|n| *n == name).unwrap();
+        let mut search = TypeAhead::default();
+        // A leading space opens the list or picks the unit instead, as in WinUI.
+        assert!(!search.takes(' ', 1.0));
+        let (mut current, mut now) = (at("Square meters"), 1.0);
+        for c in "square f".chars() {
+            now += 0.2;
+            assert!(search.takes(c, now), "{c:?}");
+            current = search.find(c, now, current, &names).unwrap_or(current);
+        }
+        assert_eq!(current, at("Square feet"));
+        // A second after the last letter, a space no longer continues the search.
+        assert!(!search.takes(' ', now + 1.5));
+    }
+
+    fn length_converter() -> ConverterState {
+        let mut converter = Converter::new(Region::new("US"));
+        converter.set_category(crate::converter::Category::Length);
+        ConverterState {
+            converter,
+            popup: None,
+            flash: None,
+            type_ahead: Default::default(),
+        }
+    }
+
+    fn pressed(key: Key) -> Event {
+        Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }
+    }
+
+    fn top_unit(state: &ConverterState) -> &'static str {
+        state.converter.units()[state.converter.unit1()].name
+    }
+
+    #[test]
+    fn enter_picks_the_unit_typed_to_in_an_open_list() {
+        let mut state = length_converter();
+        state.popup = Some(UnitPopup {
+            top: true,
+            anchor: Rect::ZERO,
+            scroll_pending: false,
+            jump: None,
+        });
+        // `k` and Enter in the same frame, while the focus is still on Centimeters.
+        let focused = Some(Id::new("converter-unit-item").with(state.converter.unit1()));
+        let typed = Event::Text("k".into());
+        assert_eq!(state.unit_picker_key(&typed, focused, 1.0), None);
+        assert_eq!(top_unit(&state), "Centimeters");
+        let enter = state.unit_picker_key(&pressed(Key::Enter), focused, 1.0);
+        assert_eq!(enter, Some(Key::Enter));
+        assert!(state.popup.is_none());
+        assert_eq!(top_unit(&state), "Kilometers");
+    }
+
+    #[test]
+    fn a_closed_picker_ignores_enter_while_searching() {
+        let mut state = length_converter();
+        let picker = Some(unit_picker_id(true));
+        let typed = Event::Text("k".into());
+        assert_eq!(state.unit_picker_key(&typed, picker, 1.0), None);
+        assert_eq!(top_unit(&state), "Kilometers");
+        // Within the search, Enter doesn't open the list, as in WinUI.
+        let enter = pressed(Key::Enter);
+        assert_eq!(state.unit_picker_key(&enter, picker, 1.5), Some(Key::Enter));
+        // A second after the last letter, it opens the list again.
+        assert_eq!(state.unit_picker_key(&enter, picker, 2.6), None);
+        // A space within the search is part of it, not a press of the picker.
+        let space = Event::Text(" ".into());
+        assert_eq!(state.unit_picker_key(&typed, picker, 5.0), None);
+        assert_eq!(state.unit_picker_key(&space, picker, 5.2), Some(Key::Space));
+    }
 
     #[test]
     fn star_rows_respect_minimums() {

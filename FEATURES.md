@@ -780,8 +780,14 @@ code, unit tests at the bottom) and the UI is `src/app/converter_view.rs`.*
     clear) or a click outside closes it.
   - In a landscape window the keypad sits next to the values, and from 640 px on the values, the
     unit pickers and the keys get larger, as in `UnitConverter.xaml`.
+  - Typing the first letters of a unit's name in an open unit list moves the focus to that unit,
+    and in a focused unit picker picks it, like WinUI's `ComboBox` text search: letters typed
+    within a second add up, and the same letter after a pause goes on to the next unit.
 - **Differences:** the unit lists don't wrap around (Windows uses a looping `CarouselPanel`).
-  The "About equal to" results under the values are `FEAT-SHELL-004`.
+  In an open list, the unit typed to only takes the focus until Enter; Windows already selects
+  it and puts the old unit back on `Esc` or a click outside. The search ignores case but not
+  accents, which WinUI's also ignores. The "About equal to" results under the values are
+  `FEAT-SHELL-004`.
 
 #### `FEAT-CONV-002` Length Converter
 - **Status:** `[x] COMPLETED`
