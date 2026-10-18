@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "CalcCraft",
+  "short_name": "CalcCraft",
+  "description": "A clone of the Windows 11 Calculator: Standard, Scientific, Graphing, Programmer, Date calculation and unit converters.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#291A29",
+  "theme_color": "#291A29",
+  "categories": ["utilities", "education"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -17,7 +17,8 @@ the date picker, the function analysis, and F5 in the Programmer mode (HEX, no r
 | 4. Size and speed | Measured: 11.2 MB `.wasm`, **3.9 MB gzipped** (Noto Sans Math adds 0.4 MB), within the target. No web-only profile yet. |
 | 5. CI | Done: the `web` job in `ci.yml` (clippy for wasm32 and `trunk build --release`). |
 | 6. Pages | Done in code (`pages.yml`). **Open:** the repository settings of step 6.1, then a first run. |
-| 7.–10. | Docs updated (README, AGENTS.md); release asset, wasm tests, Playwright and PWA not started. |
+| 7.–9. | Docs updated (README, AGENTS.md); release asset, wasm tests and Playwright not started. |
+| 10. Installable and offline | Done: app manifest, maskable icons, a service worker (page from the network first, the app's hashed files kept), safe areas for notches. Tested locally: installable manifest, offline start, old build files cleared after an update. |
 
 ## Goal
 

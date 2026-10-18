@@ -4,8 +4,10 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <!-- No pinch zoom: the calculator scales itself, and pinching zooms the graph. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <!-- No pinch zoom: the calculator scales itself, and pinching zooms the graph. The page
+         covers the whole screen, notch included; the body's padding keeps the calculator in
+         the safe area. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>CalcCraft</title>
     <meta name="description" content="CalcCraft, a clone of the Windows 11 Calculator in the browser: Standard, Scientific, Graphing, Programmer, Date calculation and unit converters.">
     <!-- The app's background (palette.rs), so the page doesn't flash another color. -->
@@ -16,6 +18,22 @@
     <link data-trunk rel="icon" href="assets/web/icon-32.png" />
     <link data-trunk rel="copy-file" href="assets/web/icon-180.png" />
     <link rel="apple-touch-icon" href="icon-180.png">
+
+    <!-- Installable as an app (a PWA): the manifest with the app's icons, and the service
+         worker that keeps its files for starting without a connection. Phones put it on the
+         home screen with "Install app" (Android) or "Add to Home Screen" (iOS). -->
+    <link data-trunk rel="copy-file" href="assets/web/manifest.webmanifest" />
+    <link data-trunk rel="copy-file" href="assets/web/sw.js" />
+    <link data-trunk rel="copy-file" href="assets/web/icon-192.png" />
+    <link data-trunk rel="copy-file" href="assets/web/icon-512.png" />
+    <link data-trunk rel="copy-file" href="assets/web/icon-maskable-192.png" />
+    <link data-trunk rel="copy-file" href="assets/web/icon-maskable-512.png" />
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="CalcCraft">
+    <!-- On an iPhone's home screen the app reaches under the status bar, in its own colors. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <style>
         :root {
@@ -52,6 +70,10 @@
         body {
             /* Smaller than the calculator's minimum, the page scrolls (see #window). */
             overflow: auto;
+            /* Clear of a phone's notch, rounded corners and home indicator (all 0 elsewhere). */
+            box-sizing: border-box;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right)
+                env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
         /* On phones, tablets and small windows the calculator fills the page. It gets at least
            Windows' 320 × 500 window, the size its layout is made for: in a smaller browser
@@ -77,8 +99,9 @@
            a window in the middle of the page instead, about the desktop app's size. Dragging
            the grip at its corner resizes it (wider than 560 px, history and memory dock on the
            right, as in Windows), the browser remembers the size, and a double-click on the
-           grip goes back to the default. */
-        @media (min-width: 1024px) and (min-height: 700px) and (pointer: fine) {
+           grip goes back to the default. Installed as an app on a computer, the app's own
+           window is the window, so it fills that (display-mode isn't `browser` there). */
+        @media (min-width: 1024px) and (min-height: 700px) and (pointer: fine) and (display-mode: browser) {
             body {
                 display: flex;
                 align-items: center;
@@ -180,6 +203,16 @@
                 }
             });
         })();
+
+        // The service worker (sw.js) that makes the app installable and lets it start
+        // offline. Browsers allow one only over HTTPS and on localhost.
+        if ("serviceWorker" in navigator) {
+            addEventListener("load", () => {
+                navigator.serviceWorker.register("sw.js").catch(() => {
+                    // Without it the page still works, just not offline.
+                });
+            });
+        }
     </script>
 </body>
 </html>

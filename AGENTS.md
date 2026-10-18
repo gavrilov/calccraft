@@ -38,6 +38,7 @@ others; code for the browser alone goes under `#[cfg(target_arch = "wasm32")]` t
 ```
 src/main.rs              window options, eframe::run_native; the web version's eframe::WebRunner
 index.html, Trunk.toml   the web version's page and its Trunk build (deployed by pages.yml)
+assets/web/              the web version's icons, app manifest and service worker (sw.js): a PWA
 src/icon.rs              the app icon, drawn in code with std only (also compiled into build.rs)
 build.rs                 embeds the icon and version info into calculator.exe (Windows only)
 src/engine.rs            calculator logic, no UI dependencies, unit tests at the bottom
@@ -671,6 +672,10 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
     window, the page scrolls instead. On large screens with a mouse (`index.html`'s media
     query) the canvas is a centered, resizable window, sized by `index.html`'s own script, not by
     the app: eframe just follows the canvas's size.
+  - The service worker (`assets/web/sw.js`) fetches the page from the network first and keeps
+    everything else, deleting the build files a new page no longer names. That's safe only for
+    files whose names change with their contents, as Trunk names the app's: a new file the
+    page loads should get a hashed name too (a Trunk asset), not a fixed one.
 - `build.rs` includes `src/icon.rs` with `#[path]`, so `icon.rs` must not use egui or any other
   dependency. The build writes a multi-size .ico file to `OUT_DIR` and embeds it with
   `winresource`, which needs `rc.exe` from the Windows SDK. After rebuilding, Explorer may show

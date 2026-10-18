@@ -228,6 +228,19 @@ Every release tag deploys it to GitHub Pages ([`pages.yml`](.github/workflows/pa
 can be deployed by hand from the Actions tab. It works in current Chrome, Edge, Firefox and
 Safari, on desktops and phones, and keeps its settings in the browser's local storage.
 
+It installs as an app (a PWA), which then starts from the home screen without the browser's
+address bar and works offline:
+
+- **Android:** in Chrome, ⋮ → **Install app** (or Add to Home screen).
+- **iPhone and iPad:** in Safari, Share → **Add to Home Screen**. The installed app keeps its
+  own settings, apart from Safari's.
+- **Windows, macOS, Linux:** in Chrome or Edge, the install button in the address bar opens it
+  in its own window.
+
+The installed app updates itself: after a deployment, the next start loads the new version.
+The app manifest and the service worker that keeps the app's files are
+`assets/web/manifest.webmanifest` and `assets/web/sw.js`.
+
 To run it locally, install [Trunk](https://trunkrs.dev) and the WebAssembly target, then serve it
 on <http://127.0.0.1:8080>:
 
@@ -330,7 +343,7 @@ The draft is published only when all four are there. Tags with a suffix, such as
 | `src/main.rs` | Entry point: window options, and the web version's start on the page's canvas |
 | `index.html`, `Trunk.toml` | The web version's page and its Trunk build |
 | `src/app/web.rs` | The web version's ties to the browser: languages and regional formats (`Intl`), clipboard, downloads, browser shortcuts |
-| `assets/web/` | The web version's icons, rendered from `src/icon.rs` by `cargo test write_web_icons -- --ignored` |
+| `assets/web/` | The web version's icons (rendered from `src/icon.rs` by `cargo test write_web_icons -- --ignored`), its app manifest and its service worker |
 | `src/icon.rs` | The app icon, drawn in code: the window icon and the icon embedded in the executable |
 | `build.rs` | Embeds the icon and the version information (CalcCraft, version from `Cargo.toml`) into `calculator.exe` |
 | `src/engine.rs` | Calculator logic: a port of the Windows engine (immediate execution, plus operator precedence and parentheses for the Scientific and Programmer modes), exact arithmetic, number formatting, exponent entry, paste, memory, history, unit tests. No UI code. |

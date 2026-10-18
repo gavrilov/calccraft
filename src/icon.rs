@@ -127,8 +127,18 @@ mod tests {
         assert_eq!(pixel(&pixels, 64, 12, 40), [0x44, 0x37, 0x44, 0xFF]);
     }
 
-    /// Writes the web version's icons into `assets/web/` (the tab's icon and the icon iOS
-    /// puts on the home screen), which `index.html` links. Run it after changing the icon:
+    fn write_png(path: &std::path::Path, size: u32, pixels: &[u8]) {
+        let file = std::fs::File::create(path).unwrap();
+        let mut encoder = png::Encoder::new(std::io::BufWriter::new(file), size, size);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer.write_image_data(pixels).unwrap();
+    }
+
+    /// Writes the web version's icons into `assets/web/`, which `index.html` and the app
+    /// manifest link: the tab's icon, the icon iOS puts on the home screen, the installed
+    /// app's icons, and Android's maskable ones. Run it after changing the icon:
     /// `cargo test write_web_icons -- --ignored`.
     #[test]
     #[ignore]
@@ -136,12 +146,36 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/web");
         std::fs::create_dir_all(&dir).unwrap();
         for size in [32, 180, 192, 512] {
-            let file = std::fs::File::create(dir.join(format!("icon-{size}.png"))).unwrap();
-            let mut encoder = png::Encoder::new(std::io::BufWriter::new(file), size, size);
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-            let mut writer = encoder.write_header().unwrap();
-            writer.write_image_data(&rgba(size)).unwrap();
+            write_png(&dir.join(format!("icon-{size}.png")), size, &rgba(size));
+        }
+        // Android crops a maskable icon to the launcher's shape (a circle at the smallest),
+        // keeping only a circle of 80 % for sure: the calculator takes the middle 60 %, on the
+        // app's light background (palette.rs).
+        const BACKGROUND: [u8; 3] = [0xF3, 0xEB, 0xF3];
+        for size in [192, 512] {
+            let inner = size * 3 / 5;
+            let offset = (size - inner) / 2;
+            let icon = rgba(inner);
+            let mut pixels = Vec::with_capacity((size * size * 4) as usize);
+            for y in 0..size {
+                for x in 0..size {
+                    let (ix, iy) = (x.wrapping_sub(offset), y.wrapping_sub(offset));
+                    let front = if ix < inner && iy < inner {
+                        pixel(&icon, inner, ix, iy)
+                    } else {
+                        [0; 4]
+                    };
+                    let alpha = u32::from(front[3]);
+                    for channel in 0..3 {
+                        let blended = u32::from(front[channel]) * alpha
+                            + u32::from(BACKGROUND[channel]) * (255 - alpha);
+                        pixels.push(((blended + 127) / 255) as u8);
+                    }
+                    pixels.push(255);
+                }
+            }
+            let path = dir.join(format!("icon-maskable-{size}.png"));
+            write_png(&path, size, &pixels);
         }
     }
 }
