@@ -1,6 +1,6 @@
 //! The Android app's ties to the system, through JNI where only Java can tell: the parts of
 //! the screen under the status bar, the navigation bar and a camera cutout (NativeActivity
-//! draws under them), the user's languages, and the back button.
+//! draws under them), the user's languages, the back button, and the keys' vibration.
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,17 +54,42 @@ fn sdk_version(env: &mut JNIEnv) -> jni::errors::Result<i32> {
         .i()
 }
 
+/// The activity window's top view (`getWindow().getDecorView()`).
+fn decor_view<'local>(
+    env: &mut JNIEnv<'local>,
+    activity: &JObject,
+) -> jni::errors::Result<JObject<'local>> {
+    let window = env
+        .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
+        .l()?;
+    env.call_method(&window, "getDecorView", "()Landroid/view/View;", &[])?
+        .l()
+}
+
+/// `HapticFeedbackConstants.KEYBOARD_TAP`: the system keyboard's key tap.
+const KEYBOARD_TAP: i32 = 3;
+
+/// A light tap of the vibration motor, as the system keyboard gives for a key: Android tunes
+/// it for each phone, and leaves it out when the user has turned touch feedback off.
+pub(super) fn key_tap() {
+    with_activity(|env, activity| {
+        let decor = decor_view(env, activity)?;
+        env.call_method(
+            &decor,
+            "performHapticFeedback",
+            "(I)Z",
+            &[JValue::Int(KEYBOARD_TAP)],
+        )?;
+        Ok(())
+    });
+}
+
 /// How far the system bars and a display cutout reach into the window, in pixels (left, top,
 /// right, bottom). NativeActivity draws on the whole window's surface, under the bars, on
 /// every Android version, whatever space its content view leaves them.
 fn covered_edges() -> Option<[i32; 4]> {
     with_activity(|env, activity| {
-        let window = env
-            .call_method(activity, "getWindow", "()Landroid/view/Window;", &[])?
-            .l()?;
-        let decor = env
-            .call_method(&window, "getDecorView", "()Landroid/view/View;", &[])?
-            .l()?;
+        let decor = decor_view(env, activity)?;
         let insets = env
             .call_method(
                 &decor,

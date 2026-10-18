@@ -479,6 +479,16 @@ impl WindowSizes {
     }
 }
 
+/// In the Android app, a light tap of the vibration motor as a finger lands on a key (see
+/// `android::key_tap`), like the system keyboard's. Keys typed on a keyboard don't vibrate.
+#[cfg_attr(not(target_os = "android"), allow(unused_variables))]
+fn key_feedback(ui: &Ui, response: &Response) {
+    #[cfg(target_os = "android")]
+    if response.is_pointer_button_down_on() && ui.input(|i| i.pointer.primary_pressed()) {
+        android::key_tap();
+    }
+}
+
 /// Where the app is drawn: the whole window, except on phones, which draw apps under the
 /// status bar, the navigation bar and a camera cutout (egui's safe area leaves them out).
 fn app_rect(ui: &Ui) -> Rect {
@@ -1083,6 +1093,7 @@ impl CalculatorApp {
         let p = self.palette;
         let pressed = enabled && (response.is_pointer_button_down_on() || flash);
         let hovered = enabled && response.hovered();
+        key_feedback(ui, response);
 
         let pick = |normal, hover, down| {
             if pressed {
