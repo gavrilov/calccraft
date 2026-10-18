@@ -45,3 +45,32 @@ jobs:
 
       - name: Test
         run: cargo test
+
+  web:
+    name: web build (wasm32)
+    # The web version (.github/workflows/pages.yml deploys it) builds from the same code, so
+    # every push and pull request checks that it still compiles for the browser. Nothing is
+    # deployed here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm32
+
+      - name: Clippy (wasm32)
+        run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+
+      # A prebuilt Trunk; it fetches the wasm-bindgen and wasm-opt it needs itself.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk
+
+      - name: Build the web version
+        run: trunk build --release

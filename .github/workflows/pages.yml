@@ -1,0 +1,66 @@
+name: Web
+
+# Builds the web version (index.html, Trunk) and deploys it to GitHub Pages, at
+# https://gavrilov.github.io/calccraft/. It runs for every release tag, alongside release.yml,
+# so the site matches the latest desktop release, and on demand from the Actions tab.
+#
+# Once, in the repository's settings: Pages → Build and deployment → Source: GitHub Actions,
+# and Environments → github-pages → Deployment branches and tags: add the tag pattern `v*`
+# (by default only the default branch may deploy).
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write # deploy to Pages
+  id-token: write # prove that the deployment comes from this workflow
+
+# One deployment at a time; a newer one waits instead of cancelling a running one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build the web version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm32
+
+      # A prebuilt Trunk; it fetches the wasm-bindgen and wasm-opt it needs itself.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk
+
+      # The site lives under /<repository>/, so every URL in the page starts there.
+      - name: Build
+        run: trunk build --release --public-url "/${GITHUB_REPOSITORY#*/}/"
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
