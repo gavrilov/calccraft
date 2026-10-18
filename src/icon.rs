@@ -178,4 +178,31 @@ mod tests {
             write_png(&path, size, &pixels);
         }
     }
+
+    /// Writes the Android app's launcher icons into `android/res/`, at 4 pixels a dp
+    /// (xxxhdpi; Android scales them down): the plain icon for Android 7, and the foreground
+    /// of the adaptive icon of Android 8 and later. The launcher crops that 108 dp layer to
+    /// its shape and keeps a circle of 66 dp for sure, so the calculator takes the middle
+    /// 48 %, on the background color of `res/values/colors.xml`. Run it after changing the
+    /// icon: `cargo test write_android_icons -- --ignored`.
+    #[test]
+    #[ignore]
+    fn write_android_icons() {
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("android/res/mipmap-xxxhdpi");
+        std::fs::create_dir_all(&dir).unwrap();
+        write_png(&dir.join("ic_launcher.png"), 192, &rgba(192));
+        let size = 432;
+        let inner = size * 12 / 25;
+        let offset = (size - inner) / 2;
+        let icon = rgba(inner);
+        let mut pixels = vec![0; (size * size * 4) as usize];
+        for y in 0..inner {
+            for x in 0..inner {
+                let i = (((y + offset) * size + x + offset) * 4) as usize;
+                pixels[i..i + 4].copy_from_slice(&pixel(&icon, inner, x, y));
+            }
+        }
+        write_png(&dir.join("ic_launcher_foreground.png"), size, &pixels);
+    }
 }

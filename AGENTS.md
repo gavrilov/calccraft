@@ -31,13 +31,17 @@ changes"). CI (`.github/workflows/ci.yml`) runs the first three on Windows, Linu
 for every push and pull request and builds the web version with Trunk, and a pull request
 isn't done until all of that passes. Code for Windows alone goes under `#[cfg(windows)]`, and
 what only it uses gets `#[cfg_attr(not(windows), allow(dead_code))]`, or clippy fails on the
-others; code for the browser alone goes under `#[cfg(target_arch = "wasm32")]` the same way.
+others; code for the browser alone goes under `#[cfg(target_arch = "wasm32")]` the same way, and
+code for the Android app alone under `#[cfg(target_os = "android")]` (see `android/README.md`).
 
 ## Architecture
 
 ```
-src/main.rs              window options, eframe::run_native; the web version's eframe::WebRunner
+src/main.rs              starts the app: `run` on desktops, `start_web` in the browser
+src/lib.rs               the modules; window options and eframe::run_native, the web version's
+                         eframe::WebRunner, and the Android app's `android_main`
 index.html, Trunk.toml   the web version's page and its Trunk build (deployed by pages.yml)
+android/                 the Android app (prototype): manifest, icons, themes, build-apk.ps1
 assets/web/              the web version's icons, app manifest and service worker (sw.js): a PWA
 src/icon.rs              the app icon, drawn in code with std only (also compiled into build.rs)
 build.rs                 embeds the icon and version info into calculator.exe (Windows only)
@@ -60,6 +64,8 @@ src/app/strings.rs       the interface's text in the user's language (from local
 src/app/region.rs        the user's regional formats, read from Windows (or the browser's Intl)
 src/app/web.rs           the web version's ties to the browser: URL parameters, languages, Intl,
                          clipboard, downloads, browser shortcuts (wasm32 only)
+src/app/android.rs       the Android app's ties to the system (JNI): the system bars' insets as
+                         egui's safe area, the back button, languages (Android only)
 src/app/palette.rs       the dark and light color palettes (`DARK`, `LIGHT`)
 src/app/share.rs         the graph's share: Windows' share sheet (`IDataTransferManagerInterop`),
                          or a PNG download in the browser
@@ -779,6 +785,6 @@ Unit tests don't cover the UI. After visual or interaction changes:
   commit to one topic.
 - In the PR description, say what changed, why, and how you verified it (tests and manual
   checks). Include before/after screenshots for UI changes.
-- Pushing a `v*` tag publishes a GitHub release for Windows and Linux (x64) and macOS (Apple
-  silicon and Intel) (`.github/workflows/release.yml`, see "Releasing" in the README). The tag must match `version` in `Cargo.toml`. Don't create or push tags unless
+- Pushing a `v*` tag publishes a GitHub release for Windows and Linux (x64), macOS (Apple
+  silicon and Intel) and Android (arm64) (`.github/workflows/release.yml`, see "Releasing" in the README). The tag must match `version` in `Cargo.toml`. Don't create or push tags unless
   a maintainer asks.

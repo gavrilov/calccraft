@@ -287,6 +287,15 @@ How the browser version differs:
 - **Screen readers:** egui has no screen reader tree in the browser yet, only spoken focus
   changes; the desktop app serves screen reader users better.
 
+## Android app (prototype)
+
+The same app also builds as a native Android app for 64-bit ARM phones and tablets (Android 7.0
+and later): `pwsh android/build-apk.ps1` writes `target/android/CalcCraft-<version>-arm64.apk`,
+which installs with `adb install -r`. CI builds the same APK for every push (the run's
+`CalcCraft-android-arm64` artifact), and every release has one. It isn't in Google Play yet and
+still lacks the clipboard, Share and regional formats; [`android/README.md`](android/README.md)
+has the requirements and the details.
+
 ## Development
 
 ```bash
@@ -330,8 +339,8 @@ git push origin v1.0.0
 
 The [release workflow](.github/workflows/release.yml) checks that the tag matches `Cargo.toml`
 and creates a draft release with generated release notes. Then it runs the tests and builds the
-app on Windows and Linux (x64) and macOS (Apple silicon and Intel), and uploads each with its
-SHA-256 checksum:
+app on Windows and Linux (x64), macOS (Apple silicon and Intel) and Android (arm64), and uploads
+each with its SHA-256 checksum:
 
 | Platform | File |
 | --- | --- |
@@ -339,17 +348,20 @@ SHA-256 checksum:
 | Linux | `calculator-v1.0.0-linux-x64.tar.gz` (the `calculator` executable) |
 | macOS (Apple silicon) | `calculator-v1.0.0-macos-arm64.zip` (`CalcCraft.app`, signed ad hoc) |
 | macOS (Intel) | `calculator-v1.0.0-macos-x64.zip` (`CalcCraft.app`, signed ad hoc, cross-compiled on Apple silicon) |
+| Android | `calculator-v1.0.0-android-arm64.apk` (signed with the release key from the repository's secrets, see [`android/README.md`](android/README.md)) |
 
-The draft is published only when all four are there. Tags with a suffix, such as
+The draft is published only when all five are there. Tags with a suffix, such as
 `v1.0.0-beta.1`, are published as pre-releases.
 
 ## Project layout
 
 | Path | Contents |
 | --- | --- |
-| `src/main.rs` | Entry point: window options, and the web version's start on the page's canvas |
+| `src/main.rs`, `src/lib.rs` | Entry points: `main.rs` starts the app; `lib.rs` has the window options, the web version's start on the page's canvas and the Android app's `android_main` |
 | `index.html`, `Trunk.toml` | The web version's page and its Trunk build |
+| `android/` | The Android app: its manifest, launcher icons and themes, and `build-apk.ps1`, which builds the APK |
 | `src/app/web.rs` | The web version's ties to the browser: languages and regional formats (`Intl`), clipboard, downloads, browser shortcuts |
+| `src/app/android.rs` | The Android app's ties to the system (JNI): the system bars' insets, the back button, languages |
 | `assets/web/` | The web version's icons (rendered from `src/icon.rs` by `cargo test write_web_icons -- --ignored`), its app manifest and its service worker |
 | `src/icon.rs` | The app icon, drawn in code: the window icon and the icon embedded in the executable |
 | `build.rs` | Embeds the icon and the version information (CalcCraft, version from `Cargo.toml`) into `calculator.exe` |

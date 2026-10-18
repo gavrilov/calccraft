@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- No title bar, the app's light background while it starts (palette.rs), and dark
+         status bar icons over it. values-night has the dark theme. -->
+    <style name="CalcCraft" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <color name="background">#F3EBF3</color>
+</resources>
