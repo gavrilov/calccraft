@@ -27,19 +27,56 @@ pwsh android/build-apk.ps1
 ```
 
 It writes `target/android/CalcCraft-<version>-arm64.apk`, with the version from `Cargo.toml`
-(1.2.0 is version code 10200). It needs:
+(1.2.0 is version code 10200). It runs in PowerShell 7 on Windows, Linux and macOS, and needs:
 
 - the Rust target and cargo-ndk: `rustup target add aarch64-linux-android`,
   `cargo install cargo-ndk`;
 - the Android SDK's `platforms;android-36` and `build-tools;36.0.0`, and the NDK
-  `29.0.14206865` (in `%LOCALAPPDATA%\Android\Sdk` or `ANDROID_HOME`);
-- a JDK 17 or later for `apksigner` and `keytool` (`%LOCALAPPDATA%\Android\jdk-21` or
-  `JAVA_HOME`).
+  `29.0.14206865` (in `ANDROID_HOME`, or by default `%LOCALAPPDATA%\Android\Sdk`,
+  `~/Library/Android/sdk` or `~/Android/Sdk`);
+- a JDK 17 or later for `apksigner` and `keytool` (`JAVA_HOME`, or by default
+  `%LOCALAPPDATA%\Android\jdk-21` on Windows and the `PATH` elsewhere).
 
 The script doesn't use Gradle. cargo-ndk builds the library (a `cdylib` only for Android: the
 desktop and web builds use the binary), `llvm-strip` drops its symbol table, `aapt2` links the
 manifest and resources, the library goes in uncompressed, `zipalign -P 16` aligns it to 16 KB
 pages (as Google Play requires), and `apksigner` signs the APK (v2 and v3).
+
+## CI and releases
+
+- **CI** (the `android` job in `.github/workflows/ci.yml`) runs clippy for Android and builds
+  the APK for every push and pull request. The APK is the run's `CalcCraft-android-arm64`
+  artifact. Each run signs it with a new debug key, so uninstall the app before installing
+  one from another run.
+- **Releases** (`.github/workflows/release.yml`) attach
+  `calculator-<tag>-android-arm64.apk` and its SHA-256 checksum, signed with the release key
+  from the repository's secrets. Without them the release still gets an APK, signed with a
+  debug key, and the run warns.
+
+### The release key
+
+Every update of an Android app has to be signed with the same key as the version it
+replaces, so releases need a key of their own, kept out of the repository. Make it once:
+
+```bash
+keytool -genkeypair -keystore calccraft-release.keystore -storetype PKCS12 -alias calccraft -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=CalcCraft"
+```
+
+keytool asks for a password. Keep the keystore and its password somewhere safe, with a
+backup: without the key, users have to uninstall the app to install an update (and Google
+Play would have to reset its upload key). Then add four secrets in GitHub (Settings → Secrets
+and variables → Actions → New repository secret):
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | The keystore file in Base64: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("calccraft-release.keystore"))` in PowerShell, or `base64 -w0 calccraft-release.keystore` on Linux |
+| `ANDROID_KEYSTORE_PASSWORD` | The keystore's password |
+| `ANDROID_KEY_ALIAS` | `calccraft` |
+| `ANDROID_KEY_PASSWORD` | Only if the key has a password of its own (a PKCS12 keystore uses the keystore's) |
+
+To sign a local build with it, set `ANDROID_KEYSTORE` to the keystore's path and the other
+three variables before running `build-apk.ps1`. An APK signed with the release key can't
+update one signed with a debug key: uninstall the debug build first.
 
 ## How it works
 
@@ -68,4 +105,4 @@ pages (as Google Play requires), and `apksigner` signs the APK (v2 and v3).
 - TalkBack: eframe's screen reader support needs GameActivity on Android.
 - The status bar's icons follow the phone's dark mode, not the app's own theme setting.
 - The graph's hover-only features (its buttons, tracing) have no touch alternative yet.
-- Google Play: an App Bundle (AAB) and a release signing key.
+- Google Play: an App Bundle (AAB); the release key above becomes its upload key.

@@ -74,3 +74,46 @@ jobs:
 
       - name: Build the web version
         run: trunk build --release
+
+  android:
+    name: Android build (arm64)
+    # The Android app (android/README.md) builds from the same code, so every push and pull
+    # request checks it and builds an APK, signed with a debug key, which the run keeps as an
+    # artifact for `adb install`.
+    runs-on: ubuntu-latest
+    env:
+      NDK: 29.0.14206865
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      # The runner has the Android SDK and a JDK; these are the packages build-apk.ps1 uses.
+      - name: Install the Android SDK packages
+        run: >
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install
+          "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK" > /dev/null
+
+      - name: Clippy (Android)
+        run: ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK" cargo ndk -t arm64-v8a -P 24 clippy --all-targets -- -D warnings
+
+      - name: Build the APK
+        shell: pwsh
+        run: android/build-apk.ps1 -Ndk $env:NDK
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CalcCraft-android-arm64
+          path: target/android/*.apk
+          if-no-files-found: error

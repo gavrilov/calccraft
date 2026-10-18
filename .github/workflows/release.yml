@@ -1,8 +1,13 @@
 name: Release
 
-# Pushing a tag such as v1.0.0 builds the app for Windows and Linux (x64) and macOS (Apple silicon
-# and Intel) and publishes them as a GitHub release. When it succeeds, pages.yml deploys the web
-# version of the same commit.
+# Pushing a tag such as v1.0.0 builds the app for Windows and Linux (x64), macOS (Apple silicon
+# and Intel) and Android (arm64) and publishes them as a GitHub release. When it succeeds,
+# pages.yml deploys the web version of the same commit.
+#
+# The Android APK is signed with the release key from the repository's secrets
+# (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and, if the key has
+# its own, ANDROID_KEY_PASSWORD; see android/README.md). Without them it gets a new debug key,
+# and installing it over an earlier release needs an uninstall first.
 on:
   push:
     tags:
@@ -152,9 +157,66 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber
 
+  android:
+    name: Build (android-arm64)
+    needs: draft
+    runs-on: ubuntu-latest
+    env:
+      NDK: 29.0.14206865
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      # The runner has the Android SDK and a JDK; these are the packages build-apk.ps1 uses.
+      - name: Install the Android SDK packages
+        run: >
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install
+          "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK" > /dev/null
+
+      - name: Build the APK
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if ($env:ANDROID_KEYSTORE_BASE64) {
+              $env:ANDROID_KEYSTORE = Join-Path $env:RUNNER_TEMP 'release.keystore'
+              [IO.File]::WriteAllBytes($env:ANDROID_KEYSTORE,
+                  [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64))
+          } else {
+              '::warning::No ANDROID_KEYSTORE_BASE64 secret: the APK is signed with a debug key.'
+          }
+          android/build-apk.ps1 -Ndk $env:NDK
+
+      - name: Package
+        run: |
+          asset="calculator-$GITHUB_REF_NAME-android-arm64.apk"
+          mkdir dist
+          cp target/android/CalcCraft-*-arm64.apk "dist/$asset"
+          cd dist
+          sha256sum "$asset" > "$asset.sha256"
+
+      - name: Upload to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+
   publish:
     name: Publish the release
-    needs: build
+    needs: [build, android]
     runs-on: ubuntu-latest
     steps:
       - name: Publish the draft
