@@ -1,0 +1,6 @@
+# The web version (see docs/web-version-plan.md): `trunk serve` runs it on
+# http://127.0.0.1:8080, `trunk build --release` writes it to dist/. GitHub Pages serves it
+# under /calccraft/, which .github/workflows/pages.yml passes as --public-url.
+[build]
+target = "index.html"
+dist = "dist"

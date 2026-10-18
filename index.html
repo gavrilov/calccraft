@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<!-- The web version's page (see docs/web-version-plan.md). Trunk builds it: `trunk serve`
+     runs it locally, `trunk build --release` writes it to dist/. -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <!-- No pinch zoom: the calculator scales itself, and pinching zooms the graph. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>CalcCraft</title>
+    <meta name="description" content="CalcCraft, a clone of the Windows 11 Calculator in the browser: Standard, Scientific, Graphing, Programmer, Date calculation and unit converters.">
+    <!-- The app's background (palette.rs), so the page doesn't flash another color. -->
+    <meta name="theme-color" content="#F3EBF3" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#291A29" media="(prefers-color-scheme: dark)">
+
+    <link data-trunk rel="rust" data-bin="calculator" data-wasm-opt="z" />
+    <link data-trunk rel="icon" href="assets/web/icon-32.png" />
+    <link data-trunk rel="copy-file" href="assets/web/icon-180.png" />
+    <link rel="apple-touch-icon" href="icon-180.png">
+
+    <style>
+        html {
+            /* No double-tap zoom on phones. */
+            touch-action: manipulation;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #F3EBF3;
+            color: #1A1A1A;
+            font-family: "Segoe UI", system-ui, sans-serif;
+        }
+        @media (prefers-color-scheme: dark) {
+            html, body {
+                background: #291A29;
+                color: #FFFFFF;
+            }
+        }
+        body {
+            /* Smaller than the calculator's minimum, the page scrolls (see the canvas). */
+            overflow: auto;
+        }
+        /* The calculator gets at least Windows' 320 × 500 window, the size its layout is made
+           for: in a smaller browser window or on a small phone, the page scrolls instead. */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            min-width: 320px;
+            min-height: 500px;
+            outline: none;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 16px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="calccraft"></canvas>
+    <div id="loading">Loading CalcCraft…</div>
+</body>
+</html>

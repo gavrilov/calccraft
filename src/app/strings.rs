@@ -196,7 +196,14 @@ pub(super) fn languages() -> impl Iterator<Item = &'static str> {
     LOCALES
         .iter()
         .map(|(tag, _)| *tag)
-        .filter(|tag| !UNSUPPORTED.contains(tag))
+        .filter(|tag| drawable(tag))
+}
+
+/// Whether egui can draw a language: not one of `UNSUPPORTED`, and in the web version not
+/// one that needs a Windows font from `script_font` either, since a browser page can't
+/// read the system's fonts.
+fn drawable(tag: &str) -> bool {
+    !UNSUPPORTED.contains(&tag) && !(cfg!(target_arch = "wasm32") && script_font(tag).is_some())
 }
 
 fn load(language: &'static str) -> &'static Strings {
@@ -280,15 +287,18 @@ fn match_language(tag: &str) -> Option<&'static str> {
             .find(|candidate| candidate.to_ascii_lowercase() == tag)
             .or_else(|| tags().find(|candidate| candidate.split('-').next() == Some(language)))?,
     };
-    (!UNSUPPORTED.contains(&chosen)).then_some(chosen)
+    drawable(chosen).then_some(chosen)
 }
 
 /// The user's preferred display languages, most preferred first. The environment
-/// variable `CALCCRAFT_LANGUAGE` (for example `de-DE`) overrides them.
+/// variable `CALCCRAFT_LANGUAGE` (for example `de-DE`) overrides them; in the web version
+/// they are the browser's languages, and the page address's `?lang=de-DE` overrides them.
 pub(super) fn preferred_languages() -> Vec<String> {
     if let Ok(language) = std::env::var("CALCCRAFT_LANGUAGE") {
         return vec![language];
     }
+    #[cfg(target_arch = "wasm32")]
+    return super::web::query("lang").map_or_else(super::web::languages, |language| vec![language]);
     #[cfg(windows)]
     {
         use windows_sys::Win32::Globalization::{GetUserPreferredUILanguages, MUI_LANGUAGE_NAME};
@@ -324,6 +334,7 @@ pub(super) fn preferred_languages() -> Vec<String> {
             }
         }
     }
+    #[cfg(not(target_arch = "wasm32"))]
     Vec::new()
 }
 

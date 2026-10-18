@@ -1272,6 +1272,9 @@ impl CalculatorApp {
         if response.secondary_clicked() {
             let at = ui.ctx().pointer_interact_pos().unwrap_or(rect.center());
             self.graphing.popup = Some(Popup::RowMenu { row: id, at });
+            // The menu's Paste needs the text by the time it's picked.
+            #[cfg(target_arch = "wasm32")]
+            super::web::prefetch_clipboard();
         }
         let enter = ctx.input(|i| i.key_pressed(Key::Enter));
         if response.lost_focus() {
@@ -2767,8 +2770,16 @@ fn tooltip(ui: &Ui, rect: Rect, id: Id, text: &str) {
 }
 
 /// The clipboard's text, for Paste from the menu (keyboard pastes come as egui events).
+#[cfg(not(target_arch = "wasm32"))]
 fn clipboard_text() -> Option<String> {
     arboard::Clipboard::new().ok()?.get_text().ok()
+}
+
+/// The clipboard's text as the browser gave it when the menu opened: browsers only read
+/// the clipboard asynchronously (`web::prefetch_clipboard`).
+#[cfg(target_arch = "wasm32")]
+fn clipboard_text() -> Option<String> {
+    super::web::clipboard_text()
 }
 
 /// An analysis value in the region's format: a decimal comma takes `;` between the

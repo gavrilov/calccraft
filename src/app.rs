@@ -13,6 +13,8 @@ mod region;
 mod scientific_view;
 mod share;
 mod strings;
+#[cfg(target_arch = "wasm32")]
+mod web;
 
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -473,6 +475,8 @@ pub struct CalculatorApp {
 
 impl CalculatorApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        #[cfg(target_arch = "wasm32")]
+        web::guard_shortcuts();
         let theme = cc
             .storage
             .and_then(|storage| storage.get_string(THEME_KEY))
@@ -1059,8 +1063,9 @@ impl CalculatorApp {
             p.text,
         );
         // Keep on top exists only in the Standard mode, the history in the Standard and
-        // Scientific modes, and its button only while the history isn't docked.
-        if self.mode == Mode::Standard {
+        // Scientific modes, and its button only while the history isn't docked. A browser
+        // tab can't stay on top or change its size, so the web version has no keep on top.
+        if self.mode == Mode::Standard && !cfg!(target_arch = "wasm32") {
             let label = icon_label(ICON_KEEP_ON_TOP, 14.0);
             let keep_on_top = icon_button(title.right() + 26.0);
             if self.button(
@@ -3330,6 +3335,11 @@ fn setup_fonts(ctx: &Context, script_fonts: &[strings::ScriptFont]) {
     // own fallback fonts.
     for (i, name) in scripts.into_iter().enumerate() {
         proportional.insert(1 + i, name);
+    }
+    // Last, egui's Hack: without Segoe UI Symbol (the web version, Linux and macOS) it has
+    // the analysis' `∈ ∪ ∀` and the Scientific mode's `⌊ ⌋ ⌈ ⌉ ∛`, which Inter lacks.
+    if fonts.font_data.contains_key("Hack") {
+        proportional.push("Hack".to_owned());
     }
     let fallback = proportional.clone();
     let family =

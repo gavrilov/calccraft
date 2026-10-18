@@ -86,10 +86,31 @@ pub(super) fn show(hwnd: Option<isize>, content: Content) -> bool {
     hwnd.is_some_and(|hwnd| sheet::open(hwnd, &content).is_ok())
 }
 
-/// There's no share sheet but Windows'.
-#[cfg(not(windows))]
+/// The web version downloads the graph as `graph.png`: browsers' share sheets (the Web Share
+/// API) exist only on some systems and take only files, so a download works everywhere.
+#[cfg(target_arch = "wasm32")]
+pub(super) fn show(_hwnd: Option<isize>, content: Content) -> bool {
+    png(&content.image).is_ok_and(|bytes| super::web::download("graph.png", "image/png", &bytes))
+}
+
+/// There's no share sheet but Windows' and the browser's download.
+#[cfg(not(any(windows, target_arch = "wasm32")))]
 pub(super) fn show(_hwnd: Option<isize>, _content: Content) -> bool {
     false
+}
+
+/// The image as a PNG file.
+#[cfg(any(windows, target_arch = "wasm32"))]
+fn png(image: &ColorImage) -> Result<Vec<u8>, png::EncodingError> {
+    let mut bytes = Vec::new();
+    let [width, height] = image.size;
+    let mut encoder = png::Encoder::new(&mut bytes, width as u32, height as u32);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(image.as_raw())?;
+    writer.finish()?;
+    Ok(bytes)
 }
 
 #[cfg(windows)]
@@ -171,7 +192,7 @@ mod sheet {
 
     /// The image as a PNG stream.
     fn image_stream(image: &ColorImage) -> Result<RandomAccessStreamReference> {
-        let png = png(image).map_err(|_| Error::from(E_FAIL))?;
+        let png = super::png(image).map_err(|_| Error::from(E_FAIL))?;
         let stream = InMemoryRandomAccessStream::new()?;
         let writer = DataWriter::CreateDataWriter(&stream)?;
         writer.WriteBytes(&png)?;
@@ -179,18 +200,6 @@ mod sheet {
         writer.DetachStream()?;
         stream.Seek(0)?;
         RandomAccessStreamReference::CreateFromStream(&stream)
-    }
-
-    fn png(image: &ColorImage) -> std::result::Result<Vec<u8>, png::EncodingError> {
-        let mut bytes = Vec::new();
-        let [width, height] = image.size;
-        let mut encoder = png::Encoder::new(&mut bytes, width as u32, height as u32);
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = encoder.write_header()?;
-        writer.write_image_data(image.as_raw())?;
-        writer.finish()?;
-        Ok(bytes)
     }
 }
 

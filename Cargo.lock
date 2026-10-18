@@ -526,11 +526,17 @@ dependencies = [
  "arboard",
  "chrono",
  "eframe",
+ "js-sys",
+ "log",
  "num-bigint",
  "num-rational",
  "num-traits",
  "png",
  "raw-window-handle",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "web-time",
  "windows",
  "windows-sys 0.61.2",
  "winresource",
@@ -626,7 +632,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
  "iana-time-zone",
+ "js-sys",
  "num-traits",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -826,6 +834,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "egui_glow",
+ "glow",
  "glutin",
  "glutin-winit",
  "image",
