@@ -2,8 +2,10 @@
 //!
 //! Windows' engine solves symbolically and shows `π/2` or `−2√3 − 6`. CalcCraft finds
 //! the same features numerically, then recognizes the doubles as the simple exact values
-//! they are: integers, fractions, rational multiples of π, and (a + b√c)/d. Anything
-//! else is shown as a decimal with 6 significant digits.
+//! they are: integers, fractions, short decimals (`1.05`, to the roundoff), rational
+//! multiples of π, and (a + b√c)/d. A multiple of π or a surd has to be much shorter to
+//! write than the decimal (or exact to the roundoff), or it would only be a near miss.
+//! Anything else is shown as a decimal with 6 significant digits.
 
 use std::f64::consts::PI;
 
@@ -56,7 +58,84 @@ const SQUARE_FREE: [i64; 18] = [
     2, 3, 5, 6, 7, 10, 11, 13, 14, 15, 17, 19, 21, 22, 23, 26, 29, 30,
 ];
 
-/// Recognizes `v` within `tolerance` (relative). Simpler forms win.
+/// How many digits an exact form has to save, against a number written to the tolerance
+/// (9 significant digits within `TIGHT`, 6 within `LOOSE`), to be believed: a short decimal
+/// has its last digit more than 10^`SAVED_DIGITS` times the tolerance, and a multiple of π
+/// or a surd takes that many fewer digits to write (the √ or π counting as one). Less is a
+/// near miss: there are so many (p/q)√c + r/s that a long one is within the tolerance of
+/// almost any number (within `LOOSE`, 1.05 is −6√21 + 314/11, 8 digits for the 3 of 1.05).
+/// With 3, chance matches are rarer than one number in a thousand.
+const SAVED_DIGITS: i32 = 3;
+
+/// The digits written for an integer: none for 0.
+fn digits(n: i64) -> i32 {
+    n.unsigned_abs()
+        .checked_ilog10()
+        .map_or(0, |d| d as i32 + 1)
+}
+
+/// The digits written for a factor or a denominator: none for 1.
+fn factor_digits(n: i64) -> i32 {
+    if n.abs() == 1 { 0 } else { digits(n) }
+}
+
+/// The decimal `v` is to the roundoff (`roundoff`), if its last digit is more than
+/// 10^`SAVED_DIGITS` times `error` (1.05, typed into the equation). A number only within the
+/// tolerance of one is a number of its own: 1.0100002 is a slope, and 0.0100001 and
+/// 0.0100003 two values (written 1.01, 0.0100001 and 0.0100003 all the same).
+fn short_decimal(v: f64, error: f64, roundoff: f64) -> Option<f64> {
+    let scale = 10f64.powi(-(error.log10().floor() as i32 + 1 + SAVED_DIGITS));
+    let d = (v * scale).round() / scale;
+    ((v - d).abs() <= roundoff).then_some(d)
+}
+
+/// How close (relative) a multiple of π or a surd has to be to a number to be it however
+/// long it is: the roundoff of a few operations on doubles. A near miss is about the
+/// tolerance off, and next to none of the forms tried is this close to a number by chance.
+pub const ROUNDOFF: f64 = 1e-12;
+
+/// The (p/q)√c + r/s within `error` of `v` that is closest to it, of those that take no
+/// more than `budget` digits to write or are within `roundoff` of it.
+fn surd(v: f64, error: f64, budget: i32, roundoff: f64) -> Option<Exact> {
+    let mut best: Option<(f64, Exact)> = None;
+    for c in SQUARE_FREE {
+        let root = (c as f64).sqrt();
+        for q in 1..=12i64 {
+            for p in -12..=12i64 {
+                if p == 0 || gcd(p, q) != 1 {
+                    continue;
+                }
+                // The rest as the fraction with the smallest denominator.
+                let rest = v - p as f64 / q as f64 * root;
+                let Some((r, s)) = (1..=12).find_map(|s| {
+                    let r = (rest * s as f64).round();
+                    ((rest - r / s as f64).abs() <= error).then(|| reduce(r as i64, s))
+                }) else {
+                    continue;
+                };
+                // The √ counts as a digit.
+                let cost = factor_digits(p)
+                    + factor_digits(q)
+                    + digits(c)
+                    + digits(r)
+                    + factor_digits(s)
+                    + 1;
+                let off = (rest - r as f64 / s as f64).abs();
+                if (cost <= budget || off <= roundoff)
+                    && best.is_none_or(|(closest, _)| off < closest)
+                {
+                    best = Some((off, Exact::Surd { p, q, c, r, s }));
+                }
+            }
+        }
+    }
+    best.map(|(_, exact)| exact)
+}
+
+/// Recognizes `v` within `tolerance` (relative): an integer or a fraction, else the
+/// closest of a short decimal (to the `ROUNDOFF`), a multiple of π and a surd that save
+/// `SAVED_DIGITS` (or are exact to the `ROUNDOFF`). A root is exact to its last few digits
+/// and a near miss is off by about the tolerance: 599π/11 is within `TIGHT` of 171.074 too.
 pub fn recognize(v: f64, tolerance: f64) -> Exact {
     if !v.is_finite() {
         return Exact::Decimal(v);
@@ -68,33 +147,34 @@ pub fn recognize(v: f64, tolerance: f64) -> Exact {
     if v.abs() > 1000.0 {
         return Exact::Decimal(v);
     }
-    if let Some((p, q)) = rational(v / PI, 12, tolerance) {
-        return Exact::Pi(p, q);
+    let error = tolerance * v.abs().max(1.0);
+    let roundoff = ROUNDOFF * v.abs().max(1.0);
+    let decimal = short_decimal(v, error, roundoff);
+    if decimal == Some(v) {
+        // Nothing is closer (a coefficient typed into the equation).
+        return Exact::Decimal(v);
     }
-    // (p/q)√c + r/s: try each radicand and coefficient, and see whether the rest is a
-    // simple fraction.
-    for c in SQUARE_FREE {
-        let root = (c as f64).sqrt();
-        for q in 1..=12i64 {
-            for p in -12..=12i64 {
-                if p == 0 {
-                    continue;
-                }
-                let rest = v - p as f64 / q as f64 * root;
-                if let Some((r, s)) = rational(rest, 12, tolerance)
-                    && near(
-                        v,
-                        p as f64 / q as f64 * root + r as f64 / s as f64,
-                        tolerance,
-                    )
-                {
-                    let (p, q) = reduce(p, q);
-                    return Exact::Surd { p, q, c, r, s };
-                }
-            }
-        }
-    }
-    Exact::Decimal(v)
+    // The significant digits of a number written to the tolerance, less the saving.
+    let budget = (v.abs().min(1.0) / tolerance).log10().ceil() as i32 - SAVED_DIGITS;
+    // The π counts as a digit, like the √ of a surd. `rational` holds the tolerance for v/π,
+    // which is closer to p/q than v is to pπ/q when v is below π, so check v itself too.
+    let pi = rational(v / PI, 12, tolerance)
+        .map(|(p, q)| (factor_digits(p) + factor_digits(q) + 1, Exact::Pi(p, q)))
+        .filter(|&(cost, pi)| {
+            let off = (pi.value() - v).abs();
+            off <= error && (cost <= budget || off <= roundoff)
+        })
+        .map(|(_, pi)| pi);
+    // On a tie, the decimal, then the multiple of π.
+    [
+        decimal.map(Exact::Decimal),
+        pi,
+        surd(v, error, budget, roundoff),
+    ]
+    .into_iter()
+    .flatten()
+    .min_by(|a, b| (a.value() - v).abs().total_cmp(&(b.value() - v).abs()))
+    .unwrap_or(Exact::Decimal(v))
 }
 
 impl Exact {
@@ -264,6 +344,57 @@ mod tests {
         assert_eq!(format(1f64.sin()), "0.841471");
         assert_eq!(format(-123456.789), "−123457");
         assert_eq!(decimal(0.000123456789), "0.000123457");
+    }
+
+    #[test]
+    fn decimals_are_no_surds() {
+        // Within LOOSE, some (p/q)√c + r/s is near almost any number: 1.05 was −6√21 + 314/11,
+        // 0.3 · π/2 was −9√19/8 + 43/8 and π/180 was √2/11 − 1/9.
+        assert_eq!(format_loose(1.05), "1.05");
+        assert_eq!(format_loose(1.05 + 1e-12), "1.05");
+        assert_eq!(coefficient_of_x(1.05), "1.05x");
+        assert_eq!(format_loose(0.3 * PI / 2.0), "0.471239");
+        assert_eq!(format_loose(PI / 180.0), "0.0174533");
+        // Within TIGHT too, for larger numbers: an inflection point of x·sin(x) in degrees
+        // was −9√11/10 − 1852/9.
+        assert_eq!(format(-208.762_739_939_297), "−208.763");
+        // A surd or a multiple of π within TIGHT of a short decimal (3.248452, 940.907,
+        // 171.074, 342.148) is still what it is: it is closer. Exact to the roundoff, even
+        // a long one is.
+        assert_eq!(format(3.0 + 5f64.sqrt() / 9.0), "√5/9 + 3");
+        assert_eq!(format(599.0 * PI / 2.0), "599π/2");
+        assert_eq!(format(599.0 * PI / 11.0), "599π/11");
+        assert_eq!(format(1198.0 * PI / 11.0), "1198π/11");
+        // A short decimal is what it looks like. To compute with, it is exact only to the
+        // roundoff: the limits from both sides of 1/x + 1.05 are one number, but 1.0100002
+        // isn't 1.01, though it is written so.
+        assert_eq!(snap(1.05 + 1e-12, LOOSE), 1.05);
+        assert_eq!(snap(1.05 - 1e-12, LOOSE), 1.05);
+        assert_eq!(format_loose(1.0100002), "1.01");
+        assert_eq!(snap(1.0100002, LOOSE), 1.0100002);
+        assert_eq!(snap(1.0500000005, TIGHT), 1.0500000005);
+        // Half of these were surds within LOOSE.
+        for k in -1000..=1000 {
+            let v = k as f64 / 100.0;
+            for tolerance in [TIGHT, LOOSE] {
+                let exact = recognize(v, tolerance);
+                assert!(
+                    matches!(exact, Exact::Rational(..) | Exact::Decimal(_)),
+                    "{v} is {}",
+                    format_exact(exact)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn multiples_of_pi_are_within_the_tolerance() {
+        // The tolerance holds for the number, not for its quotient by π, which is closer for a
+        // number below π: π/12 + 2·10⁻⁶ is more than LOOSE off π/12, though its quotient is
+        // within 10⁻⁶ of 1/12.
+        assert_eq!(format_loose(PI / 12.0 + 2e-6), "0.261801");
+        assert_eq!(format_loose(PI / 2.0 + 3e-6), "1.5708");
+        assert_eq!(format_loose(PI / 12.0 + 5e-7), "π/12");
     }
 
     #[test]
