@@ -95,7 +95,10 @@ update one signed with a debug key: uninstall the debug build first.
   of the screen becomes egui's safe area, which the layout keeps clear (NativeActivity always
   draws under them); the back button closes the open menu, popup, flyout or Settings page as
   Esc does, and with nothing open moves the app to the background (Esc would clear the
-  calculator, as in Windows); and the interface follows the phone's languages.
+  calculator, as in Windows); the interface follows the phone's languages; and a finger
+  landing on a key gives the system keyboard's light tap (`performHapticFeedback` with
+  `KEYBOARD_TAP`), which Android tunes for each phone and leaves out when touch feedback is
+  turned off in its settings.
 
 ## Not done yet
 

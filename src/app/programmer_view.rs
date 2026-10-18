@@ -960,6 +960,7 @@ impl CalculatorApp {
                     let info = access::item(WidgetType::Checkbox, &name, set);
                     let id = Id::new("programmer-bit").with(bit);
                     let response = access::control(ui, p, cell, id, enabled, RADIUS, info);
+                    super::key_feedback(ui, &response);
                     let pressed = enabled && response.is_pointer_button_down_on();
                     let hovered = enabled && response.hovered();
                     let color = match (enabled, set) {
