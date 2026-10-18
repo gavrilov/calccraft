@@ -113,7 +113,7 @@ impl CalculatorApp {
             self.graphing.fitted = Some((w, h));
         }
 
-        // The pointer: drag to pan, the wheel to zoom, right-click for Copy.
+        // The pointer: drag to pan, the wheel or a pinch to zoom, right-click for Copy.
         let id = Id::new("graph");
         let count = self
             .graphing
@@ -147,7 +147,25 @@ impl CalculatorApp {
         };
         let mut pointer = None;
         if let Some(response) = &response {
-            if response.dragged_by(PointerButton::Primary) {
+            // A pinch on a touch screen that starts on the graph zooms around the point between
+            // the fingers, and moving them pans, like the wheel and a drag. The first finger,
+            // which egui also takes for the pointer, doesn't drag the graph meanwhile.
+            let pinch = ctx
+                .input(|i| i.multi_touch())
+                .filter(|touch| response.sense.senses_drag() && rect.contains(touch.start_pos));
+            if let Some(touch) = pinch {
+                let d = touch.translation_delta;
+                let at = touch.center_pos - rect.min;
+                let mut view = self.graphing.view.dragged(d.x as f64, d.y as f64, w, h);
+                if touch.zoom_delta > 0.0 {
+                    let scale = 1.0 / touch.zoom_delta as f64;
+                    view = view.zoomed(at.x as f64, at.y as f64, w, h, scale);
+                }
+                if view != self.graphing.view {
+                    self.graphing.view = view;
+                    self.graphing.manual = true;
+                }
+            } else if response.dragged_by(PointerButton::Primary) {
                 let d = response.drag_delta();
                 if d != egui::Vec2::ZERO {
                     self.graphing.view = self.graphing.view.dragged(d.x as f64, d.y as f64, w, h);
@@ -186,7 +204,7 @@ impl CalculatorApp {
                         self.graphing.manual = true;
                     }
                 }
-                if !response.dragged() {
+                if !response.dragged() && pinch.is_none() {
                     pointer = ctx.pointer_hover_pos().map(|p| p - rect.min);
                 }
             }
