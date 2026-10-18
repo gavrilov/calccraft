@@ -1,5 +1,5 @@
 # CalcCraft
-
+## 🖩 Web Live demo [https://gavrilov.github.io/calccraft/](https://gavrilov.github.io/calccraft/)
 Calculator; an open-source reimplementation of Calculator, rebuilt in pure Rust with [eframe/egui](https://github.com/emilk/egui).
 It looks like the original (Segoe UI fonts, Fluent icons, the same layout and colors) and behaves like it, down to how the expression line, `%`, repeated `=` and error messages work.
 
