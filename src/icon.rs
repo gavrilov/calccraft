@@ -126,4 +126,22 @@ mod tests {
         assert_eq!(pixel(&pixels, 64, 32, 16), [0xDB, 0x9E, 0xE5, 0xFF]);
         assert_eq!(pixel(&pixels, 64, 12, 40), [0x44, 0x37, 0x44, 0xFF]);
     }
+
+    /// Writes the web version's icons into `assets/web/` (the tab's icon and the icon iOS
+    /// puts on the home screen), which `index.html` links. Run it after changing the icon:
+    /// `cargo test write_web_icons -- --ignored`.
+    #[test]
+    #[ignore]
+    fn write_web_icons() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/web");
+        std::fs::create_dir_all(&dir).unwrap();
+        for size in [32, 180, 192, 512] {
+            let file = std::fs::File::create(dir.join(format!("icon-{size}.png"))).unwrap();
+            let mut encoder = png::Encoder::new(std::io::BufWriter::new(file), size, size);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().unwrap();
+            writer.write_image_data(&rgba(size)).unwrap();
+        }
+    }
 }

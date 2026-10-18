@@ -1,1 +1,3 @@
 /target
+# The web version, built by Trunk.
+/dist

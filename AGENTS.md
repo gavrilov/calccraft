@@ -21,18 +21,23 @@ and the user-facing changes that are welcome are the ones that bring the app clo
 | Tests | `cargo test` |
 | Format | `cargo fmt` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
+| Lint the web version | `cargo clippy --target wasm32-unknown-unknown -- -D warnings` |
+| Run the web version | `trunk serve` (http://127.0.0.1:8080; `trunk build --release` writes `dist/`) |
 
-**Definition of done:** `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and
-`cargo test` all pass, and UI changes have been checked by actually running the app
-(see "Verifying UI changes"). CI (`.github/workflows/ci.yml`) runs the same three commands on
-Windows, Linux and macOS for every push and pull request, and a pull request isn't done until
-they pass on all three. Code for Windows alone goes under `#[cfg(windows)]`, and what only it
-uses gets `#[cfg_attr(not(windows), allow(dead_code))]`, or clippy fails on the others.
+**Definition of done:** `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+`cargo test` and the web version's `cargo clippy --target wasm32-unknown-unknown -- -D warnings`
+all pass, and UI changes have been checked by actually running the app (see "Verifying UI
+changes"). CI (`.github/workflows/ci.yml`) runs the first three on Windows, Linux and macOS
+for every push and pull request and builds the web version with Trunk, and a pull request
+isn't done until all of that passes. Code for Windows alone goes under `#[cfg(windows)]`, and
+what only it uses gets `#[cfg_attr(not(windows), allow(dead_code))]`, or clippy fails on the
+others; code for the browser alone goes under `#[cfg(target_arch = "wasm32")]` the same way.
 
 ## Architecture
 
 ```
-src/main.rs              window options, eframe::run_native
+src/main.rs              window options, eframe::run_native; the web version's eframe::WebRunner
+index.html, Trunk.toml   the web version's page and its Trunk build (deployed by pages.yml)
 src/icon.rs              the app icon, drawn in code with std only (also compiled into build.rs)
 build.rs                 embeds the icon and version info into calculator.exe (Windows only)
 src/engine.rs            calculator logic, no UI dependencies, unit tests at the bottom
@@ -51,7 +56,9 @@ src/app.rs               egui user interface (custom painting), modes, menu, key
 src/app/access.rs        keyboard focus, focus visuals and screen reader names of every control
 src/app/icons.rs         the icons: code points of the embedded icon font, and a test that it has them
 src/app/strings.rs       the interface's text in the user's language (from locales/)
-src/app/region.rs        the user's regional formats, read from Windows
+src/app/region.rs        the user's regional formats, read from Windows (or the browser's Intl)
+src/app/web.rs           the web version's ties to the browser: URL parameters, languages, Intl,
+                         clipboard, downloads, browser shortcuts (wasm32 only)
 src/app/date_view.rs     the date calculation mode's UI (a child module of app.rs)
 src/app/converter_view.rs  the converters' UI (a child module of app.rs)
 src/app/scientific_view.rs  the Scientific mode's UI (a child module of app.rs)
@@ -650,6 +657,18 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
   it's on, so its 320 × 394 window fits.
 - Release builds use `windows_subsystem = "windows"`, so `println!` output goes nowhere.
   Debug with `cargo run`.
+- **The web version** (`target_arch = "wasm32"`, `index.html`, `docs/web-version-plan.md`) runs
+  the same code in the browser:
+  - `std::time::SystemTime::now()` and `Instant::now()` panic there; use `web_time`.
+  - `std::fs` and `std::env::var` find nothing, threads can't be spawned, and `arboard` doesn't
+    build. Code that needs the browser goes into `src/app/web.rs`.
+  - The page can't read the system's fonts. The web version embeds Noto Sans Math
+    (`assets/fonts/`) for the symbols Inter lacks (`ℝ ℤ ∖ ∈ ⌊ ⌋ ∛`), before egui's Hack, which
+    comes last in every family on all systems.
+  - Browsers keep some keys: eframe never stops F5 or Ctrl+R (the calculator's GRAD and MR), so
+    `web::guard_shortcuts` does, with the other browser shortcuts the calculator uses.
+  - The canvas has a CSS minimum of 320 × 500 (`MIN_SIZE`): the layout code never sees a smaller
+    window, the page scrolls instead.
 - `build.rs` includes `src/icon.rs` with `#[path]`, so `icon.rs` must not use egui or any other
   dependency. The build writes a multi-size .ico file to `OUT_DIR` and embeds it with
   `winresource`, which needs `rc.exe` from the Windows SDK. After rebuilding, Explorer may show

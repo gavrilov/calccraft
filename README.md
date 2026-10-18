@@ -221,6 +221,48 @@ The executable is `target/release/calculator.exe` (`calculator` on Linux and mac
 builds use the Windows GUI subsystem, so no console window appears. Debug builds (`cargo run`) keep the console, which is
 handy for logging.
 
+## Web version
+
+The same app runs in the browser, compiled to WebAssembly: <https://gavrilov.github.io/calccraft/>.
+Every release tag deploys it to GitHub Pages ([`pages.yml`](.github/workflows/pages.yml)), and it
+can be deployed by hand from the Actions tab. It works in current Chrome, Edge, Firefox and
+Safari, on desktops and phones, and keeps its settings in the browser's local storage.
+
+To run it locally, install [Trunk](https://trunkrs.dev) and the WebAssembly target, then serve it
+on <http://127.0.0.1:8080>:
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
+```bash
+cargo install trunk --locked
+```
+
+```bash
+trunk serve --open
+```
+
+`trunk build --release` writes the site to `dist/`. Trunk downloads the `wasm-bindgen` and
+`wasm-opt` it needs; where that isn't possible, `cargo install wasm-bindgen-cli --version <the one
+in Cargo.lock>` and `cargo install wasm-opt` put them on the `PATH`, where Trunk finds them.
+
+How the browser version differs:
+
+- **Language and formats** follow the browser's language list and `Intl`; the page address's
+  `?lang=de-DE&region=de-DE` stands in for `CALCCRAFT_LANGUAGE` and `CALCCRAFT_REGION`. Chinese,
+  Japanese, Korean, Thai and Amharic need fonts the page can't read from the system, so they
+  aren't offered yet.
+- **Keep on top** is gone: a browser tab can't stay on top or set its size. Smaller than
+  320 × 500, the page scrolls.
+- **Share** in the Graphing mode downloads the graph as `graph.png`. **Paste** in an equation
+  box's menu asks the browser for the clipboard, which may ask for permission first.
+- **Shortcuts:** the page keeps the browser from acting on the calculator's shortcuts (Ctrl+R
+  reloading, F5, F3, Ctrl+L …), but browsers never hand some to a page (Ctrl+W, Ctrl+T, Ctrl+N,
+  Cmd+Q on a Mac).
+- **Screen readers:** egui has no screen reader tree in the browser yet, only spoken focus
+  changes; the desktop app serves screen reader users better.
+
 ## Development
 
 ```bash
@@ -229,8 +271,10 @@ cargo fmt --check                           # formatting
 cargo clippy --all-targets -- -D warnings   # lints
 ```
 
-All three must pass before a change is merged.
-[GitHub Actions](.github/workflows/ci.yml) runs them on Windows for every push and pull request.
+All three must pass before a change is merged, and so must the web build's lints
+(`cargo clippy --target wasm32-unknown-unknown -- -D warnings`).
+[GitHub Actions](.github/workflows/ci.yml) runs them on Windows, Linux and macOS, and builds the
+web version, for every push and pull request.
 Contributors (people and AI agents alike)
 should read [AGENTS.md](AGENTS.md) first: it describes the architecture, the Windows behaviors
 that the tests pin down, and known pitfalls.
@@ -279,7 +323,10 @@ The draft is published only when all four are there. Tags with a suffix, such as
 
 | Path | Contents |
 | --- | --- |
-| `src/main.rs` | Entry point: window options |
+| `src/main.rs` | Entry point: window options, and the web version's start on the page's canvas |
+| `index.html`, `Trunk.toml` | The web version's page and its Trunk build |
+| `src/app/web.rs` | The web version's ties to the browser: languages and regional formats (`Intl`), clipboard, downloads, browser shortcuts |
+| `assets/web/` | The web version's icons, rendered from `src/icon.rs` by `cargo test write_web_icons -- --ignored` |
 | `src/icon.rs` | The app icon, drawn in code: the window icon and the icon embedded in the executable |
 | `build.rs` | Embeds the icon and the version information (CalcCraft, version from `Cargo.toml`) into `calculator.exe` |
 | `src/engine.rs` | Calculator logic: a port of the Windows engine (immediate execution, plus operator precedence and parentheses for the Scientific and Programmer modes), exact arithmetic, number formatting, exponent entry, paste, memory, history, unit tests. No UI code. |
@@ -306,7 +353,7 @@ The draft is published only when all four are there. Tags with a suffix, such as
 | `tools/icon-font.py` | Builds the icon font from Fluent System Icons (`uv run tools/icon-font.py`) |
 | `locales/` | The strings in 60 languages, imported from the Windows Calculator by `tools/import-strings.ps1`, and CalcCraft's own few in `calccraft.txt` |
 | `docs/screenshot.png`, `docs/screenshot-light.png`, `docs/scientific.png`, `docs/date-calculation.png`, `docs/programmer.png`, `docs/unit-converter.png` | The screenshots shown above |
-| `.github/workflows/` | GitHub Actions: CI checks and the release build |
+| `.github/workflows/` | GitHub Actions: CI checks (with the web build), the release build, and the web version's deployment to GitHub Pages |
 | `AGENTS.md` | Guide for contributors and AI coding agents |
 | `CLAUDE.md` | Entry point for Claude Code (imports `AGENTS.md`) |
 

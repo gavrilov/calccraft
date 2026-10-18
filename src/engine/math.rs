@@ -555,9 +555,10 @@ pub fn random() -> Number {
     let seed = *SEED.get_or_init(|| {
         use std::hash::{BuildHasher, Hasher};
         let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+        // web_time, not std::time: the browser has no `SystemTime::now()`, it panics there.
         hasher.write_u128(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
+            web_time::SystemTime::now()
+                .duration_since(web_time::UNIX_EPOCH)
                 .map_or(0, |d| d.as_nanos()),
         );
         hasher.finish()

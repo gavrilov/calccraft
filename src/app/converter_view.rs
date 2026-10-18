@@ -67,8 +67,13 @@ impl ConverterState {
 }
 
 /// The user's region (Windows Settings → Time & language → Language & region), which
-/// picks the default units as Windows' `GeographicRegion` does. `US` when unknown.
+/// picks the default units as Windows' `GeographicRegion` does. `US` when unknown. The web
+/// version takes the country of the browser's regional format (`DE` for `de-DE`).
 fn user_region() -> String {
+    #[cfg(target_arch = "wasm32")]
+    if let Some(country) = super::web::country() {
+        return country;
+    }
     #[cfg(windows)]
     {
         use windows_sys::Win32::Globalization::GetUserDefaultGeoName;

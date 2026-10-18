@@ -8,12 +8,50 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-arboard = { version = "3.6", default-features = false }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
-eframe = { version = "0.36.2", features = ["persistence"] }
 num-bigint = "0.4"
 num-rational = "0.4.2"
 num-traits = "0.2.19"
+# `std::time::SystemTime::now()` panics in the browser; web-time's works everywhere.
+web-time = "1.1"
+
+# eframe is listed per target: a dependency in both [dependencies] and a target table gets
+# the union of their features, and the web build wants glow instead of the default wgpu.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+arboard = { version = "3.6", default-features = false }
+eframe = { version = "0.36.2", features = ["persistence"] }
+
+# The web version (see docs/web-version-plan.md): WebGL through glow, which every current
+# browser has, and the browser's own APIs for the language, formats, clipboard and downloads.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std", "wasmbind"] }
+eframe = { version = "0.36.2", default-features = false, features = [
+    "default_fonts",
+    "glow",
+    "persistence",
+    "web_screen_reader",
+] }
+js-sys = "0.3.106"
+log = "0.4"
+png = "0.18"
+wasm-bindgen = "0.2.129"
+wasm-bindgen-futures = "0.4.79"
+web-sys = { version = "0.3.106", features = [
+    "Blob",
+    "BlobPropertyBag",
+    "Clipboard",
+    "Document",
+    "Element",
+    "EventTarget",
+    "HtmlAnchorElement",
+    "HtmlCanvasElement",
+    "HtmlElement",
+    "KeyboardEvent",
+    "Location",
+    "Navigator",
+    "Url",
+    "Window",
+] }
 
 [target."cfg(windows)".dependencies]
 png = "0.18"
@@ -27,6 +65,10 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
 ] }
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Graphics_Dwm"] }
+
+[dev-dependencies]
+# For `icon::tests::write_web_icons`, on every system.
+png = "0.18"
 
 [build-dependencies]
 winresource = "0.1.34"

@@ -56,7 +56,9 @@ fn load(choice: Option<&str>) -> &'static Formats {
     }
     #[cfg(windows)]
     let formats = windows::load(choice).unwrap_or_else(Formats::english);
-    #[cfg(not(windows))]
+    #[cfg(target_arch = "wasm32")]
+    let formats = browser(choice).unwrap_or_else(Formats::english);
+    #[cfg(not(any(windows, target_arch = "wasm32")))]
     let formats = Formats::english();
     let formats: &'static Formats = Box::leak(Box::new(formats));
     loaded.push((choice.map(str::to_string), formats));
@@ -68,6 +70,30 @@ enum DateFormats {
     English,
     #[cfg(windows)]
     Windows(windows::Locale),
+    /// The browser's `Intl.DateTimeFormat` for a locale name.
+    #[cfg(target_arch = "wasm32")]
+    Web(String),
+}
+
+/// The formats of a region from the browser's `Intl` (`None`: the browser's language, or the
+/// page address's `?region=de-DE`), as `windows::load` reads Windows'. Browsers have no list
+/// separator: Windows' is `;` where the decimal separator is a comma, and `,` elsewhere.
+#[cfg(target_arch = "wasm32")]
+fn browser(choice: Option<&str>) -> Option<Formats> {
+    use super::web;
+
+    let tag = choice.map_or_else(web::region, str::to_string);
+    let numbers = web::number_format(&tag)?;
+    let list = if numbers.decimal == "," { ";" } else { "," };
+    Some(Formats {
+        first_day: web::first_day(&tag),
+        weekdays: web::weekdays(&tag)?,
+        months: web::months(&tag)?,
+        list_separator: format!("{list} "),
+        numbers,
+        dates: DateFormats::Web(tag.clone()),
+        tag,
+    })
 }
 
 impl Formats {
@@ -99,6 +125,13 @@ impl Formats {
             DateFormats::Windows(locale) => locale
                 .format(date, 0, Some(&locale.picker_pattern))
                 .unwrap_or_else(|| dates::format_date(date)),
+            #[cfg(target_arch = "wasm32")]
+            DateFormats::Web(tag) => super::web::format_date(
+                tag,
+                date,
+                &[("year", "numeric"), ("month", "long"), ("day", "numeric")],
+            )
+            .unwrap_or_else(|| dates::format_date(date)),
         }
     }
 
@@ -111,6 +144,18 @@ impl Formats {
             DateFormats::Windows(locale) => locale
                 .format(date, windows::DATE_LONGDATE, None)
                 .unwrap_or_else(|| dates::format_long_date(date)),
+            #[cfg(target_arch = "wasm32")]
+            DateFormats::Web(tag) => super::web::format_date(
+                tag,
+                date,
+                &[
+                    ("weekday", "long"),
+                    ("year", "numeric"),
+                    ("month", "long"),
+                    ("day", "numeric"),
+                ],
+            )
+            .unwrap_or_else(|| dates::format_long_date(date)),
         }
     }
 
@@ -122,6 +167,11 @@ impl Formats {
             DateFormats::Windows(locale) => locale
                 .format(date, windows::DATE_YEARMONTH, None)
                 .unwrap_or_else(|| date.format("%B %Y").to_string()),
+            #[cfg(target_arch = "wasm32")]
+            DateFormats::Web(tag) => {
+                super::web::format_date(tag, date, &[("year", "numeric"), ("month", "long")])
+                    .unwrap_or_else(|| date.format("%B %Y").to_string())
+            }
         }
     }
 
@@ -150,7 +200,11 @@ pub(super) fn regions() -> &'static [Region] {
     REGIONS.get_or_init(|| {
         #[cfg(windows)]
         let tags = windows::regions();
-        #[cfg(not(windows))]
+        // Browsers don't list their locales: the web version offers the regions of the
+        // translations.
+        #[cfg(target_arch = "wasm32")]
+        let tags: Vec<String> = super::strings::languages().map(str::to_string).collect();
+        #[cfg(not(any(windows, target_arch = "wasm32")))]
         let tags: Vec<String> = Vec::new();
         let mut regions: Vec<Region> = tags
             .into_iter()
@@ -182,6 +236,10 @@ pub(super) fn regions() -> &'static [Region] {
 pub(super) fn native_name(tag: &str) -> String {
     #[cfg(windows)]
     if let Some(name) = windows::native_name(tag) {
+        return name;
+    }
+    #[cfg(target_arch = "wasm32")]
+    if let Some(name) = super::web::display_name(tag) {
         return name;
     }
     tag.to_string()
