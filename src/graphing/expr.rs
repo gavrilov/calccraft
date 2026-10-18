@@ -527,6 +527,25 @@ impl Expr {
         Some(self.derive(angle)?.simplify()).filter(fits)
     }
 
+    /// How large the numbers are that evaluating the expression at (x, y) goes through:
+    /// its value, but a sum or difference counts the sizes of its terms rather than their
+    /// total, and a product or quotient carries them along. Rounding is a few units in the
+    /// last place of it: the derivative of 10¹³(sin²x + cos²x) is 10¹³ times terms near 1
+    /// that cancel, and its value is that rounding.
+    pub fn magnitude(&self, x: f64, y: f64, env: &Env) -> f64 {
+        use BinOp::*;
+        match self {
+            Expr::Neg(a) => a.magnitude(x, y, env),
+            Expr::Bin(Add | Sub, a, b) => a.magnitude(x, y, env) + b.magnitude(x, y, env),
+            Expr::Bin(Mul, a, b) => a.magnitude(x, y, env) * b.magnitude(x, y, env),
+            Expr::Bin(Div, a, b) => {
+                let value = self.eval(x, y, env).abs();
+                (a.magnitude(x, y, env) + value * b.magnitude(x, y, env)) / b.eval(x, y, env).abs()
+            }
+            _ => self.eval(x, y, env).abs(),
+        }
+    }
+
     fn derive(&self, angle: Angle) -> Option<Expr> {
         use BinOp::*;
         use Expr::*;
