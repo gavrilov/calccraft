@@ -1,0 +1,2009 @@
+# Golden vectors: key sequences on which this engine and Microsoft's own CalcManager agree.
+# Source: https://github.com/microsoft/calculator, commit d125246a4e19842ce1332e6c7839cf0e110027d8 (2026-09-28),
+#   src/CalcManager built unmodified with MSVC 14.39 (/std:c++20) behind a small harness that implements ICalcDisplay
+#   and IResourceProvider (en-US strings from CEngineStrings.resw) and, like the view model, clears the error state
+#   before a digit and drops other keys there. Memory buttons are not sent while memory is empty (the UI disables them).
+# Chosen: every key and every pair of keys of a reduced keypad per mode, and random sequences (up to 14 keys, with
+#   digit runs) picked so that every kind of final state is covered (errors, memory, parentheses, history, F-E, ...).
+# Fields (tab separated): mode, keys, display, expression, error (0/1), open parentheses, memory (| separated),
+#   history, oldest first (expression=>result, ; separated; - for the Programmer mode), radix list HEX|DEC|OCT|BIN (- elsewhere and in the error state).
+std	0	0		0	0			-
+std	1	1		0	0			-
+std	2	2		0	0			-
+std	7	7		0	0			-
+std	9	9		0	0			-
+std	PNT	0.		0	0			-
+std	ADD	0	0 + 	0	0			-
+std	SUB	0	0 - 	0	0			-
+std	MUL	0	0 × 	0	0			-
+std	DIV	0	0 ÷ 	0	0			-
+std	EQU	0	0=	0	0		0 ==>0	-
+std	SIGN	0		0	0			-
+std	PERCENT	0	0	0	0			-
+std	SQRT	0	√(0)	0	0			-
+std	SQR	0	sqr(0)	0	0			-
+std	REC	Cannot divide by zero	1/(0)	1	0			-
+std	CLEAR	0		0	0			-
+std	CENTR	0		0	0			-
+std	BACK	0		0	0			-
+std	MS	0		0	0	0		-
+std	MR	0		0	0			-
+std	MPLUS	0		0	0	0		-
+std	MMINUS	0		0	0	0		-
+std	MC	0		0	0			-
+std	2 0	20		0	0			-
+std	ADD ADD	0	0 + 	0	0			-
+std	ADD PNT	0.	0 + 	0	0			-
+std	2 DIV	2	2 ÷ 	0	0			-
+std	SQRT EQU	0	√(0)=	0	0		√( 0 ) ==>0	-
+std	9 MC	9		0	0			-
+std	2 MUL	2	2 × 	0	0			-
+std	CLEAR DIV	0	0 ÷ 	0	0			-
+std	1 PNT	1.		0	0			-
+std	MPLUS MMINUS	0		0	0	0		-
+std	MMINUS MPLUS	0		0	0	0		-
+std	PNT PERCENT	0	0	0	0			-
+std	MMINUS CLEAR	0		0	0	0		-
+std	9 MS	9		0	0	9		-
+std	ADD 1	1	0 + 	0	0			-
+std	0 PNT	0.		0	0			-
+std	PERCENT MMINUS	0	0	0	0	0		-
+std	MMINUS BACK	0		0	0	0		-
+std	PERCENT SIGN	0	negate(0)	0	0			-
+std	ADD 0	0	0 + 	0	0			-
+std	SQRT REC	Cannot divide by zero	1/(√(0))	1	0			-
+std	SQRT PERCENT	0	0	0	0		√( 0 )=>0	-
+std	SIGN 2	2		0	0			-
+std	0 MMINUS	0		0	0	0		-
+std	PERCENT PNT	0.	0	0	0		0=>0	-
+std	1 0	10		0	0			-
+std	CLEAR REC	Cannot divide by zero	1/(0)	1	0			-
+std	ADD SQRT	0	0 + √(0)	0	0			-
+std	MUL 2	2	0 × 	0	0			-
+std	PERCENT CLEAR	0		0	0			-
+std	CENTR PNT	0.		0	0			-
+std	MMINUS 9	9		0	0	0		-
+std	CENTR 0	0		0	0			-
+std	MR 9	9		0	0			-
+std	DIV BACK	0	0 ÷ 	0	0			-
+std	CLEAR SQR	0	sqr(0)	0	0			-
+std	MC EQU	0	0=	0	0		0 ==>0	-
+std	2 2	22		0	0			-
+std	REC 0	0		0	0			-
+std	DIV SQRT	0	0 ÷ √(0)	0	0			-
+std	BACK 0	0		0	0			-
+std	MR 7	7		0	0			-
+std	BACK SQR	0	sqr(0)	0	0			-
+std	CENTR CLEAR	0		0	0			-
+std	SQR MR	0	sqr(0)	0	0			-
+std	0 DIV	0	0 ÷ 	0	0			-
+std	MUL 9	9	0 × 	0	0			-
+std	9 2	92		0	0			-
+std	0 ADD	0	0 + 	0	0			-
+std	ADD PERCENT	0	0 + 0	0	0			-
+std	SQR MUL	0	sqr(0) × 	0	0			-
+std	1 PERCENT	0	0	0	0			-
+std	BACK MS	0		0	0	0		-
+std	MUL 7	7	0 × 	0	0			-
+std	MMINUS PERCENT	0	0	0	0	0		-
+std	PNT MC	0.		0	0			-
+std	9 DIV	9	9 ÷ 	0	0			-
+std	SQR 0	0	sqr(0)	0	0		sqr( 0 )=>0	-
+std	7 MS	7		0	0	7		-
+std	MC SQR	0	sqr(0)	0	0			-
+std	SUB SQR	0	0 - sqr(0)	0	0			-
+std	SUB SUB	0	0 - 	0	0			-
+std	PNT CENTR	0		0	0			-
+std	REC CENTR	0		0	0			-
+std	0 CLEAR	0		0	0			-
+std	9 SUB	9	9 - 	0	0			-
+std	MS PNT	0.		0	0	0		-
+std	7 SQRT	2.645751311064591	√(7)	0	0			-
+std	DIV CENTR	0	0 ÷ 	0	0			-
+std	MMINUS EQU	0	0=	0	0	0	0 ==>0	-
+std	0 9	9		0	0			-
+std	0 MC	0		0	0			-
+std	1 MR	1		0	0			-
+std	PNT 1	0.1		0	0			-
+std	MMINUS 0	0		0	0	0		-
+std	EQU SQR	0	sqr(0)	0	0		0 ==>0	-
+std	SQRT MUL	0	√(0) × 	0	0			-
+std	7 SQR	49	sqr(7)	0	0			-
+std	MS MMINUS	0		0	0	0		-
+std	1 SIGN	-1		0	0			-
+std	MPLUS SQRT	0	√(0)	0	0	0		-
+std	0 CENTR	0		0	0			-
+std	MPLUS 0	0		0	0	0		-
+std	MPLUS 2	2		0	0	0		-
+std	PNT DIV	0	0 ÷ 	0	0			-
+std	ADD 7	7	0 + 	0	0			-
+std	1 REC	1	1/(1)	0	0			-
+std	SIGN SQRT	0	√(0)	0	0			-
+std	CENTR ADD	0	0 + 	0	0			-
+std	SQRT ADD	0	√(0) + 	0	0			-
+std	SIGN CLEAR	0		0	0			-
+std	BACK REC	Cannot divide by zero	1/(0)	1	0			-
+std	MS EQU	0	0=	0	0	0	0 ==>0	-
+std	SUB PERCENT	0	0 - 0	0	0			-
+std	ADD 9	9	0 + 	0	0			-
+std	EQU 7	7	0=	0	0		0 ==>0	-
+std	MMINUS MS	0		0	0	0|0		-
+std	MPLUS CENTR	0		0	0	0		-
+std	CLEAR 0	0		0	0			-
+std	SIGN MUL	0	0 × 	0	0			-
+std	MPLUS MPLUS	0		0	0	0		-
+std	0 2	2		0	0			-
+std	DIV REC	Cannot divide by zero	0 ÷ 1/(0)	1	0			-
+std	MS MUL	0	0 × 	0	0	0		-
+std	9 PNT	9.		0	0			-
+std	CLEAR SIGN	0		0	0			-
+std	CENTR PERCENT	0	0	0	0			-
+std	CLEAR 2	2		0	0			-
+std	0 MPLUS	0		0	0	0		-
+std	BACK ADD	0	0 + 	0	0			-
+std	PERCENT PERCENT	0	0	0	0		0=>0	-
+std	CLEAR CLEAR	0		0	0			-
+std	SQRT CENTR	0	√(0)	0	0		√( 0 )=>0	-
+std	MC 2	2		0	0			-
+std	DIV SIGN	0	0 ÷ negate(0)	0	0			-
+std	MUL MS	0	0 × 	0	0	0		-
+std	PERCENT 1	1	0	0	0		0=>0	-
+std	7 7	77		0	0			-
+std	MR SQRT	0	√(0)	0	0			-
+std	2 MPLUS	2		0	0	2		-
+std	SIGN REC	Cannot divide by zero	1/(0)	1	0			-
+std	BACK SIGN	0		0	0			-
+std	SQRT CLEAR	0		0	0			-
+std	SQR SIGN	0	negate(sqr(0))	0	0			-
+std	CENTR BACK	0		0	0			-
+std	MC SQRT	0	√(0)	0	0			-
+std	DIV 7	7	0 ÷ 	0	0			-
+std	ADD MC	0	0 + 	0	0			-
+std	SIGN MC	0		0	0			-
+std	EQU CENTR	0	0=	0	0		0 ==>0	-
+std	2 EQU	2	2=	0	0		2 ==>2	-
+std	MC MMINUS	0		0	0	0		-
+std	ADD MR	0	0 + 	0	0			-
+std	7 PERCENT	0	0	0	0			-
+std	CENTR MR	0		0	0			-
+std	EQU DIV	0	0 ÷ 	0	0		0 ==>0	-
+std	REC 9	9		0	0			-
+std	SUB SQRT	0	0 - √(0)	0	0			-
+std	MC 0	0		0	0			-
+std	MC MUL	0	0 × 	0	0			-
+std	MR MMINUS	0		0	0	0		-
+std	DIV SUB	0	0 - 	0	0			-
+std	PNT 0	0.0		0	0			-
+std	ADD SIGN	0	0 + negate(0)	0	0			-
+std	PERCENT SQRT	0	√(0)	0	0			-
+std	EQU CLEAR	0		0	0		0 ==>0	-
+std	2 MS	2		0	0	2		-
+std	MS CENTR	0		0	0	0		-
+std	MC SUB	0	0 - 	0	0			-
+std	DIV CLEAR	0		0	0			-
+std	PERCENT 0	0	0	0	0		0=>0	-
+std	0 REC	Cannot divide by zero	1/(0)	1	0			-
+std	7 1	71		0	0			-
+std	SIGN 0	0		0	0			-
+std	CENTR 2	2		0	0			-
+std	SUB 9	9	0 - 	0	0			-
+std	EQU MUL	0	0 × 	0	0		0 ==>0	-
+std	PERCENT DIV	0	0 ÷ 	0	0			-
+std	DIV MUL	0	0 × 	0	0			-
+std	CENTR MPLUS	0		0	0	0		-
+std	7 0	70		0	0			-
+std	MR MUL	0	0 × 	0	0			-
+std	ADD CENTR	0	0 + 	0	0			-
+std	MR 1	1		0	0			-
+std	ADD MMINUS	0	0 + 	0	0	0		-
+std	MC 9	9		0	0			-
+std	PERCENT SUB	0	0 - 	0	0			-
+std	MC 7	7		0	0			-
+std	2 9	29		0	0			-
+std	MS 2	2		0	0	0		-
+std	SUB CENTR	0	0 - 	0	0			-
+std	7 MUL	7	7 × 	0	0			-
+std	9 SIGN	-9		0	0			-
+std	MUL MC	0	0 × 	0	0			-
+std	1 BACK	0		0	0			-
+std	7 9	79		0	0			-
+std	9 CLEAR	0		0	0			-
+std	MC MS	0		0	0	0		-
+std	MS BACK	0		0	0	0		-
+std	EQU MC	0	0=	0	0		0 ==>0	-
+std	BACK PNT	0.		0	0			-
+std	EQU REC	Cannot divide by zero	1/(0)	1	0		0 ==>0	-
+std	CLEAR CENTR	0		0	0			-
+std	0 MUL	0	0 × 	0	0			-
+std	MR SUB	0	0 - 	0	0			-
+std	9 BACK	0		0	0			-
+std	SQRT PNT	0.	√(0)	0	0		√( 0 )=>0	-
+std	MMINUS MMINUS	0		0	0	0		-
+std	PERCENT MS	0	0	0	0	0		-
+std	MMINUS DIV	0	0 ÷ 	0	0	0		-
+std	PERCENT 9	9	0	0	0		0=>0	-
+std	PERCENT MR	0	0	0	0			-
+std	SQR MMINUS	0	sqr(0)	0	0	0		-
+std	MC PERCENT	0	0	0	0			-
+std	SIGN 1	1		0	0			-
+std	MUL SIGN	0	0 × negate(0)	0	0			-
+std	7 PNT	7.		0	0			-
+std	MC SIGN	0		0	0			-
+std	MS 7	7		0	0	0		-
+std	PNT BACK	0		0	0			-
+std	MMINUS CENTR	0		0	0	0		-
+std	SUB PNT	0.	0 - 	0	0			-
+std	CENTR CENTR	0		0	0			-
+std	2 MR	2		0	0			-
+std	CENTR MMINUS	0		0	0	0		-
+std	MS DIV	0	0 ÷ 	0	0	0		-
+std	EQU 1	1	0=	0	0		0 ==>0	-
+std	DIV MMINUS	0	0 ÷ 	0	0	0		-
+std	SIGN MPLUS	0		0	0	0		-
+std	SQRT SUB	0	√(0) - 	0	0			-
+std	1 ADD	1	1 + 	0	0			-
+std	MC REC	Cannot divide by zero	1/(0)	1	0			-
+std	9 REC	0.1111111111111111	1/(9)	0	0			-
+std	CENTR MUL	0	0 × 	0	0			-
+std	MMINUS SIGN	0	negate(0)	0	0	0		-
+std	MPLUS DIV	0	0 ÷ 	0	0	0		-
+std	CENTR MC	0		0	0			-
+std	SQR PNT	0.	sqr(0)	0	0		sqr( 0 )=>0	-
+std	EQU ADD	0	0 + 	0	0		0 ==>0	-
+std	SQRT SQRT	0	√(√(0))	0	0			-
+std	1 SQR	1	sqr(1)	0	0			-
+std	9 MPLUS	9		0	0	9		-
+std	MMINUS MC	0		0	0			-
+std	9 SQR	81	sqr(9)	0	0			-
+std	EQU MR	0	0=	0	0		0 ==>0	-
+std	PERCENT 2	2	0	0	0		0=>0	-
+std	CENTR SUB	0	0 - 	0	0			-
+std	CLEAR 7	7		0	0			-
+std	MPLUS MS	0		0	0	0|0		-
+std	CLEAR MS	0		0	0	0		-
+std	MUL 0	0	0 × 	0	0			-
+std	SUB BACK	0	0 - 	0	0			-
+std	BACK PERCENT	0	0	0	0			-
+std	7 MR	7		0	0			-
+std	MPLUS BACK	0		0	0	0		-
+std	MS MC	0		0	0			-
+std	1 EQU	1	1=	0	0		1 ==>1	-
+std	7 REC	0.1428571428571429	1/(7)	0	0			-
+std	CLEAR MUL	0	0 × 	0	0			-
+std	MMINUS ADD	0	0 + 	0	0	0		-
+std	SIGN 7	7		0	0			-
+std	MC MPLUS	0		0	0	0		-
+std	SQR 2	2	sqr(0)	0	0		sqr( 0 )=>0	-
+std	SIGN EQU	0	0=	0	0		0 ==>0	-
+std	CENTR 1	1		0	0			-
+std	SUB MR	0	0 - 	0	0			-
+std	CENTR 7	7		0	0			-
+std	1 CLEAR	0		0	0			-
+std	MC MR	0		0	0			-
+std	SIGN SUB	0	0 - 	0	0			-
+std	9 1	91		0	0			-
+std	BACK MUL	0	0 × 	0	0			-
+std	SQR DIV	0	sqr(0) ÷ 	0	0			-
+std	1 MPLUS	1		0	0	1		-
+std	MMINUS MR	0		0	0	0		-
+std	CLEAR MC	0		0	0			-
+std	0 EQU	0	0=	0	0		0 ==>0	-
+std	MUL SQRT	0	0 × √(0)	0	0			-
+std	PNT PNT	0.		0	0			-
+std	SQR ADD	0	sqr(0) + 	0	0			-
+std	SUB ADD	0	0 + 	0	0			-
+std	9 PERCENT	0	0	0	0			-
+std	CENTR 9	9		0	0			-
+std	MC MC	0		0	0			-
+std	PNT REC	Cannot divide by zero	1/(0)	1	0			-
+std	MS 1	1		0	0	0		-
+std	MUL 1	1	0 × 	0	0			-
+std	SQRT 1	1	√(0)	0	0		√( 0 )=>0	-
+std	CLEAR MPLUS	0		0	0	0		-
+std	PNT MMINUS	0		0	0	0		-
+std	2 MC	2		0	0			-
+std	ADD REC	Cannot divide by zero	0 + 1/(0)	1	0			-
+std	7 ADD	7	7 + 	0	0			-
+std	EQU PNT	0.	0=	0	0		0 ==>0	-
+std	PNT MPLUS	0		0	0	0		-
+std	7 DIV	7	7 ÷ 	0	0			-
+std	6 MMINUS SQRT MUL SUB 8 DIV 4 1 PERCENT 0 SQRT DIV	Cannot divide by zero	-5.550510257216822 ÷ √(0) ÷ 	1	0	-6	√( 6 )   -   8 ==>-5.550510257216822	-
+std	1 5 6 7 6 DIV 3 7 MS 7 BACK 9 SIGN SQRT	Invalid input	15676 ÷ √(-9)	1	0	37		-
+std	3 7 7 9 6 BACK 1 7 PERCENT MUL DIV EQU	Result is undefined	0 ÷ 	1	0			-
+std	4 MC 1 EQU 4 0 MS ADD 1 MMINUS 0 REC	Cannot divide by zero	40 + 1/(0)	1	0	39	41 ==>41	-
+std	7 SUB 5 PERCENT 0 8 MUL 0 MR DIV EQU	Result is undefined	0 ÷ 	1	0		7   -   8 ==>-1;-1   ×   0 ==>0	-
+std	5 CENTR REC	Cannot divide by zero	1/(0)	1	0			-
+std	1 MR 4 REC 7 4 9 4 CENTR MUL 4 SIGN SQRT	Invalid input	0 × √(-4)	1	0		1/( 14 )=>0.0714285714285714	-
+std	MS MUL 4 5 0 2 6 PERCENT 6 4 8	648	0 × 	0	0	0		-
+std	PNT 5 1 MPLUS 8 1 6 PERCENT 4	4	0	0	0	0.51	0=>0	-
+std	4 MS PERCENT MC REC 7 PNT 4 6 5 9 5	7.46595		0	0			-
+std	DIV 9 0 SQRT 7 0 8 4 7 5 MPLUS 9 SIGN	-9	0 ÷ 	0	0	708,475		-
+std	EQU 7 MR 5 2 3 1 1 6 5 6 MMINUS 2 7	27	0=	0	0	-752,311,656	0 ==>0	-
+std	PERCENT MC 6 SUB 3 7 8	378	6 - 	0	0		0=>0	-
+std	8 8 PNT 0 1 DIV 6 2 5	625	88.01 ÷ 	0	0			-
+std	EQU ADD 2 7	27	0 + 	0	0		0 ==>0	-
+std	0 5 MPLUS PERCENT MUL BACK 5 DIV CENTR ADD	Result is undefined	0 ÷ 0 + 	1	0	5	0   ×   5 ==>0	-
+std	8 5 MPLUS MUL SIGN 0 REC	Cannot divide by zero	85 × 1/(0)	1	0	85		-
+std	3 PERCENT REC	Cannot divide by zero	1/(0)	1	0			-
+std	6 EQU 4 8 5 8 5 MMINUS DIV 0 SIGN DIV	Cannot divide by zero	48585 ÷ 0 ÷ 	1	0	-48,585	6 ==>6	-
+std	DIV 5 DIV 1 8 PERCENT 0 8 2 DIV REC	Cannot divide by zero	0 ÷ 1/(0)	1	0		0   ÷   5 ==>0;0   ÷   82 ==>0	-
+std	1 8 7 2 8 6 4 6 8 8 DIV 8 BACK DIV	Cannot divide by zero	1872864688 ÷ 0 ÷ 	1	0			-
+std	7 EQU 1 MUL 7 9 1 REC EQU REC PNT REC	Cannot divide by zero	1/(0)	1	0		7 ==>7;1   ×   1/( 791 ) ==>0.0012642225031606;1/( 0.0012642225031606 )=>791	-
+std	1 DIV 6 MPLUS 8 9 8 2 9 6 5 3 3 PERCENT	8,982,965.33	1 ÷ 8982965.33	0	0	6		-
+std	EQU 4 5 7 6 0 7 MUL PERCENT 1 6 4 MPLUS	164	457607 × 	0	0	164	0 ==>0	-
+std	7 ADD MUL SQRT PERCENT 0 0	0	7 × 	0	0			-
+std	3 MMINUS 0 3 2 1 ADD 6 3 4	634	321 + 	0	0	-3		-
+std	4 MMINUS 0 7 7 REC 8 PNT 1 4 EQU	8.14	8.14=	0	0	-4	1/( 77 )=>0.012987012987013;8.14 ==>8.14	-
+std	6 EQU 3 0 9 6 7 PERCENT 4	4	1858.02	0	0		6 ==>6;1858.02=>1,858.02	-
+std	1 4 8 8 SQR	2,214,144	sqr(1488)	0	0			-
+std	2 DIV 3 8 2 2 7 1 0 0 9 8 5 5 3 0 0 9 1 9 0 6 6 8 0 9 2 MUL 7 5 ADD 7 SIGN	-7	3.923917747693678e-14 + 	0	0		2   ÷   3822710098553009 ==>5.231890330258237e-16;5.231890330258237e-16   ×   75 ==>3.923917747693678e-14	-
+std	5 7 3 DIV MR MMINUS 3 8 CENTR MUL	Cannot divide by zero	573 ÷ 0 × 	1	0	-573		-
+std	DIV 3 PERCENT SIGN PNT ADD	Result is undefined	0 ÷ 0 + 	1	0			-
+std	6 4 MUL EQU CENTR 2 SIGN MPLUS SQRT	Invalid input	√(-2)	1	0	-2	64   ×   64 ==>4,096	-
+std	SIGN 3 5 BACK 9 2 SQR 8 PERCENT REC	Cannot divide by zero	1/(0)	1	0		sqr( 392 )=>153,664	-
+std	DIV CENTR ADD	Result is undefined	0 ÷ 0 + 	1	0			-
+std	PNT 2 4 1 8 7 8 EQU 6 CENTR REC	Cannot divide by zero	1/(0)	1	0		0.241878 ==>0.241878	-
+std	SUB 7 4 MPLUS PERCENT	0	0 - 0	0	0	74		-
+std	5 PERCENT 0 5 4 3 4 MUL 6 SQRT MS SUB 8	8	13310.52726228379 - 	0	0	2.449489742783178	0=>0;5434   ×   √( 6 ) ==>13,310.52726228379	-
+std	8 ADD PERCENT 5 7 SIGN	-57	8 + 	0	0			-
+std	1 BACK MS	0		0	0	0		-
+std	2 MUL 8 CENTR 4 7 MPLUS BACK 4 MUL	8	8 × 	0	0	47	2   ×   4 ==>8	-
+std	SQRT 8 9 7 BACK 3 7 9 0 PERCENT SQRT 8 9	89	√(0)	0	0		√( 0 )=>0;√( 0 )=>0	-
+std	SUB 7 2 6	726	0 - 	0	0			-
+std	MUL 2 6 SUB 9 9 8	998	0 - 	0	0		0   ×   26 ==>0	-
+std	ADD MMINUS REC	Cannot divide by zero	0 + 1/(0)	1	0	0		-
+std	PERCENT ADD 2 CLEAR DIV EQU	Result is undefined	0 ÷ 	1	0			-
+std	SUB 2 MUL 0 3 7 PNT 4 8 MMINUS PNT 7 SUB SQRT	Invalid input	-1.4 - √(-1.4)	1	0	-37.48	0   -   2 ==>-2;-2   ×   0.7 ==>-1.4	-
+std	SQRT EQU 2 2 2 5 9 PERCENT EQU CENTR REC	Cannot divide by zero	1/(0)	1	0		√( 0 ) ==>0;0 ==>0	-
+std	8 BACK DIV EQU	Result is undefined	0 ÷ 	1	0			-
+std	0 3 1 7 SQRT EQU 7 MR CENTR 8 0 DIV 0 MUL	Cannot divide by zero	80 ÷ 0 × 	1	0		√( 317 ) ==>17.80449381476486	-
+std	8 1 PNT 0 7 5 MMINUS PERCENT ADD 3	3	0 + 	0	0	-81.075		-
+std	PERCENT 5 MMINUS 5 4 2 0 2	54,202	0	0	0	-5	0=>0	-
+std	MUL 0 7 PERCENT 5 SQR 2 9 1 4 6 8 5 2 4 7 4 1 6 7 0 7 2 8	2,914,685,247,416,707	0 × 	0	0			-
+std	MPLUS ADD 3 9 2	392	0 + 	0	0	0		-
+std	5 4 0 5 8 7 1 9 4 8 3 1 8 2 5 8 4 6 6 9 4 7 5 0 7 2 4 5 4 7 8 3 0 5 0 6 4 7 BACK MMINUS SQR SUB 9 1 EQU 2 0 2 2	2,022		0	0	-540,587,194,831,825	sqr( 540587194831825 )   -   91 ==>2.922345152161415e+29	-
+std	PERCENT 0 SUB 7 5 ADD PNT 1 3 6	0.136	-75 + 	0	0		0=>0;0   -   75 ==>-75	-
+std	SUB 8 SQRT 6 9 7 6 3 SQRT 1 2	12	0 - 	0	0			-
+std	0 5 0 DIV 8 DIV 5 ADD EQU 9 2 2	922		0	0		50   ÷   8 ==>6.25;6.25   ÷   5 ==>1.25;1.25   +   1.25 ==>2.5	-
+std	MMINUS SUB DIV EQU	Result is undefined	0 ÷ 	1	0	0		-
+std	PNT ADD 3 1 3 0 REC PERCENT 4 5 4 PERCENT 0 REC	Cannot divide by zero	0 + 1/(0)	1	0			-
+std	2 DIV 9 7 9 3 MUL 6 DIV MPLUS 0 SUB	Cannot divide by zero	0.0012253650566731 ÷ 0 - 	1	0	0.0012253650566731	2   ÷   9793 ==>2.042275094455223e-4;2.042275094455223e-4   ×   6 ==>0.0012253650566731	-
+std	DIV 1 8 0 MR 1 5 9 SQR PERCENT 5 3 DIV EQU	Result is undefined	0 ÷ 	1	0		0   ÷   53 ==>0	-
+std	PNT 9 2 DIV 9 BACK SUB	Cannot divide by zero	0.92 ÷ 0 - 	1	0			-
+std	7 6 0 MR 1 SQR 1 3 REC SUB 4 DIV PNT SUB	Cannot divide by zero	-3.923076923076923 ÷ 0 - 	1	0		sqr( 7601 )=>57,775,201;1/( 13 )   -   4 ==>-3.923076923076923	-
+std	7 PERCENT MS ADD 7 0 6 4	7,064	0 + 	0	0	0		-
+std	PNT 1 MS 3 4 5 6 7 PERCENT 5 0	50	0	0	0	0.1	0=>0	-
+std	REC 8 8 SUB PERCENT 0	0	88 - 	0	0			-
+std	8 MPLUS 0 8 9	89		0	0	8		-
+std	8 7 0 MPLUS MUL EQU 7 ADD PNT 3	0.3	7 + 	0	0	870	870   ×   870 ==>756,900	-
+std	5 5 PERCENT 1 3 2 8 5 6 5 9 MR 6	132,856,596	0	0	0		0=>0	-
+std	0 CENTR PNT 7 0 3 2 0 SUB 2	2	0.7032 - 	0	0			-
+std	1 EQU 4 DIV	4	4 ÷ 	0	0		1 ==>1	-
+std	MPLUS PNT MR REC	Cannot divide by zero	1/(0)	1	0	0		-
+std	ADD ADD ADD PERCENT REC	Cannot divide by zero	0 + 1/(0)	1	0			-
+std	ADD SUB 6 6 BACK SQRT 3 8 1 8 8 3 2 1 0 6 9 0 1 4 7 1 6 MS 7 5 7 MUL SQRT	Invalid input	-757 × √(-757)	1	0	3,818,832,106,901,471	0   -   757 ==>-757	-
+std	5 7 PERCENT 4 5 CENTR SQR 4 6 1 7 5 0 1 1 9 8 9 2 7 3 2 3 0 1 5 1 4 9 4 4 2 1 9 6 0 4 8 1 2 8 9 2 7 EQU ADD SIGN SQRT	Invalid input	4617501198927323 + √(negate(4617501198927323))	1	0		0=>0;sqr( 0 )=>0;4617501198927323 ==>4,617,501,198,927,323	-
+std	6 DIV PNT SUB	Cannot divide by zero	6 ÷ 0 - 	1	0			-
+std	5 6 9 4 9 SQR 2 BACK REC	Cannot divide by zero	1/(0)	1	0		sqr( 56949 )=>3,243,188,601	-
+std	PERCENT SUB MMINUS MUL 2 6 1	261	0 × 	0	0	0		-
+std	1 6 CLEAR SUB MS 2 SQRT EQU MUL DIV PERCENT 2 7	27	-1.414213562373095 ÷ 	0	0	0	0   -   √( 2 ) ==>-1.414213562373095	-
+std	1 ADD 4 PERCENT 0 5 1 0 CENTR 8 6 1	861	1 + 	0	0			-
+std	MS 1 5 SUB ADD ADD 7 9 7 3 0	79,730	15 + 	0	0	0		-
+std	MMINUS 9 9 REC 5 4 SUB	54	54 - 	0	0	0	1/( 99 )=>0.0101010101010101	-
+std	SIGN 0 DIV SUB 5 PERCENT 2 2 EQU 0 3 2 0	320		0	0		0   -   22 ==>-22	-
+std	7 7 7 3 0 8 5 ADD PNT 1	0.1	7773085 + 	0	0			-
+std	3 SUB 7 MUL 6 9 4 4 CENTR ADD 3 1 7 DIV	317	317 ÷ 	0	0		3   -   7 ==>-4;-4   ×   0 ==>0;0   +   317 ==>317	-
+std	0 MMINUS REC	Cannot divide by zero	1/(0)	1	0	0		-
+std	5 PERCENT REC	Cannot divide by zero	1/(0)	1	0			-
+std	1 5 6 MUL 5 MS 1 DIV 3 SQR 0 MUL	Cannot divide by zero	156 ÷ 0 × 	1	0	5	156   ×   1 ==>156	-
+std	EQU DIV PERCENT MUL	Result is undefined	0 ÷ 0 × 	1	0		0 ==>0	-
+std	0 PNT SIGN 6 SQRT	Invalid input	√(-0.6)	1	0			-
+std	3 9 4 7 4 SQR 4 0 5 9 DIV PNT MUL	Cannot divide by zero	4059 ÷ 0 × 	1	0		sqr( 39474 )=>1,558,196,676	-
+std	3 MMINUS 2 SUB 9 8 REC 2 7 6 PERCENT	5.52	2 - 5.52	0	0	-3		-
+std	8 7 8 7 REC 7 MS 1 8 3 0 PERCENT 8	8	0	0	0	7	1/( 8787 )=>1.138044838966655e-4;0=>0	-
+std	7 SUB 1 6 8 4 9 0 2 PERCENT REC 8 3 PNT	83.	7 - 	0	0			-
+std	9 MS 9 9	99		0	0	9		-
+std	2 ADD MUL MPLUS REC 9 0 EQU 0 0 3 7 MUL	37	37 × 	0	0	2	2   ×   90 ==>180	-
+std	1 3 PERCENT 2 3 0	230	0	0	0		0=>0	-
+std	SIGN 0 4	4		0	0			-
+std	6 8 0 EQU EQU 5	5	680=	0	0		680 ==>680;680 ==>680	-
+std	MPLUS SQRT REC	Cannot divide by zero	1/(√(0))	1	0	0		-
+std	SUB 8 5 4 3 PERCENT REC	Cannot divide by zero	0 - 1/(0)	1	0			-
+std	9 2 5 1 MPLUS 5 ADD CENTR 3 3 ADD PNT REC	Cannot divide by zero	38 + 1/(0)	1	0	9,251	5   +   33 ==>38	-
+std	9 6 8 6 4 2 8 5 3 0 3 2 1 4 4 5 3 3 4 6 7 6 5 SIGN 6 PERCENT 8 CENTR REC	Cannot divide by zero	1/(0)	1	0		0=>0	-
+std	3 CENTR 9 9 9 8 3 2 SQR CLEAR 3 DIV 0 MUL	Cannot divide by zero	3 ÷ 0 × 	1	0			-
+std	EQU MUL 9 5 BACK SQRT SUB 0 REC	Cannot divide by zero	0 - 1/(0)	1	0		0 ==>0;0   ×   √( 9 ) ==>0	-
+std	2 8 MUL 7 7 MMINUS PERCENT SQRT MPLUS	0.8774964387392122	28 × √(0.77)	0	0	-76.12250356126079		-
+std	5 2 PERCENT 7 2 4 MMINUS 8 6 1	861	0	0	0	-724	0=>0	-
+std	0 ADD MUL PERCENT 8 CENTR	0	0 × 	0	0			-
+std	7 1 6 1 CENTR 8 3 MMINUS	83		0	0	-83		-
+std	9 EQU 6 REC 3 4 MMINUS MUL 1 1 PNT	11.	34 × 	0	0	-34	9 ==>9;1/( 6 )=>0.1666666666666667	-
+std	EQU BACK 6 4 6 PERCENT 2 5 MUL 6 0 5 1 EQU	151,275	25 × 6051=	0	0		0 ==>0;0=>0;25   ×   6051 ==>151,275	-
+std	ADD 6 PNT 7 PNT 0 0 8 0 6 2 4 4 0 0 0 2 7 6 5 0 6 7 2 1 2	6.700806244000276	0 + 	0	0			-
+std	BACK EQU 9 DIV REC 8 1 6 1 5	81,615	9 ÷ 	0	0		0 ==>0	-
+std	0 9 MMINUS 7 DIV 1 BACK EQU	Cannot divide by zero	7 ÷ 	1	0	-9		-
+std	3 4 3 5 PERCENT REC	Cannot divide by zero	1/(0)	1	0			-
+std	PNT 6 SUB 7 1 8 ADD REC MS 6 SIGN MUL SQRT	Invalid input	-723.4 × √(-723.4)	1	0	-0.0013939224979091	0.6   -   718 ==>-717.4;-717.4   +   -6 ==>-723.4	-
+std	PERCENT PERCENT REC	Cannot divide by zero	1/(0)	1	0		0=>0	-
+std	REC 4 PNT 7 9 5 6 0 DIV 0 SUB	Cannot divide by zero	4.7956 ÷ 0 - 	1	0			-
+std	1 7 SQR 7 BACK 6 2 DIV 0 MUL	Cannot divide by zero	62 ÷ 0 × 	1	0		sqr( 17 )=>289	-
+std	9 PERCENT MMINUS	0	0	0	0	0		-
+std	2 8 0 REC REC MMINUS 6 2 8 9 ADD PERCENT SQR DIV	156,432,287,630.3441	156432287630.3441 ÷ 	0	0	-280	1/( 1/( 280 ) )=>280;6289   +   sqr( 395515.21 ) ==>156,432,287,630.3441	-
+std	MUL 7 6 2 8 2 PERCENT	762.82	0 × 762.82	0	0			-
+std	MMINUS 7 9 DIV 7 2 4 2 4 5 3 3 5 4 3 0 9	7,242,453,354,309	79 ÷ 	0	0	0		-
+std	EQU 9 9 MS 9 1 DIV 5 7 3	573	91 ÷ 	0	0	99	0 ==>0	-
+std	1 SIGN 0 PERCENT 7	7	0	0	0		0=>0	-
+std	1 ADD 5 7 1 SQR 6 2 4 1 0 1 5	6,241,015	1 + 	0	0			-
+std	1 2 3 3 REC 5 SIGN 7 7	-577	1/(1233)	0	0		1/( 1233 )=>8.110300081103001e-4	-
+std	3 7 PERCENT REC	Cannot divide by zero	1/(0)	1	0			-
+std	MMINUS ADD 0 DIV 0 SUB	Result is undefined	0 ÷ 0 - 	1	0	0	0   +   0 ==>0	-
+std	MUL 2 4 6 5 7 8 6 SIGN PERCENT SUB REC	Cannot divide by zero	0 - 1/(0)	1	0		0   ×   -24657.86 ==>0	-
+std	PNT MUL SIGN REC	Cannot divide by zero	0 × 1/(negate(0))	1	0			-
+std	MUL 2 SUB REC	Cannot divide by zero	0 - 1/(0)	1	0		0   ×   2 ==>0	-
+std	1 2 8 7 9 3 2 0 MPLUS 6 3 PERCENT	0	0	0	0	12,879,320		-
+std	2 MMINUS 9 PNT 8 SQR 8 6 EQU PERCENT	73.96	73.96	0	0	-2	sqr( 9.8 )=>96.04;86 ==>86	-
+std	3 6 PERCENT ADD 9 SQR 5 4	54	0 + 	0	0			-
+std	9 0 1 2 SIGN 3 8 7 5 5 2 SIGN MS 8	8		0	0	9,012,387,552		-
+std	EQU 9 EQU 0 3 BACK 7 6 SIGN 2 SUB MPLUS 6 1	61	-762 - 	0	0	-762	0 ==>0;9 ==>9	-
+std	PERCENT SIGN 9 5 SQR EQU 6	6	sqr(95)=	0	0		negate( 0 )=>0;sqr( 95 ) ==>9,025	-
+std	6 8 3 DIV 5 2 2 8	5,228	683 ÷ 	0	0			-
+std	EQU 2 MUL BACK 0 PNT	0.	2 × 	0	0		0 ==>0	-
+std	DIV 4 3 PERCENT 0 SQRT MUL	Result is undefined	0 ÷ √(0) × 	1	0			-
+std	4 6 8 3 MUL 5 MPLUS DIV 0 ADD	Cannot divide by zero	23415 ÷ 0 + 	1	0	5	4683   ×   5 ==>23,415	-
+std	PERCENT MUL EQU REC	Cannot divide by zero	1/(0)	1	0		0   ×   0 ==>0	-
+std	CLEAR MUL DIV EQU	Result is undefined	0 ÷ 	1	0			-
+std	3 3 7 4 ADD 2 SUB 0 8 REC 2 BACK REC	Cannot divide by zero	3376 - 1/(0)	1	0		3374   +   2 ==>3,376	-
+std	6 MPLUS 6 PERCENT	0	0	0	0	6		-
+std	1 5 MMINUS SUB PERCENT PNT MUL MS 4	4	15 × 	0	0	15|-15	15   -   0 ==>15	-
+std	MUL SUB PERCENT 1 1 6	116	0 - 	0	0			-
+std	4 MMINUS 4 3 5 3 9 7 1 MUL MR 8 1 4	814	4353971 × 	0	0	-4		-
+std	5 8 2 MPLUS EQU 0 CENTR 1 7 8 REC 1 8	18	1/(178)	0	0	582	582 ==>582;1/( 178 )=>0.0056179775280899	-
+std	3 MUL PERCENT 6 8 8 2 5 0 2 8 2 1 9 3 6 3 8 0 2 4 1 5 5 8 7 7 9 3 0 3 9 ADD 6 4 5 5	6,455	2.064750846580914e+16 + 	0	0		3   ×   6882502821936380 ==>2.064750846580914e+16	-
+std	MR BACK PNT 8	0.8		0	0			-
+std	9 4 4 SQRT 6 4	64	√(944)	0	0		√( 944 )=>30.72458299147443	-
+std	0 0 7 PERCENT REC	Cannot divide by zero	1/(0)	1	0			-
+std	6 ADD 6 8 1 3 7 5 2 MMINUS DIV 1 BACK EQU	Cannot divide by zero	6813758 ÷ 	1	0	-6,813,752	6   +   6813752 ==>6,813,758	-
+std	4 5 PERCENT 6 1 7 MR MUL 0 SUB REC	Cannot divide by zero	0 - 1/(0)	1	0		0=>0;617   ×   0 ==>0	-
+std	3 3 2 1 6 DIV 0 MUL	Cannot divide by zero	33216 ÷ 0 × 	1	0			-
+std	4 7 8 3 2 3 1 9 9 3 SQRT 0 MC REC	Cannot divide by zero	1/(0)	1	0		√( 4783231993 )=>69,160.9137663753	-
+std	1 REC MR ADD 1 8 MS PERCENT 9	9	1/(1) + 	0	0	18		-
+std	9 BACK PERCENT 0 7 5 9 4 MPLUS 7 2 3 SUB	723	723 - 	0	0	7,594	0=>0	-
+std	3 PERCENT MUL 8 4 PNT 9	84.9	0 × 	0	0			-
+std	9 BACK 3 3 9 7 9 PNT MS	33,979		0	0	33,979		-
+std	0 6 2 2 2 7 4 DIV 7 EQU 4 MMINUS ADD 2	2	4 + 	0	0	-4	622274   ÷   7 ==>88,896.28571428571	-
+std	DIV 7 7 ADD PNT 1 3 2 6 0 4 0 0 4 4 9 7 9 5 0 5 5 0 4 5 1 1 PERCENT 0	0	0 + 	0	0		0   ÷   77 ==>0	-
+std	6 2 2 7 SUB 4 9 5 SQRT PNT	0.	6227 - 	0	0			-
+std	CLEAR 6 0 3 5 SUB 1 DIV 7 1 EQU 0 DIV	0	0 ÷ 	0	0		6035   -   1 ==>6,034;6034   ÷   71 ==>84.98591549295775	-
+std	DIV 2 PERCENT 3 REC 3 BACK PNT SIGN EQU	Result is undefined	0 ÷ 	1	0			-
+std	MS 9 SIGN 6 5 PNT DIV 0 6 2 ADD SQRT	Invalid input	-15.56451612903226 + √(-15.56451612903226)	1	0	0	-965   ÷   62 ==>-15.56451612903226	-
+std	PERCENT EQU 0 PERCENT 5 8 BACK 1 EQU 9 0 SIGN REC SQRT	Invalid input	√(1/(-90))	1	0		0 ==>0;0=>0;51 ==>51	-
+std	DIV SIGN SUB	Result is undefined	0 ÷ negate(0) - 	1	0			-
+std	MUL 4 4 0 8 3 SQRT SUB DIV PNT SQRT SUB	Result is undefined	0 ÷ √(0) - 	1	0		0   ×   √( 44083 ) ==>0	-
+std	6 0 4 6 MS 4 2 MUL SUB 0 PERCENT 1 PNT	1.	42 - 	0	0	6,046		-
+std	DIV 2 2 MC PERCENT MPLUS DIV 5 7 MR 1 EQU	0	0 ÷ 1=	0	0	0.22	0   ÷   0.22 ==>0;0   ÷   1 ==>0	-
+std	0 ADD SUB ADD ADD 1 8 1 PERCENT	0	0 + 0	0	0			-
+std	MS 0 3 2 4	324		0	0	0		-
+std	6 8 SUB CENTR 4 0 EQU DIV MPLUS 8 0	80	28 ÷ 	0	0	28	68   -   40 ==>28	-
+std	PERCENT 1 8 PNT 0 5	18.05	0	0	0		0=>0	-
+std	0 3 ADD 0	0	3 + 	0	0			-
+std	5 0 5 6 REC SIGN 2 3 8 MUL 1 DIV 1	1	238 ÷ 	0	0		negate( 1/( 5056 ) )=>-1.977848101265823e-4;238   ×   1 ==>238	-
+std	CENTR 3 0 0 3 6 EQU PERCENT 5 0 6 SIGN SQRT	Invalid input	√(-506)	1	0		30036 ==>30,036;9021612.96=>9,021,612.96	-
+std	ADD 9 BACK REC	Cannot divide by zero	0 + 1/(0)	1	0			-
+std	6 MUL 4 5 EQU 0 SQRT REC 0 REC	Cannot divide by zero	1/(0)	1	0		6   ×   45 ==>270	-
+std	1 MUL 3 PERCENT 5 4 9 0 MMINUS 0 5	5	1 × 	0	0	-5,490		-
+std	3 PNT 5 6 8 9 PERCENT MS 4 ADD	4	4 + 	0	0	0	0=>0	-
+std	2 8 9 8 8 7 7 PERCENT	0	0	0	0			-
+std	PNT MS 7 6 5 ADD 8 2 SIGN	-82	765 + 	0	0	0		-
+std	9 SUB 8 ADD 5 2 2 2 5 MS	52,225	1 + 	0	0	52,225	9   -   8 ==>1	-
+std	6 PERCENT 7 SUB 7 SUB	0	0 - 	0	0		0=>0;7   -   7 ==>0	-
+std	2 9 8 6 5 3 5 DIV	2,986,535	2986535 ÷ 	0	0			-
+std	5 EQU 9 7 PNT 9 3 5	97.935	5=	0	0		5 ==>5	-
+std	DIV 1 PNT ADD 1 7 EQU 7 4 DIV PERCENT 0 DIV	Cannot divide by zero	74 ÷ 0 ÷ 	1	0		0   ÷   1 ==>0;0   +   17 ==>17	-
+std	DIV SQR MUL	Result is undefined	0 ÷ sqr(0) × 	1	0			-
+std	0 SUB 2 3 ADD SQRT	Invalid input	-23 + √(-23)	1	0		0   -   23 ==>-23	-
+std	SUB PNT CENTR MMINUS 1 MS 8 PERCENT	0	0 - 0	0	0	1|0		-
+std	1 PERCENT 0 BACK 8 7 3 DIV MS 9 6 SIGN	-96	873 ÷ 	0	0	873	0=>0	-
+std	SUB PNT 0 7 4 PERCENT 0 4 4 3 5 5	44,355	0 - 	0	0			-
+std	6 0 MS 8 4 SUB 9 7 2	972	84 - 	0	0	60		-
+std	MUL 9 ADD SUB 1 5 7 6 MMINUS 8 DIV	-8	-8 ÷ 	0	0	-1,576	0   ×   9 ==>0;0   -   8 ==>-8	-
+std	9 4 6 2 MUL 6 7 EQU PERCENT	6,339.54	6339.54	0	0		9462   ×   67 ==>633,954	-
+std	6 4 6 DIV 3	3	646 ÷ 	0	0			-
+std	6 REC 7 PNT 2 DIV	7.2	7.2 ÷ 	0	0		1/( 6 )=>0.1666666666666667	-
+std	7 3 3 PERCENT 7 4 4 SUB 9 SUB EQU DIV PNT SUB	Result is undefined	0 ÷ 0 - 	1	0		0=>0;744   -   9 ==>735;735   -   735 ==>0	-
+std	DIV DIV DIV EQU	Result is undefined	0 ÷ 	1	0			-
+std	8 6 3 SQRT 0 SIGN DIV REC 9 SIGN SQRT	Invalid input	√(-9)	1	0		√( 863 )=>29.37686164313676	-
+std	7 7 MUL 9 9 0 PERCENT 0 3 MS	3	77 × 	0	0	3		-
+std	SUB SUB 4 0 3 7 4 3 EQU MS 9 4 PERCENT MPLUS	-379,518.42		0	0	-783,261.42	0   -   403743 ==>-403,743	-
+std	7 5 7 1 PNT MUL 5 5 4 PERCENT 9	9	7571 × 	0	0			-
+std	MMINUS 1 3 3 SUB	133	133 - 	0	0	0		-
+std	6 5 9 3 MUL EQU MPLUS 7 9 1 4	7,914		0	0	43,467,649	6593   ×   6593 ==>43,467,649	-
+std	8 0 MUL 0 6 4 4 DIV PERCENT 6 6 PNT 5 SUB	774.7368421052632	774.7368421052632 - 	0	0		80   ×   644 ==>51,520;51520   ÷   66.5 ==>774.7368421052632	-
+std	3 0 1 1 9 PNT 6	30,119.6		0	0			-
+std	4 DIV ADD 9 ADD PNT 5 SIGN 0 EQU	12.5	13 + -0.5=	0	0		4   +   9 ==>13;13   +   -0.5 ==>12.5	-
+std	4 4 PERCENT 0 SUB REC	Cannot divide by zero	0 - 1/(0)	1	0		0=>0	-
+std	PNT BACK SUB REC	Cannot divide by zero	0 - 1/(0)	1	0			-
+std	MUL 8 DIV SIGN ADD	Result is undefined	0 ÷ negate(0) + 	1	0		0   ×   8 ==>0	-
+std	7 3 PERCENT REC 0 2 5 MMINUS 0	0		0	0	-25		-
+std	MPLUS PERCENT EQU 2	2	0=	0	0	0	0 ==>0	-
+std	DIV 4 PERCENT 8 8 1 3	8,813	0 ÷ 	0	0			-
+std	DIV 9 9 0 4 7 6 MMINUS 2 7 SIGN 6 3	-2,763	0 ÷ 	0	0	-990,476		-
+std	9 3 0 5 EQU MMINUS BACK SQR ADD 8 6 6	866	sqr(9305) + 	0	0	-9,305	9305 ==>9,305	-
+std	9 0 4 6 1 1 5 9 9 0 3 0 8 5 1 MC PERCENT 7 BACK 3 5 7 SUB 9	9	357 - 	0	0		0=>0	-
+std	9 0 2 7 DIV SIGN	-9,027	9027 ÷ negate(9027)	0	0			-
+std	5 EQU 3 3 ADD SUB 3 7 4 5 4 9	374,549	33 - 	0	0		5 ==>5	-
+std	EQU ADD ADD 5 EQU 0 6 PERCENT PNT REC	Cannot divide by zero	1/(0)	1	0		0 ==>0;0   +   5 ==>5;0.3=>0.3	-
+std	9 7 ADD 8 0 8 9 9 PNT CLEAR REC	Cannot divide by zero	1/(0)	1	0			-
+std	CENTR 6 7 MUL 0 9 9 EQU DIV ADD 9 SIGN SQRT	Invalid input	6633 + √(-9)	1	0		67   ×   99 ==>6,633	-
+std	MS MUL DIV PERCENT 8 0	80	0 ÷ 	0	0	0		-
+std	PNT 8 DIV 3 6 PERCENT ADD MUL 4 ADD 6 MMINUS 1	1	8.888888888888889 + 	0	0	-6	0.8   ÷   0.36 ==>2.222222222222222;2.222222222222222   ×   4 ==>8.888888888888889	-
+std	7 3 1 DIV PERCENT 9 3 0 BACK	93	731 ÷ 	0	0			-
+std	4 6 CENTR 3 5 4 MMINUS	354		0	0	-354		-
+std	SUB MPLUS 2 DIV EQU 7 CENTR	0		0	0	0	0   -   2 ==>-2;-2   ÷   -2 ==>1	-
+std	2 PERCENT EQU ADD 5 8 1 1 7 7 7 1 9 6 8 6 0 0 PNT 0 CENTR	0	0 + 	0	0		0 ==>0	-
+std	9 1 PNT 2 6 ADD 2 0 1 6 9 7 SIGN	-201,697	91.26 + 	0	0			-
+std	3 4 2 SIGN 2 MUL 9 MUL 3 6 5 7 9 3	365,793	-30798 × 	0	0		-3422   ×   9 ==>-30,798	-
+std	2 0 3 PERCENT SQRT PNT 6 6 CENTR REC	Cannot divide by zero	1/(0)	1	0		√( 0 )=>0	-
+std	3 9 1 2 4 9 3 MUL PNT 0 SQRT REC	Cannot divide by zero	3912493 × 1/(√(0))	1	0			-
+std	9 DIV 4 2 8 1 9 ADD 9 SUB 4 2 EQU SQRT	Invalid input	√(-32.99978981293351)	1	0		9   ÷   42819 ==>2.101870664891754e-4;2.101870664891754e-4   +   9 ==>9.000210187066489;9.000210187066489   -   42 ==>-32.99978981293351	-
+std	MS 0 CENTR 2 DIV PERCENT	0.02	2 ÷ 0.02	0	0	0		-
+std	3 MPLUS PERCENT 8 8 1 0 6 2	881,062	0	0	0	3	0=>0	-
+std	1 4 SIGN 8 ADD 7 3 4 BACK 3 3 SQR PERCENT 5	5	-148 + 	0	0			-
+std	MS 6 5 PNT 2	65.2		0	0	0		-
+std	SQRT SUB 4 MMINUS 2 9 MUL 9 CENTR	0	-29 × 	0	0	-4	√( 0 )   -   29 ==>-29	-
+std	5 6 SIGN PERCENT 1 6 SIGN 6	-166	0	0	0		0=>0	-
+std	DIV 4 MR	4	0 ÷ 	0	0			-
+std	6 3 DIV 2 7 MUL 5 3 0 PNT 8 2 7 8	530.8278	2.333333333333333 × 	0	0		63   ÷   27 ==>2.333333333333333	-
+std	MUL SUB DIV SQRT SQRT SUB	Result is undefined	0 ÷ √(√(0)) - 	1	0			-
+std	7 DIV 7 7 DIV 5 MC 2 EQU PNT REC	Cannot divide by zero	1/(0)	1	0		7   ÷   77 ==>0.0909090909090909;0.0909090909090909   ÷   52 ==>0.0017482517482517	-
+std	0 0 1 0 4 1 3 2 3 PERCENT SUB MS	0	0 - 	0	0	0		-
+std	5 7 9 1 PERCENT 1 0 9 7 SIGN MPLUS 9 6	96	0	0	0	-1,097	0=>0	-
+std	6 PERCENT BACK	0	0	0	0			-
+std	7 4 ADD MMINUS	74	74 + 	0	0	-74		-
+std	2 EQU 5 8 EQU DIV 9 3 MS 5 2 3 SQR 4	4	58 ÷ 	0	0	93	2 ==>2;58 ==>58	-
+std	PERCENT 8 ADD 2	2	8 + 	0	0		0=>0	-
+std	SUB 8 0 2 4 4	80,244	0 - 	0	0			-
+std	ADD SUB EQU 7 1 5 DIV 2 8	28	715 ÷ 	0	0		0   -   0 ==>0	-
+std	SUB 1 5 4 1 SIGN 1 7 SQRT	Invalid input	0 - √(-154117)	1	0			-
+std	SUB 5 SUB 5 3 0 5 MUL SQRT	Invalid input	-5310 × √(-5310)	1	0		0   -   5 ==>-5;-5   -   5305 ==>-5,310	-
+std	9 8 MPLUS MUL SQR PERCENT 3 0 4 5	3,045	98 × 	0	0	98		-
+std	PERCENT 2 CENTR 1 1 0 SUB DIV 7 MUL MPLUS	15.71428571428571	15.71428571428571 × 	0	0	15.71428571428571	0=>0;110   ÷   7 ==>15.71428571428571	-
+std	ADD 6 6 0 PERCENT 7 4 9 7 5	74,975	0 + 	0	0			-
+std	REC 2 8 7 7 6 MPLUS MR	28,776		0	0	28,776		-
+std	7 2 1 6 0 0 SUB MMINUS 0 4 MUL 2 6 DIV	18,761,496	18761496 ÷ 	0	0	-721,600	721600   -   4 ==>721,596;721596   ×   26 ==>18,761,496	-
+std	3 ADD 9 PNT 4 MUL EQU 9 PERCENT SUB 1 BACK 6	6	0.09 - 	0	0		3   +   9.4 ==>12.4;12.4   ×   12.4 ==>153.76	-
+std	8 9 1 8 SIGN 1 ADD	-89,181	-89181 + 	0	0			-
+std	SUB CLEAR 5 REC 1 SUB SUB 6 9 1 CLEAR 4	4		0	0		1/( 5 )=>0.2	-
+std	PNT PNT REC	Cannot divide by zero	1/(0)	1	0			-
+std	SUB REC 1 7 3 BACK 0 1 4 3 MUL CLEAR EQU REC	Cannot divide by zero	1/(0)	1	0		0 ==>0	-
+std	9 1 1 0 1 6 7 7 0 2 PERCENT MMINUS	0	0	0	0	0		-
+std	2 REC 8 6 ADD 9 MPLUS PERCENT SQRT EQU 7 1	71		0	0	9	1/( 2 )=>0.5;86   +   √( 7.74 ) ==>88.78208554864871	-
+std	ADD 1 8 4 PERCENT 6	6	0 + 	0	0			-
+std	8 8 6 6 4 6 6 MS 1 7 7 MS MUL BACK	177	177 × 	0	0	177|8,866,466		-
+std	1 9 5 DIV 9 EQU 6 4 MUL 5 MPLUS	5	64 × 	0	0	5	195   ÷   9 ==>21.66666666666667	-
+std	PERCENT 7 1 3 1 1 EQU SIGN PERCENT 9 DIV	9	9 ÷ 	0	0		0=>0;71311 ==>71,311;negate( 71311 )=>-50,852,587.21;-50852587.21=>-50,852,587.21	-
+std	4 ADD MUL 1 SQRT	1	4 × √(1)	0	0			-
+std	DIV 0 7 6 1 DIV 6 PNT 0	6.0	0 ÷ 	0	0		0   ÷   761 ==>0	-
+std	MUL 8 SIGN 6 1 8 0 6 SQRT	Invalid input	0 × √(-861806)	1	0			-
+std	BACK 5 5 1 MUL 2 EQU 0 REC	Cannot divide by zero	1/(0)	1	0		551   ×   2 ==>1,102	-
+std	4 1 MMINUS 3 8 4 9 0 2 3 PERCENT	0	0	0	0	-41		-
+std	7 0 8 PERCENT 7 MS	7	0	0	0	7	0=>0	-
+std	DIV MUL 7 PERCENT 7 3	73	0 × 	0	0			-
+std	MUL MPLUS 1 9 7 2	1,972	0 × 	0	0	0		-
+std	8 4 6 5 MR EQU 0 ADD 8 MMINUS 3	3	0 + 	0	0	-8	8465 ==>8,465	-
+std	3 4 PERCENT SIGN 3 5 DIV 4 5 9 REC	0.0021786492374728	35 ÷ 1/(459)	0	0		negate( 0 )=>0	-
+std	0 1 3 8 8 9 5 0 4	13,889,504		0	0			-
+std	PNT 3 3 9 1 5 1 EQU 7 3 3 EQU 8	8	733=	0	0		0.339151 ==>0.339151;733 ==>733	-
+std	1 6 7 SIGN SQRT	Invalid input	√(-167)	1	0			-
+std	4 7 5 8 SUB 0 DIV 0 ADD	Cannot divide by zero	4758 ÷ 0 + 	1	0		4758   -   0 ==>4,758	-
+std	PERCENT SIGN MS SQR	0	sqr(negate(0))	0	0	0		-
+std	3 PNT 2 SIGN 3 4 MPLUS 0 3 6 5 DIV PERCENT EQU	100	365 ÷ 3.65=	0	0	-3.234	365   ÷   3.65 ==>100	-
+std	3 7 PERCENT	0	0	0	0			-
+std	1 MMINUS 4 5	45		0	0	-1		-
+std	7 MUL BACK 5 DIV MS 7 SUB 4 PNT 7 1 8 6	4.7186	5 - 	0	0	35	7   ×   5 ==>35;35   ÷   7 ==>5	-
+std	0 PERCENT REC 6 0 ADD 6 3 9 7 8 6 3 4 5 1 9 0 5 0 1 9 6 3 3 2 0 8 4 SQR 4 SUB	64	64 - 	0	0		60   +   4 ==>64	-
+std	9 7 7 0	9,770		0	0			-
+std	9 EQU 7 MR 3 SUB SQRT ADD 1 ADD 9 6	96	65.45599625468247 + 	0	0		9 ==>9;73   -   √( 73 ) ==>64.45599625468247;64.45599625468247   +   1 ==>65.45599625468247	-
+std	MUL MUL REC	Cannot divide by zero	0 × 1/(0)	1	0			-
+std	PNT 9 5 6 7 SIGN 7 SUB 9 0 5 7 MUL SQRT	Invalid input	-9057.95677 × √(-9057.95677)	1	0		-0.95677   -   9057 ==>-9,057.95677	-
+std	DIV PNT MPLUS PERCENT 3 1 9 BACK 5 2 7 2 PNT 6	315,272.6	0 ÷ 	0	0	0		-
+std	7 DIV 9 5 PERCENT 6 2 9 5 EQU PNT MMINUS EQU DIV	0	0 ÷ 	0	0	0	7   ÷   6295 ==>0.0011119936457506;0   ÷   6295 ==>0	-
+sci	0	0		0	0			-
+sci	1	1		0	0			-
+sci	2	2		0	0			-
+sci	7	7		0	0			-
+sci	9	9		0	0			-
+sci	PNT	0.		0	0			-
+sci	ADD	0	0 + 	0	0			-
+sci	SUB	0	0 - 	0	0			-
+sci	MUL	0	0 × 	0	0			-
+sci	DIV	0	0 ÷ 	0	0			-
+sci	EQU	0	0=	0	0		0 ==>0	-
+sci	SIGN	0		0	0			-
+sci	PERCENT	0	0	0	0			-
+sci	SQRT	0	√(0)	0	0			-
+sci	SQR	0	sqr(0)	0	0			-
+sci	REC	Cannot divide by zero	1/(0)	1	0			-
+sci	CLEAR	0		0	0			-
+sci	CENTR	0		0	0			-
+sci	BACK	0		0	0			-
+sci	MS	0		0	0	0		-
+sci	MR	0		0	0			-
+sci	MPLUS	0		0	0	0		-
+sci	MMINUS	0		0	0	0		-
+sci	MC	0		0	0			-
+sci	OPENP	0	(	0	1			-
+sci	CLOSEP	0		0	0			-
+sci	MOD	0	0 Mod 	0	0			-
+sci	PWR	0	0 ^ 	0	0			-
+sci	ROOT	0	0 yroot 	0	0			-
+sci	LOGBASEY	0	0 log base 	0	0			-
+sci	SIN	0	sin₀(0)	0	0			-
+sci	COS	1	cos₀(0)	0	0			-
+sci	TAN	0	tan₀(0)	0	0			-
+sci	SEC	1	sec₀(0)	0	0			-
+sci	CSC	Cannot divide by zero	csc₀(0)	1	0			-
+sci	COT	Cannot divide by zero	cot₀(0)	1	0			-
+sci	ASIN	0	sin₀⁻¹(0)	0	0			-
+sci	ACOS	90	cos₀⁻¹(0)	0	0			-
+sci	ATAN	0	tan₀⁻¹(0)	0	0			-
+sci	SINH	0	sinh(0)	0	0			-
+sci	COSH	1	cosh(0)	0	0			-
+sci	TANH	0	tanh(0)	0	0			-
+sci	ASINH	0	sinh⁻¹(0)	0	0			-
+sci	ACOSH	Invalid input	cosh⁻¹(0)	1	0			-
+sci	ATANH	0	tanh⁻¹(0)	0	0			-
+sci	FAC	1	fact(0)	0	0			-
+sci	CUB	0	cube(0)	0	0			-
+sci	CUBEROOT	0	cuberoot(0)	0	0			-
+sci	POW10	1	10^(0)	0	0			-
+sci	POW2	1	2^(0)	0	0			-
+sci	POWE	1	e^(0)	0	0			-
+sci	LN	Invalid input	ln(0)	1	0			-
+sci	LOG	Invalid input	log(0)	1	0			-
+sci	ABS	0	abs(0)	0	0			-
+sci	FLOOR	0	floor(0)	0	0			-
+sci	CEIL	0	ceil(0)	0	0			-
+sci	DMS	0	dms(0)	0	0			-
+sci	PI	3.1415926535897932384626433832795		0	0			-
+sci	EULER	2.7182818284590452353602874713527		0	0			-
+sci	FE	0.e+0		0	0			-
+sci	EXP	0.e+0		0	0			-
+sci	RAD	0		0	0			-
+sci	GRAD	0		0	0			-
+sci	MOD PNT	0.	0 Mod 	0	0			-
+sci	ATAN CUB	0	cube(tan₀⁻¹(0))	0	0			-
+sci	FAC MMINUS	1	fact(0)	0	0	-1		-
+sci	ACOS MS	90	cos₀⁻¹(0)	0	0	90		-
+sci	COS SQR	1	sqr(cos₀(0))	0	0			-
+sci	SINH MR	0	sinh(0)	0	0			-
+sci	PWR 2	2	0 ^ 	0	0			-
+sci	CLOSEP SQRT	0	√(0)	0	0			-
+sci	ROOT MOD	0	0 Mod 	0	0			-
+sci	MMINUS 1	1		0	0	0		-
+sci	PNT TAN	0	tan₀(0)	0	0			-
+sci	ROOT CENTR	0	0 yroot 	0	0			-
+sci	9 OPENP	9	9 × (	0	1			-
+sci	SIN PERCENT	0	0	0	0		sin₀( 0 )=>0	-
+sci	SUB COSH	1	0 - cosh(0)	0	0			-
+sci	ADD 7	7	0 + 	0	0			-
+sci	EXP ABS	0	abs(0)	0	0			-
+sci	9 ACOSH	2.8872709503576206849865534805462	cosh⁻¹(9)	0	0			-
+sci	7 ACOS	Invalid input	cos₀⁻¹(7)	1	0			-
+sci	DMS CLOSEP	0	dms(0)	0	0			-
+sci	TAN ADD	0	tan₀(0) + 	0	0			-
+sci	SIGN MPLUS	0		0	0	0		-
+sci	PWR MUL	0	0 × 	0	0			-
+sci	ASINH MMINUS	0	sinh⁻¹(0)	0	0	0		-
+sci	PWR TAN	0	0 ^ tan₀(0)	0	0			-
+sci	1 MR	1		0	0			-
+sci	1 SQR	1	sqr(1)	0	0			-
+sci	CLEAR ATAN	0	tan₀⁻¹(0)	0	0			-
+sci	SEC GRAD	1	sec₀(0)	0	0			-
+sci	MMINUS CLOSEP	0		0	0	0		-
+sci	0 ABS	0	abs(0)	0	0			-
+sci	SQR COS	1	cos₀(sqr(0))	0	0			-
+sci	EULER SUB	2.7182818284590452353602874713527	2.7182818284590452353602874713527 - 	0	0			-
+sci	9 0	90		0	0			-
+sci	POWE SIGN	-1	negate(e^(0))	0	0			-
+sci	2 SUB	2	2 - 	0	0			-
+sci	EQU BACK	0	0=	0	0		0 ==>0	-
+sci	DMS CLEAR	0		0	0			-
+sci	PWR ACOS	90	0 ^ cos₀⁻¹(0)	0	0			-
+sci	CUBEROOT SIGN	0	negate(cuberoot(0))	0	0			-
+sci	GRAD FE	0.e+0		0	0			-
+sci	MPLUS 9	9		0	0	0		-
+sci	CLOSEP ADD	0	0 + 	0	0			-
+sci	SEC CEIL	1	ceil(sec₀(0))	0	0			-
+sci	CEIL DIV	0	ceil(0) ÷ 	0	0			-
+sci	SUB 1	1	0 - 	0	0			-
+sci	SIGN SEC	1	sec₀(0)	0	0			-
+sci	TAN 2	2	tan₀(0)	0	0		tan₀( 0 )=>0	-
+sci	LN EQU	0		0	0			-
+sci	SIGN 9	9		0	0			-
+sci	TAN TAN	0	tan₀(tan₀(0))	0	0			-
+sci	EXP OPENP	0	(	0	1			-
+sci	EXP ASINH	0	sinh⁻¹(0)	0	0			-
+sci	SINH CLEAR	0		0	0			-
+sci	MMINUS PI	3.1415926535897932384626433832795		0	0	0		-
+sci	ASIN SQRT	0	√(sin₀⁻¹(0))	0	0			-
+sci	EULER EULER	2.7182818284590452353602874713527		0	0			-
+sci	FAC ASINH	0.88137358701954302523260932497979	sinh⁻¹(fact(0))	0	0			-
+sci	SIN PI	3.1415926535897932384626433832795	sin₀(0)	0	0		sin₀( 0 )=>0	-
+sci	9 7	97		0	0			-
+sci	SQRT MOD	0	√(0) Mod 	0	0			-
+sci	GRAD PNT	0.		0	0			-
+sci	POW2 SQR	1	sqr(2^(0))	0	0			-
+sci	ROOT PI	3.1415926535897932384626433832795	0 yroot 	0	0			-
+sci	LOGBASEY ATANH	0	0 log base tanh⁻¹(0)	0	0			-
+sci	OPENP RAD	0	(	0	1			-
+sci	ASIN FAC	1	fact(sin₀⁻¹(0))	0	0			-
+sci	BACK POW10	1	10^(0)	0	0			-
+sci	BACK ASIN	0	sin₀⁻¹(0)	0	0			-
+sci	SEC SUB	1	sec₀(0) - 	0	0			-
+sci	FLOOR TANH	0	tanh(floor(0))	0	0			-
+sci	FLOOR SEC	1	sec₀(floor(0))	0	0			-
+sci	CLEAR LOGBASEY	0	0 log base 	0	0			-
+sci	ADD FLOOR	0	0 + floor(0)	0	0			-
+sci	FE EULER	2.7182818284590452353602874713527e+0		0	0			-
+sci	FLOOR ASINH	0	sinh⁻¹(floor(0))	0	0			-
+sci	BACK LOGBASEY	0	0 log base 	0	0			-
+sci	BACK MR	0		0	0			-
+sci	EULER LN	1	ln(2.7182818284590452353602874713527)	0	0			-
+sci	CLOSEP ABS	0	abs(0)	0	0			-
+sci	COS MUL	1	cos₀(0) × 	0	0			-
+sci	ASINH 9	9	sinh⁻¹(0)	0	0		sinh⁻¹( 0 )=>0	-
+sci	MOD CSC	Cannot divide by zero	0 Mod csc₀(0)	1	0			-
+sci	SQRT SUB	0	√(0) - 	0	0			-
+sci	ROOT 7	7	0 yroot 	0	0			-
+sci	MR REC	Cannot divide by zero	1/(0)	1	0			-
+sci	LOG 7	7		0	0			-
+sci	MS EXP	0		0	0	0		-
+sci	EQU PNT	0.	0=	0	0		0 ==>0	-
+sci	LOGBASEY SIN	0	0 log base sin₀(0)	0	0			-
+sci	MR ADD	0	0 + 	0	0			-
+sci	POWE FLOOR	1	floor(e^(0))	0	0			-
+sci	FE RAD	0.e+0		0	0			-
+sci	SQRT SQR	0	sqr(√(0))	0	0			-
+sci	CENTR TAN	0	tan₀(0)	0	0			-
+sci	ADD 9	9	0 + 	0	0			-
+sci	ATAN ACOSH	Invalid input	cosh⁻¹(tan₀⁻¹(0))	1	0			-
+sci	7 ATANH	Invalid input	tanh⁻¹(7)	1	0			-
+sci	PI SEC	1.0015051120940516120197920922817	sec₀(3.1415926535897932384626433832795)	0	0			-
+sci	POW2 ACOS	0	cos₀⁻¹(2^(0))	0	0			-
+sci	9 COS	0.98768834059513772619004024769344	cos₀(9)	0	0			-
+sci	COSH DIV	1	cosh(0) ÷ 	0	0			-
+sci	ATANH OPENP	0	tanh⁻¹(0) × (	0	1			-
+sci	0 ASINH	0	sinh⁻¹(0)	0	0			-
+sci	BACK PI	3.1415926535897932384626433832795		0	0			-
+sci	MOD LN	Invalid input	0 Mod ln(0)	1	0			-
+sci	ADD CENTR	0	0 + 	0	0			-
+sci	ACOS FLOOR	90	floor(cos₀⁻¹(0))	0	0			-
+sci	EULER MMINUS	2.7182818284590452353602874713527		0	0	-2.7182818284590452353602874713527		-
+sci	LN CLEAR	0		0	0			-
+sci	ABS RAD	0	abs(0)	0	0			-
+sci	CLOSEP TANH	0	tanh(0)	0	0			-
+sci	OPENP MC	0	(	0	1			-
+sci	SQR ADD	0	sqr(0) + 	0	0			-
+sci	MC POW10	1	10^(0)	0	0			-
+sci	MMINUS MC	0		0	0			-
+sci	EQU TAN	0	tan₀(0)	0	0		0 ==>0	-
+sci	CLOSEP POW2	1	2^(0)	0	0			-
+sci	ACOS 9	9	cos₀⁻¹(0)	0	0		cos₀⁻¹( 0 )=>90	-
+sci	POWE EQU	1	e^(0)=	0	0		e^( 0 ) ==>1	-
+sci	SQR POW2	1	2^(sqr(0))	0	0			-
+sci	MS PERCENT	0	0	0	0	0		-
+sci	MR EQU	0	0=	0	0		0 ==>0	-
+sci	MC SEC	1	sec₀(0)	0	0			-
+sci	ATAN ACOS	90	cos₀⁻¹(tan₀⁻¹(0))	0	0			-
+sci	SQRT PWR	0	√(0) ^ 	0	0			-
+sci	MC ACOSH	Invalid input	cosh⁻¹(0)	1	0			-
+sci	CLEAR MC	0		0	0			-
+sci	ASIN LOG	Invalid input	log(sin₀⁻¹(0))	1	0			-
+sci	ASIN POWE	1	e^(sin₀⁻¹(0))	0	0			-
+sci	FE FLOOR	0.e+0	floor(0.e+0)	0	0			-
+sci	ACOS SIGN	-90	negate(cos₀⁻¹(0))	0	0			-
+sci	7 SIGN	-7		0	0			-
+sci	PNT ABS	0	abs(0)	0	0			-
+sci	POW10 COSH	1.5430806348152437784779056207571	cosh(10^(0))	0	0			-
+sci	SINH DIV	0	sinh(0) ÷ 	0	0			-
+sci	SQRT RAD	0	√(0)	0	0			-
+sci	MOD FAC	1	0 Mod fact(0)	0	0			-
+sci	ATAN MS	0	tan₀⁻¹(0)	0	0	0		-
+sci	EULER ATAN	69.802468710427350188825653867406	tan₀⁻¹(2.7182818284590452353602874713527)	0	0			-
+sci	MR COSH	1	cosh(0)	0	0			-
+sci	COSH SUB	1	cosh(0) - 	0	0			-
+sci	FAC SIGN	-1	negate(fact(0))	0	0			-
+sci	ASIN COT	Cannot divide by zero	cot₀(sin₀⁻¹(0))	1	0			-
+sci	FLOOR EXP	0	floor(0)	0	0			-
+sci	SIN COT	Cannot divide by zero	cot₀(sin₀(0))	1	0			-
+sci	COS GRAD	1	cos₀(0)	0	0			-
+sci	TANH SEC	1	sec₀(tanh(0))	0	0			-
+sci	ATAN SIN	0	sin₀(tan₀⁻¹(0))	0	0			-
+sci	POW2 MPLUS	1	2^(0)	0	0	1		-
+sci	CUB GRAD	0	cube(0)	0	0			-
+sci	SIGN ABS	0	abs(0)	0	0			-
+sci	PWR CUB	0	0 ^ cube(0)	0	0			-
+sci	MOD GRAD	0	0 Mod 	0	0			-
+sci	COSH COT	57.289961630759424687278147537113	cot₀(cosh(0))	0	0			-
+sci	COSH ROOT	1	cosh(0) yroot 	0	0			-
+sci	ASINH PERCENT	0	0	0	0		sinh⁻¹( 0 )=>0	-
+sci	RAD PERCENT	0	0	0	0			-
+sci	1 SUB	1	1 - 	0	0			-
+sci	ATAN TAN	0	tan₀(tan₀⁻¹(0))	0	0			-
+sci	SEC SQRT	1	√(sec₀(0))	0	0			-
+sci	EQU MC	0	0=	0	0		0 ==>0	-
+sci	OPENP TAN	0	(tan₀(0)	0	1			-
+sci	SQR CSC	Cannot divide by zero	csc₀(sqr(0))	1	0			-
+sci	PI EQU	3.1415926535897932384626433832795	3.1415926535897932384626433832795=	0	0		3.1415926535897932384626433832795 ==>3.1415926535897932384626433832795	-
+sci	CLOSEP FLOOR	0	floor(0)	0	0			-
+sci	TAN CEIL	0	ceil(tan₀(0))	0	0			-
+sci	POW10 PERCENT	0	0	0	0		10^( 0 )=>0	-
+sci	OPENP SIGN	0	(negate(0)	0	1			-
+sci	ROOT ROOT	0	0 yroot 	0	0			-
+sci	PWR SEC	1	0 ^ sec₀(0)	0	0			-
+sci	CEIL SIGN	0	negate(ceil(0))	0	0			-
+sci	ROOT DIV	0	0 ÷ 	0	0			-
+sci	MS CLOSEP	0		0	0	0		-
+sci	ROOT CUBEROOT	0	0 yroot cuberoot(0)	0	0			-
+sci	SQR GRAD	0	sqr(0)	0	0			-
+sci	PERCENT PNT	0.	0	0	0		0=>0	-
+sci	DIV DIV	0	0 ÷ 	0	0			-
+sci	MOD TAN	0	0 Mod tan₀(0)	0	0			-
+sci	CLOSEP MMINUS	0		0	0	0		-
+sci	MOD 9	9	0 Mod 	0	0			-
+sci	EULER 2	2		0	0			-
+sci	SUB MPLUS	0	0 - 	0	0	0		-
+sci	POWE ACOS	0	cos₀⁻¹(e^(0))	0	0			-
+sci	7 LN	1.9459101490553133051053527434432	ln(7)	0	0			-
+sci	CEIL MS	0	ceil(0)	0	0	0		-
+sci	CLOSEP OPENP	0	(	0	1			-
+sci	EULER MOD	2.7182818284590452353602874713527	2.7182818284590452353602874713527 Mod 	0	0			-
+sci	BACK ATANH	0	tanh⁻¹(0)	0	0			-
+sci	ATAN POWE	1	e^(tan₀⁻¹(0))	0	0			-
+sci	MOD FE	0.e+0	0 Mod 	0	0			-
+sci	SIN SIGN	0	negate(sin₀(0))	0	0			-
+sci	TAN ACOS	90	cos₀⁻¹(tan₀(0))	0	0			-
+sci	SINH POWE	1	e^(sinh(0))	0	0			-
+sci	CUB DMS	0	dms(cube(0))	0	0			-
+sci	CENTR MR	0		0	0			-
+sci	SUB 0	0	0 - 	0	0			-
+sci	EQU EULER	2.7182818284590452353602874713527	0=	0	0		0 ==>0	-
+sci	PERCENT BACK	0	0	0	0			-
+sci	LOGBASEY COT	Cannot divide by zero	0 log base cot₀(0)	1	0			-
+sci	2 SEC	1.0006095442988217764584299254744	sec₀(2)	0	0			-
+sci	POW10 GRAD	1	10^(0)	0	0			-
+sci	MR SIGN	0		0	0			-
+sci	COSH ADD	1	cosh(0) + 	0	0			-
+sci	RAD SQR	0	sqr(0)	0	0			-
+sci	ACOS 2	2	cos₀⁻¹(0)	0	0		cos₀⁻¹( 0 )=>90	-
+sci	MS CENTR	0		0	0	0		-
+sci	9 RAD	9		0	0			-
+sci	CUBEROOT CSC	Cannot divide by zero	csc₀(cuberoot(0))	1	0			-
+sci	MUL PWR	0	0 ^ 	0	0			-
+sci	1 POW10	10	10^(1)	0	0			-
+sci	POWE 7	7	e^(0)	0	0		e^( 0 )=>1	-
+sci	MMINUS SEC	1	sec₀(0)	0	0	0		-
+sci	ROOT MPLUS	0	0 yroot 	0	0	0		-
+sci	CSC 0	0		0	0			-
+sci	SEC SQR	1	sqr(sec₀(0))	0	0			-
+sci	POWE MUL	1	e^(0) × 	0	0			-
+sci	2 EXP	2.e+0		0	0			-
+sci	BACK MPLUS	0		0	0	0		-
+sci	FE FAC	1.e+0	fact(0.e+0)	0	0			-
+sci	SQRT TANH	0	tanh(√(0))	0	0			-
+sci	POW2 RAD	1	2^(0)	0	0			-
+sci	MR GRAD	0		0	0			-
+sci	CUB CENTR	0	cube(0)	0	0		cube( 0 )=>0	-
+sci	RAD EULER	2.7182818284590452353602874713527		0	0			-
+sci	7 DIV	7	7 ÷ 	0	0			-
+sci	9 2	92		0	0			-
+sci	TANH TANH	0	tanh(tanh(0))	0	0			-
+sci	TAN SUB	0	tan₀(0) - 	0	0			-
+sci	ACOS ROOT	90	cos₀⁻¹(0) yroot 	0	0			-
+sci	DMS LOG	Invalid input	log(dms(0))	1	0			-
+sci	MUL 1	1	0 × 	0	0			-
+sci	CUB MR	0	cube(0)	0	0			-
+sci	SIN REC	Cannot divide by zero	1/(sin₀(0))	1	0			-
+sci	EXP MR	0.e+0		0	0			-
+sci	PWR SUB	0	0 - 	0	0			-
+sci	MOD 1	1	0 Mod 	0	0			-
+sci	EQU 0	0	0=	0	0		0 ==>0	-
+sci	FE ACOS	9.e+1	cos₀⁻¹(0.e+0)	0	0			-
+sci	ASINH MS	0	sinh⁻¹(0)	0	0	0		-
+sci	GRAD DMS	0	dms(0)	0	0			-
+sci	CUB CEIL	0	ceil(cube(0))	0	0			-
+sci	ABS COSH	1	cosh(abs(0))	0	0			-
+sci	PERCENT MMINUS	0	0	0	0	0		-
+sci	BACK LN	Invalid input	ln(0)	1	0			-
+sci	ATANH GRAD	0	tanh⁻¹(0)	0	0			-
+sci	SEC COS	0.99984769515639123915701155881391	cos₀(sec₀(0))	0	0			-
+sci	CLEAR FLOOR	0	floor(0)	0	0			-
+sci	PERCENT EQU	0	0=	0	0		0 ==>0	-
+sci	MOD REC	Cannot divide by zero	0 Mod 1/(0)	1	0			-
+sci	CLOSEP 7	7		0	0			-
+sci	FAC SINH	1.1752011936438014568823818505956	sinh(fact(0))	0	0			-
+sci	SQRT 9	9	√(0)	0	0		√( 0 )=>0	-
+sci	MS 7	7		0	0	0		-
+sci	LOGBASEY MR	0	0 log base 	0	0			-
+sci	CUBEROOT POWE	1	e^(cuberoot(0))	0	0			-
+sci	ROOT ATAN	0	0 yroot tan₀⁻¹(0)	0	0			-
+sci	TAN CENTR	0	tan₀(0)	0	0		tan₀( 0 )=>0	-
+sci	POW2 EULER	2.7182818284590452353602874713527	2^(0)	0	0		2^( 0 )=>1	-
+sci	CLOSEP POWE	1	e^(0)	0	0			-
+sci	LOGBASEY ASIN	0	0 log base sin₀⁻¹(0)	0	0			-
+sci	TAN 9	9	tan₀(0)	0	0		tan₀( 0 )=>0	-
+sci	BACK 2	2		0	0			-
+sci	POW10 CLOSEP	1	10^(0)	0	0			-
+sci	FAC ATANH	Cannot divide by zero	tanh⁻¹(fact(0))	1	0			-
+sci	CUBEROOT ATAN	0	tan₀⁻¹(cuberoot(0))	0	0			-
+sci	SIN SEC	1	sec₀(sin₀(0))	0	0			-
+sci	ACOS MMINUS	90	cos₀⁻¹(0)	0	0	-90		-
+sci	DMS MUL	0	dms(0) × 	0	0			-
+sci	RAD MOD	0	0 Mod 	0	0			-
+sci	FAC DIV	1	fact(0) ÷ 	0	0			-
+sci	GRAD SQRT	0	√(0)	0	0			-
+sci	EXP 9	0.e+9		0	0			-
+sci	SUB 2	2	0 - 	0	0			-
+sci	CLEAR SQRT	0	√(0)	0	0			-
+sci	ACOSH 9	9		0	0			-
+sci	CUB FLOOR	0	floor(cube(0))	0	0			-
+sci	MUL EULER	2.7182818284590452353602874713527	0 × 	0	0			-
+sci	EQU SQR	0	sqr(0)	0	0		0 ==>0	-
+sci	POW10 CENTR	0	10^(0)	0	0		10^( 0 )=>1	-
+sci	GRAD MOD	0	0 Mod 	0	0			-
+sci	FAC OPENP	1	fact(0) × (	0	1			-
+sci	EQU ATAN	0	tan₀⁻¹(0)	0	0		0 ==>0	-
+sci	TANH REC	Cannot divide by zero	1/(tanh(0))	1	0			-
+sci	SIN MPLUS	0	sin₀(0)	0	0	0		-
+sci	CEIL 9	9	ceil(0)	0	0		ceil( 0 )=>0	-
+sci	7 POW2	128	2^(7)	0	0			-
+sci	2 PWR	2	2 ^ 	0	0			-
+sci	FAC POW2	2	2^(fact(0))	0	0			-
+sci	TANH POWE	1	e^(tanh(0))	0	0			-
+sci	CUB MMINUS	0	cube(0)	0	0	0		-
+sci	MMINUS COSH	1	cosh(0)	0	0	0		-
+sci	MPLUS ABS	0	abs(0)	0	0	0		-
+sci	COS TAN	0.01745506492821758576512889521973	tan₀(cos₀(0))	0	0			-
+sci	LOGBASEY FE	0.e+0	0 log base 	0	0			-
+sci	BACK POW2	1	2^(0)	0	0			-
+sci	COS ASIN	90	sin₀⁻¹(cos₀(0))	0	0			-
+sci	SUB 7	7	0 - 	0	0			-
+sci	9 9	99		0	0			-
+sci	MOD SUB	0	0 - 	0	0			-
+sci	TAN PNT	0.	tan₀(0)	0	0		tan₀( 0 )=>0	-
+sci	ADD CLEAR	0		0	0			-
+sci	FE OPENP	0.e+0	(	0	1			-
+sci	PI CSC	18.246954784594135400803517737639	csc₀(3.1415926535897932384626433832795)	0	0			-
+sci	FAC LN	0	ln(fact(0))	0	0			-
+sci	BACK 0	0		0	0			-
+sci	POW2 MOD	1	2^(0) Mod 	0	0			-
+sci	CUB PERCENT	0	0	0	0		cube( 0 )=>0	-
+sci	PI MMINUS	3.1415926535897932384626433832795		0	0	-3.1415926535897932384626433832795		-
+sci	SIN CUB	0	cube(sin₀(0))	0	0			-
+sci	OPENP ASIN	0	(sin₀⁻¹(0)	0	1			-
+sci	MOD SQR	0	0 Mod sqr(0)	0	0			-
+sci	9 CENTR	0		0	0			-
+sci	CENTR FLOOR	0	floor(0)	0	0			-
+sci	CUB BACK	0	cube(0)	0	0			-
+sci	SINH SEC	1	sec₀(sinh(0))	0	0			-
+sci	ATAN COT	Cannot divide by zero	cot₀(tan₀⁻¹(0))	1	0			-
+sci	MC COS	1	cos₀(0)	0	0			-
+sci	SINH PWR	0	sinh(0) ^ 	0	0			-
+sci	POW2 CSC	57.298688498550183476612683735174	csc₀(2^(0))	0	0			-
+sci	FAC REC	1	1/(fact(0))	0	0			-
+sci	2 MR	2		0	0			-
+sci	SEC TANH	0.76159415595576488811945828260479	tanh(sec₀(0))	0	0			-
+sci	SQRT FE	0.e+0	√(0)	0	0			-
+sci	OPENP 9	9	(	0	1			-
+sci	ACOS ADD	90	cos₀⁻¹(0) + 	0	0			-
+sci	PI 0	0		0	0			-
+sci	7 TAN	0.12278456090290459113423113605286	tan₀(7)	0	0			-
+sci	GRAD MPLUS	0		0	0	0		-
+sci	PWR POWE	1	0 ^ e^(0)	0	0			-
+sci	SIN MOD	0	sin₀(0) Mod 	0	0			-
+sci	FAC MOD	1	fact(0) Mod 	0	0			-
+sci	MS SQRT	0	√(0)	0	0	0		-
+sci	MC SQR	0	sqr(0)	0	0			-
+sci	SIGN FLOOR	0	floor(0)	0	0			-
+sci	TANH CENTR	0	tanh(0)	0	0		tanh( 0 )=>0	-
+sci	TANH MMINUS	0	tanh(0)	0	0	0		-
+sci	SUB CEIL FE ROOT 7 SQRT MS 0 1 RAD	1.e+0	0 - ceil(0) yroot 	0	0	2.6457513110645905905016157536393e+0		-
+sci	MUL 6 2 7 RAD OPENP GRAD 3 8 3 EQU SIN	0	sin₉(0)	0	0		0   ×   627   ×   ( 383 ) ==>0	-
+sci	DIV 2 EQU 3 6 MUL 5 EQU OPENP GRAD 0 SIGN ACOTH	Cannot divide by zero	(coth⁻¹(0)	1	1		0   ÷   2 ==>0;36   ×   5 ==>180	-
+sci	0 RAD ASINH MPLUS 1 GRAD POW2 8 7 ADD 6 4 COS	0.53582679497899661827130876786764	87 + cos₉(64)	0	0	0	sinh⁻¹( 0 )=>0;2^( 1 )=>2	-
+sci	OPENP 5 GRAD 8 CENTR EXP 7 PNT 1 MS 8	8	(	0	1	0		-
+sci	SQRT FE PNT MS PNT TAN EULER PNT REC	Cannot divide by zero	1/(0.e+0)	1	0	0.e+0	√( 0 )=>0.e+0;tan₀( 0.e+0 )=>0.e+0	-
+sci	EXP EQU RAD MOD EULER CLEAR EULER 8 1 EQU OPENP EQU	81	(81)=	0	0		0 ==>0;81 ==>81;( 81 ) ==>81	-
+sci	SUB EXP CLOSEP OPENP FE CLOSEP ROOT 3 MUL 5 ADD 1 7 7	177	0 - (0.e+0) yroot 3.e+0 × 5.e+0 + 	0	0			-
+sci	2 CENTR 6 7 RAD EXP SIGN DIV COS BACK 2 GRAD EXP	2	negate(67) ÷ 	0	0			-
+sci	9 1 8 2 3 4 8 EXP FE 9 ASINH PNT ACSC	Cannot divide by zero	csc₀⁻¹(0.e+0)	1	0		sinh⁻¹( 9.e+0 )=>2.8934439858858713780727183066264e+0	-
+sci	GRAD MMINUS ROOT 4 ROOT 8 OPENP 1 EQU	0	0 yroot 4 yroot 8 × (1)=	0	0	0	0   yroot   4   yroot   8   ×   ( 1 ) ==>0	-
+sci	FE GRAD TAN MS 6 4 8 POW2 7 2 ADD 9 9	99	7.2e+1 + 	0	0	0.e+0	tan₉( 0.e+0 )=>0.e+0;2^( 6.48e+2 )=>1.1679847981112819759721399310593e+195	-
+sci	EXP 2 PNT CLEAR OPENP 0 0 TANH FE EULER 7 EQU 0 EQU	0.e+0	0.e+0=	0	0		( 7.e+0 ) ==>7.e+0;0.e+0 ==>0.e+0	-
+sci	9 GRAD POWE 4 RAD 4 6 FE SQRT ATAN 4 7 FAC EQU	2.5862324151116818064296435515361e+59	fact(4.7e+1)=	0	0		e^( 9 )=>8,103.0839275753840077099966894328;tanᵣ⁻¹( √( 4.6e+1 ) )=>1.4244090675006475228860894622496e+0;fact( 4.7e+1 ) ==>2.5862324151116818064296435515361e+59	-
+sci	DIV 4 8 8 MMINUS 8 SUB 7 9 SUB EQU GRAD LN	Invalid input	ln(0)	1	0	-488	0   ÷   8   -   79   -   -79 ==>0	-
+sci	OPENP 3 EXP FE 6 6 RAD SQRT ADD 9 REC 7	7	(√(6.6e+1) + 	0	1			-
+sci	5 MUL OPENP 5 DIV 3 DIV 1 6 4 EULER EXP 0 EQU	Cannot divide by zero	5 × (5 ÷ 3 ÷ 0)	1	0			-
+sci	8 8 4 OPENP 7 8 FE 6 ROOT 6 SIGN CLOSEP MS	7.4183637559040231207579980286335e-1	884 × (6.e+0 yroot -6.e+0)	0	0	7.4183637559040231207579980286335e-1		-
+sci	6 FE MUL 6 9 DEG OPENP SIGN DIV ROOT EQU	Invalid input	6.e+0 × 6.9e+1 × ((negate(4.14e+2)) yroot -4.14e+2)	1	0			-
+sci	MUL 0 EQU POWE GRAD RAD 2 OPENP 2 DEGREES	2	2 × (degrees(2)	0	1		0   ×   0 ==>0;e^( 0 )=>1	-
+sci	7 7 MR FE SQR 9 9 RAD OPENP PNT RAD 3 EQU 0	0		0	0		sqr( 7.7e+1 )=>5.929e+3;9.9e+1   ×   ( 3.e+0 ) ==>2.97e+2	-
+sci	8 6 3 9 GRAD 4 0 5 DIV MR PNT PNT OPENP	Cannot divide by zero	405 ÷ 0 × (	1	1			-
+sci	EXP 5 3 SIGN 8 6 FE MMINUS 5 9 2 8 OPENP 1	1	5.928e+3 × (	0	1	0.e+0		-
+sci	4 3 1 POW2 4 ROOT PNT GRAD EXP REC	Cannot divide by zero	4 yroot 1/(0)	1	0		2^( 431 )=>5.5453393882416297191568283682862e+129	-
+sci	4 2 OPENP 0 SQRT RAD EQU 9 MMINUS CLOSEP	9		0	0	-9	42   ×   ( √( 0 ) ) ==>0	-
+sci	CLOSEP 2 RAD 5 ACOTH FE 2 OPENP	2.e+0	2.e+0 × (	0	1		coth⁻¹( 5 )=>2.0273255405408219098900655773217e-1	-
+sci	OPENP MMINUS DIV SUB GRAD 6 DIV CLOSEP 0 DIV ADD 8 6 MUL	86	(0 - 6 ÷ 6) × 0 + 86 × 	0	0	0		-
+sci	SUB 9 FE SQRT 6 3 OPENP GRAD EQU 0 SUB TAN	0.e+0	0.e+0 - tan₉(0.e+0)	0	0		0   -   6.3e+1   ×   ( 6.3e+1 ) ==>-3.969e+3	-
+sci	GRAD SQR MPLUS MR EXP 1 1 9 CLOSEP 6 OPENP 6	6	6 × (	0	1	0	sqr( 0 )=>0	-
+sci	8 1 EXP 4 SUB RAD CSC 5 6 FE	5.6e+1	810000 - 	0	0			-
+sci	7 EXP 4 9 CUB 7 9 MPLUS SINH CEIL 2 PWR OPENP LN	Invalid input	2 ^ (ln(0)	1	1	79	cube( 7.e+49 )=>3.43e+149;ceil( sinh( 79 ) )=>1.0191405332563343834161568768586e+34	-
+sci	OPENP FE 0 ATAN REC 1 MOD RAD	1.e+0	1.e+0 Mod 	0	0			-
+sci	PNT 0 0 4 8 RAD 3 4 SQR EXP 7 ASIN	Invalid input	sinᵣ⁻¹(7)	1	0		sqr( 34 )=>1,156	-
+sci	8 REC 0 2 8 EQU 5 RAD MS DIV 7 6 OPENP	0.06578947368421052631578947368421	5 ÷ 76 × (	0	1	5	1/( 8 )=>0.125;28 ==>28	-
+sci	6 4 7 1 6 8 1 1 1 8 1 8 6 1 7 3 2 1 5 3 0 3 1 7 8 8 0 2 RAD OPENP 0 8 2 DIV CLOSEP 5 ACOS 3 MS 6 3	63		0	0	3		-
+sci	EQU EXP 9 OPENP EXP 6 CUBEROOT EQU DIV 1 SQR PNT OPENP	Cannot divide by zero	16.354085335489256930020905806945 ÷ 0 × (	1	1		0 ==>0;9   ×   ( cuberoot( 6 ) ) ==>16.354085335489256930020905806945	-
+sci	EXP 5 RAD 1 2 3 3 3 9 2 1 8 2 3 3 0 3 0 2 9 1 7 1 4 MC 6 CENTR ASECH	Cannot divide by zero	sech⁻¹(0)	1	0			-
+sci	9 2 TANH ROOT 5 OPENP DIV 0 CLEAR EXP EQU CENTR COT	Cannot divide by zero	cot₀(0)	1	0		0 ==>0	-
+sci	EXP 8 SQR SIGN CENTR RAD 1 FAC 5 PWR SUB 9 POW10 OPENP	1,000,000,000	5 - 10^(9) × (	0	1		negate( sqr( 0 ) )=>0;fact( 1 )=>1	-
+sci	5 PNT DIV 5 DIV EXP 0 MMINUS DMS DIV	Cannot divide by zero	5 ÷ 5 ÷ dms(0) ÷ 	1	0	0		-
+sci	COS 0 TAN OPENP 5 1 RAD 7 6 1 LOGBASEY 1 MOD	Cannot divide by zero	tan₀(0) × (761 log base 1 Mod 	1	1		cos₀( 0 )=>1	-
+sci	DEGREES 0 EXP 9 1 1 4 9 4 9 7 9 6 1 0 4 9 9 0 2 7 7 6 8 8 5 8 9 8 7 1 6 7 3 6 3 3 PI MR MR RAD FE 0 CEIL 9 8	98	ceil(0.e+0)	0	0		ceil( 0.e+0 )=>0.e+0	-
+sci	MPLUS EQU PNT 2 OPENP 7 MOD MMINUS EQU ACOT	Cannot divide by zero	cot₀⁻¹(0)	1	0	-7	0 ==>0;0.2   ×   ( 7   Mod   7 ) ==>0	-
+sci	7 0 ROOT ADD FE GRAD SEC MUL 5 ASIN	Invalid input	70 + sec₉(7.e+1) × sin₉⁻¹(5.e+0)	1	0			-
+sci	0 MMINUS MUL 7 ATAN ACOSH GRAD RAD PNT 2 3	0.23	0 × 	0	0	0		-
+sci	SIGN 4 8 MOD SIGN EQU EXP 0 ACOS FE ADD MUL MUL OPENP	0.e+0	cos₀⁻¹(0) × (	0	1		48   Mod   negate( 48 ) ==>0	-
+sci	9 FE POW10 CUBEROOT 3 ACOTH REC 1 OPENP PNT SQR COT	Cannot divide by zero	1.e+0 × (cot₀(sqr(0.e+0))	1	1		cuberoot( 10^( 9.e+0 ) )=>1.e+3;1/( coth⁻¹( 3.e+0 ) )=>2.8853900817779268147198493620038e+0	-
+sci	4 DEGREES FE RAD SUB 0 OPENP PWR 5 7 9 1	5,791	degrees(4) - 0.e+0 × (0.e+0 ^ 	0	1			-
+sci	7 2 5 SUB 2 CEIL EXP FE 5 ACOS	Invalid input	725 - cos₀⁻¹(5.e+0)	1	0			-
+sci	MMINUS 1 4 CSC 3 PI CUBEROOT 8 6 OPENP CUB ACOS	Invalid input	86 × (cos₀⁻¹(cube(86))	1	1	0	csc₀( 14 )=>4.1335654944387493074799462655163;cuberoot( 3.1415926535897932384626433832795 )=>1.4645918875615232630201425272638	-
+sci	3 EQU 3 CLOSEP FE OPENP MMINUS MMINUS 6 MUL 4	4	3.e+0 × (6.e+0 × 	0	1	-6.e+0	3 ==>3	-
+sci	DIV DEGREES 2 MMINUS 2 OPENP REC	Cannot divide by zero	0 ÷ 2 × (1/(0)	1	1	-2		-
+sci	FE 6 MS MUL EXP 3 CLOSEP 1 0 3 2	1,032	6.e+0 × 	0	0	6.e+0		-
+sci	6 3 3 EXP EXP 3 5 OPENP LOGBASEY POW10 1 0 MMINUS 8	8		0	0	-10		-
+sci	PNT 7 FE MOD 3 DIV 2 BACK 0 MUL	Cannot divide by zero	7.e-1 Mod 3.e+0 ÷ 0.e+0 × 	1	0			-
+sci	8 TANH BACK 3 GRAD SEC ADD EXP MMINUS 7 3 ACSCH 2 POW10	100	sec₉(3) + 10^(2)	0	0	-1.0011113587852437610957235860319	tanh( 8 )=>0.99999977492967588981001883295637	-
+sci	2 SUB EXP SUB FE CUB EQU PWR 5 3 2 5 GRAD 4	4	-6.e+0 ^ 	0	0		2   -   cube( 2.e+0 ) ==>-6.e+0	-
+sci	8 GRAD MUL SUB EXP PNT 5 1 1 0 MPLUS 0 2	2	8 - 	0	0	0.511		-
+sci	SUB 4 RAD 0 8 5 0 OPENP 0 3 9 LOGBASEY 0 ROOT	Invalid input	0 - 850 × (39 log base 0 yroot 	1	1			-
+sci	FE MS MUL OPENP	0.e+0	0.e+0 × (	0	1	0.e+0		-
+sci	FAC RAD 1 4 EXP 8 PNT REC 0 MMINUS SQR	0	sqr(0)	0	0	0	fact( 0 )=>1;1/( 1400000000 )=>7.1428571428571428571428571428571e-10	-
+sci	4 7 9 8 GRAD SIGN 5 FAC 7 ROOT MUL MS 4 OPENP	28	7 × 4 × (	0	1	7	negate( 4798 )=>-4,798;fact( 5 )=>120	-
+sci	SUB 6 0 MUL 5 4 CLOSEP GRAD 3 SIGN ASIN	Invalid input	0 - 60 × sin₉⁻¹(-3)	1	0			-
+sci	7 8 RAD SQR 6 ADD 1 1 CLEAR REC	Cannot divide by zero	1/(0)	1	0		sqr( 78 )=>6,084	-
+sci	OPENP GRAD ABS CLOSEP 6 3 DIV	0	(abs(0)) × 63 ÷ 	0	0			-
+sci	EXP 7 5 MOD CENTR RAD LOGBASEY 9 ACSCH MOD 5 MS MOD LN	1.6094379124341003746007593332262	5 Mod ln(5)	0	0	5		-
+sci	4 1 8 8 MUL 4 9 COT EULER EQU GRAD FAC	Overflow	fact(11384.164297586481445688883930025)	1	0		4188   ×   2.7182818284590452353602874713527 ==>11,384.164297586481445688883930025	-
+sci	FE OPENP GRAD DIV 4 2 4 FAC	3.7594220766071644797785949392477e+931	(0.e+0 ÷ fact(4.24e+2)	0	1			-
+sci	1 2 7 9 EULER GRAD MOD SEC SQR 4 RAD EULER OPENP	2.7182818284590452353602874713527	2.7182818284590452353602874713527 Mod (	0	1			-
+sci	RAD OPENP EXP DIV	0	(0 ÷ 	0	1			-
+sci	EQU CUB CLOSEP 4 MOD FAC 9 EXP LOGBASEY 3 6 OPENP GRAD 7	7	4 Mod 9 log base 36 × (	0	1		0 ==>0;cube( 0 )=>0	-
+sci	0 5 0 3 9 7 0 OPENP PWR FE LOG EXP 3	3	503970 × (503970 ^ 	0	1			-
+sci	CENTR DIV RAD 5 POWE 1 5 SQRT 5 0 ATANH	Invalid input	0 ÷ tanh⁻¹(50)	1	0			-
+sci	2 OPENP 5 LOG 5 CSCH ADD 7 5 6 6 6 4 5 7 5 4 6 0 7 7 9 6 8 4 9 EXP ACOS	Invalid input	2 × (csch(5) + cos₀⁻¹(7566645754607796849)	1	1			-
+sci	CLOSEP 0 5 7 OPENP GRAD ADD 4 EXP	4.e+0	57 × (57 + 	0	1			-
+sci	OPENP PI SQRT ACSCH 8 5 8 DIV 2 5 1 8 0 9 0 7 8 2 3 3 3 3 9 5 7 4 5 1 1 6 0 4 2 5 5 1 0 6 3 8 8 1 3 CENTR EQU 4 RAD 6 9	69		0	0			-
+sci	7 RAD ABS OPENP 8 PWR MMINUS 5 LOG 6 4 1 0	6,410	abs(7) × (8 ^ 	0	1	-8		-
+sci	OPENP MS EULER MR 6 GRAD 7	7	(	0	1	0		-
+sci	1 5 8 FE ACOSH LOG SEC 5 9 RAD	5.9e+1	sec₀(log(cosh⁻¹(1.58e+2)))	0	0		sec₀( log( cosh⁻¹( 1.58e+2 ) ) )=>1.0000880032506709718970036566478e+0	-
+sci	OPENP LOGBASEY 7 EQU 5 SIGN 6 FE 2 5	25		0	0			-
+sci	OPENP 3 ACOS 6 PNT DIV PNT 1 LOGBASEY 0 SUB	Cannot divide by zero	6 ÷ 0.1 log base 0 - 	1	0			-
+sci	OPENP ADD EQU LOGBASEY MOD 0 ASIN GRAD 6 5	65	0 Mod 	0	0		( 0   +   0 ) ==>0	-
+sci	MUL GRAD 8 FAC 8 EQU EQU 6 SQR 9 FE ROOT	9.e+0	9.e+0 yroot 	0	0		0   ×   8 ==>0;0   ×   8 ==>0;sqr( 6 )=>36	-
+sci	1 FLOOR EXP 9 OPENP MS 4	4	9 × (	0	1	9	floor( 1 )=>1	-
+sci	2 OPENP CUBEROOT 4 0 OPENP 6 MMINUS EQU EXP	480		0	0	-6	2   ×   ( 40   ×   ( 6 ) ) ==>480	-
+sci	CEIL OPENP FLOOR CUB 2 ADD EULER 4 EQU LN	Invalid input	ln(0)	1	0		ceil( 0 )   ×   ( 2   +   4 ) ==>0	-
+sci	POWE FLOOR 8 MR GRAD 2 9 RAD	29	floor(e^(0))	0	0		floor( e^( 0 ) )=>1	-
+sci	FE 7 ADD LOG 3 8 CLOSEP CUB 2 EQU ATANH	Invalid input	tanh⁻¹(9.e+0)	1	0		7.e+0   +   2.e+0 ==>9.e+0	-
+sci	3 GRAD FE	3.e+0		0	0			-
+sci	9 CUB 4 OPENP ROOT 1 RAD 7 5 CLOSEP PNT EQU	0	4 × (4 yroot 75) × 0=	0	0		cube( 9 )=>729;4   ×   ( 4   yroot   75 )   ×   0 ==>0	-
+sci	0 7 RAD FE ADD 8 5 8 7 0 0 9	8,587,009	7.e+0 + 	0	0			-
+sci	9 4 1 SUB 6 5 6 REC 7 PNT RAD MUL GRAD ROOT	7	941 - 7 yroot 	0	0			-
+sci	9 LN BACK 3 0 8 COS 6 OPENP ADD 4 ACOS	Invalid input	6 × (6 + cos₀⁻¹(4)	1	1		ln( 9 )=>2.1972245773362193827904904738451;cos₀( 308 )=>0.61566147532565827966881109284366	-
+sci	9 2 FE SIN 0 OPENP CUB SUB MOD CLOSEP 6 9 8	698	0.e+0 × (cube(0.e+0) Mod 0.e+0) × 	0	0		sin₀( 9.2e+1 )=>9.9939082701909573000624344004393e-1	-
+sci	MS SECH 0 REC	Cannot divide by zero	1/(0)	1	0	0	sech( 0 )=>1	-
+sci	EQU 3 FE MPLUS 9 4 CUB SIN CUB 5 MOD 6 1 1	611	5.e+0 Mod 	0	0	3.e+0	0 ==>0;cube( sin₀( cube( 9.4e+1 ) ) )=>7.2607345742881507886215732862312e-1	-
+sci	EQU 7 8 9 9 EXP 1 8 7 2 2 DIV FAC	Overflow	7.899e+1875 ÷ fact(7.899e+1875)	1	0		0 ==>0	-
+sci	2 FE 4 ADD MS ACOS 4 5 0	450		0	0	4.e+0		-
+sci	1 1 CSC RAD 3 MOD PI 9 4 3 2 ADD 0 OPENP	0	3 Mod 9432 + 0 × (	0	1		csc₀( 11 )=>5.2408430641678487513554365670557	-
+sci	MUL 1 MUL EXP DIV ADD CLOSEP LN	Invalid input	0 × 1 + ln(0)	1	0			-
+sci	6 2 SIGN POW10 ADD MS 5 OPENP 2 9 FLOOR EXP	29	10^(-62) + 5 × (floor(29)	0	1	1.e-62		-
+sci	CEIL 6 ADD 1 RAD MC MUL 4 EXP	4.e+0	6 + 1 × 	0	0		ceil( 0 )=>0	-
+sci	SIN EQU 8 9 CLOSEP EQU 2 OPENP DEGREES DIV GRAD 3 4	34	2 × (degrees(2) ÷ 	0	1		sin₀( 0 ) ==>0;89 ==>89	-
+sci	0 3 MPLUS 4 PWR 0 8 REC 8 5 8 6 8 EQU	Invalid input	4 ^ 	1	0	3		-
+sci	7 EXP GRAD CLOSEP 4 8 8 CUBEROOT	7.8729943662043463916577027460643	cuberoot(488)	0	0			-
+sci	0 EQU DEG 0 3 ROOT MS 5 EQU ATAN 8 GRAD MUL	8	8 × 	0	0	3	0 ==>0;3   yroot   5 ==>1.2457309396155173259666803366403;tan₀⁻¹( 1.2457309396155173259666803366403 )=>51.244539317511649504607056643556	-
+sci	7 7 MMINUS 4 CUB EQU MUL 8 RAD 2	2	64 × 	0	0	-77	cube( 4 ) ==>64	-
+sci	6 7 3 0 EXP ADD EQU 2 GRAD MUL SQR 7 EQU LOG	1.1461280356782380259259551533171	log(14)	0	0		6730   +   6730 ==>13,460;2   ×   7 ==>14	-
+sci	ROOT 2 8 4 0 EXP 5 RAD	284,000,000	0 yroot 	0	0			-
+sci	OPENP 6 3 4 EXP 5 6 CLOSEP PNT CUB 0 8 4	84	(6.34e+58) × 	0	0			-
+sci	ASIN EULER 9 FE MUL FLOOR 9 CLOSEP 4 1 OPENP	3.69e+2	9.e+0 × 4.1e+1 × (	0	1		sin₀⁻¹( 0 )=>0	-
+sci	2 FAC 9 EQU EXP 7 CUBEROOT 5 6 FE BACK LOGBASEY PNT 8	0.8	5.6e+1 log base 	0	0		fact( 2 )=>2;9 ==>9;cuberoot( 7 )=>1.9129311827723891011991168395488	-
+sci	ADD 8 RAD MMINUS 3 7 CSC	-1.5539094704202325134097716061923	0 + cscᵣ(37)	0	0	-8		-
+sci	1 8 SUB OPENP ADD DMS 8 POW10 MMINUS ASIN 2 FLOOR DIV	2	floor(2) ÷ 	0	0	-100,000,000		-
+sci	CLEAR DIV 3 REC MPLUS GRAD PNT DIV 6 MUL	6	6 × 	0	0	0.33333333333333333333333333333333		-
+sci	3 8 1 3 OPENP 2 ASECH	Invalid input	3813 × (sech⁻¹(2)	1	1			-
+sci	6 LOGBASEY 9 EXP SQRT FE 1 POW2 PNT FLOOR	0.e+0	6 log base floor(0.e+0)	0	0			-
+sci	3 GRAD 1 OPENP 7 0 1 7 9	70,179	1 × (	0	1			-
+sci	ADD 2 PNT ADD EQU EXP OPENP 5 LN COS CLOSEP	0.99960550215266466578489479270296	(cos₀(ln(5)))	0	0		0   +   2   +   2 ==>4	-
+sci	MPLUS 5 OPENP 3 0 EQU DIV CENTR 2 9 EQU	5.1724137931034482758620689655172	150 ÷ 29=	0	0	0	5   ×   ( 30 ) ==>150;150   ÷   29 ==>5.1724137931034482758620689655172	-
+sci	ASECH 1 6 2 5 0 9 7 1 6 9 5 8 5 5 3 7 5 2 2 4 9 7 7 OPENP ROOT LOGBASEY 2 RAD 3 POW2 5	5	16250971695855375224977 × (16250971695855375224977 log base 	0	1			-
+sci	FE 3 OPENP 2 ADD 2 PI 3 PWR ACOSH	1.7627471740390860504652186499596e+0	3.e+0 × (2.e+0 + 3.e+0 ^ cosh⁻¹(3.e+0)	0	1			-
+sci	1 4 0 PWR 9 LOG EXP FLOOR LN 3 6 SEC CENTR OPENP	0	(	0	1		sec₀( 36 )=>1.2360679774997896964091736687313	-
+sci	8 POW10 MMINUS PNT MUL OPENP 4 FAC 7 9 3	793	0 × (	0	1	-100,000,000	10^( 8 )=>100,000,000	-
+sci	MUL ROOT EXP 4 9 CLOSEP MS 4 9 BACK 8 PWR 6	6	0 yroot 48 ^ 	0	0	49		-
+sci	EXP MS 8 1 0 9 3 6 EQU SINH 8 7 FLOOR 1	1	floor(87)	0	0	0	810936 ==>810,936;floor( 87 )=>87	-
+sci	ADD DEGREES DIV PNT 4 2 OPENP MUL 7 MUL 1 3 EXP	13.e+0	0 + degrees(0) ÷ 0.42 × (0 × 7 × 	0	1			-
+sci	FLOOR 8 LN SQR DIV SQRT 2 0 COT 7 ASIN	Invalid input	sqr(ln(8)) ÷ sin₀⁻¹(7)	1	0		floor( 0 )=>0	-
+sci	4 OPENP MPLUS 7 LOG OPENP DIV 8 SUB ADD 6 5 ADD	65.105637255001782103839027032324	4 × (log(7) × (0.84509804001425683071221625859264 ÷ 8 + 65 + 	0	2	4		-
+sci	SUB 5 1 LOGBASEY MUL DIV 8 POW10 6 0 4 OPENP CLOSEP	0.08443708609271523178807947019868	0 - 51 ÷ 604 × (0.08443708609271523178807947019868)	0	0			-
+sci	2 GRAD 9 ACOT 3 7 CUB 3 4 SIGN PNT 8	-34.8	cube(37)	0	0		cot₉⁻¹( 9 )=>7.0446574954554548844379307386972;cube( 37 )=>50,653	-
+sci	ADD 8 COS MUL EQU 3 8 1 ACSCH RAD 4 ACOSH 0	0		0	0		0   +   cos₀( 8 )   ×   0.99026806874157031508377486734485 ==>0.98063084796915943095824852427853;csch⁻¹( 381 )=>0.00262466890250161367418484900718;cosh⁻¹( 4 )=>2.0634370688955605467272811726201	-
+sci	CEIL SUB 1 6 6 0 6 0 2 2 0 7 8 2 3 2 4 5 0 8 1 5 5 7 5 1 0 7 3 6 7 6 2 5 4 5 ASECH	Invalid input	ceil(0) - sech⁻¹(16606022078232450815575107367625)	1	0			-
+sci	6 RAD 7 8	78		0	0			-
+sci	GRAD ADD 9 9 MUL PWR	99	0 + 99 ^ 	0	0			-
+sci	6 6 CUB 9 FE 1	1	cube(66)	0	0		cube( 66 )=>287,496	-
+sci	0 FE MUL	0.e+0	0.e+0 × 	0	0			-
+sci	MR 2 OPENP 9 3 9 MUL SUB EQU 6 DIV 6	6	6 ÷ 	0	0		2   ×   ( 939   -   939 ) ==>0	-
+sci	6 EQU 0 4 ADD OPENP 6 COTH FLOOR	1	4 + (floor(coth(6))	0	1		6 ==>6	-
+sci	3 EXP 7 0 MR 4 DIV SQR EQU 3 CENTR 4 3 SEC	1.3673274610985952952732138680262	sec₀(43)	0	0		3.e+704   ÷   sqr( 3.e+704 ) ==>3.3333333333333333333333333333333e-705	-
+sci	2 8 EXP 4 0	28.e+40		0	0			-
+sci	PNT 4 COT BACK 7 MMINUS DIV	7	7 ÷ 	0	0	-7	cot₀( 0.4 )=>143.23712166947508745885957900557	-
+sci	MMINUS MOD 5	5	0 Mod 	0	0	0		-
+sci	9 6 SEC DIV OPENP 5 2 SUB 6 COS 0	0	sec₀(96) ÷ (52 - 	0	1			-
+sci	PNT SIGN 8 SECH 2 POW2 8 8 ADD MUL ROOT MUL 1 6	16	88 × 	0	0		sech( -0.8 )=>0.74769991823741961576998980727789;2^( 2 )=>4	-
+sci	9 4 5 7 5 2	945,752		0	0			-
+sci	PNT 7 MPLUS OPENP 3 RAD CLOSEP SEC FAC SUB 9 7	97	0.7 × fact(secᵣ(3)) - 	0	0	0.7		-
+sci	2 SQRT CUBEROOT 1 6 SUB EXP SQRT OPENP DIV DEG ACOS	Invalid input	16 - √(16) × (4 ÷ cos₀⁻¹(4)	1	1		cuberoot( √( 2 ) )=>1.1224620483093729814335330496792	-
+sci	MOD 1 EXP 8 BACK 9 RAD 5 DIV LOGBASEY SQR LOG	Invalid input	(0 Mod 5) log base log(sqr(0))	1	0			-
+sci	EXP OPENP SINH 5 EQU 3 COS BACK SUB ACSC	Invalid input	cos₀(3) - csc₀⁻¹(0.99862953475457387378449205843944)	1	0		( 5 ) ==>5	-
+sci	4 POW10 7 EXP DIV OPENP 0 DMS 0 RAD	0	7 ÷ (	0	1		10^( 4 )=>10,000	-
+sci	7 EXP SIGN MMINUS 6 ASECH	Invalid input	sech⁻¹(6)	1	0	-7		-
+sci	9 5 MUL CLOSEP 9 EQU 8 0 OPENP RAD ATANH	Invalid input	80 × (tanh⁻¹(80)	1	1		95   ×   9 ==>855	-
+sci	EXP ATAN 5 ADD RAD FE MC 6 8 7 DIV	6.87e+2	5 + 6.87e+2 ÷ 	0	0		tan₀⁻¹( 0 )=>0	-
+sci	CLOSEP POWE OPENP PNT 4 3 MMINUS 6 EQU 1 8 ACOS	Invalid input	cos₀⁻¹(18)	1	0	-0.43	e^( 0 )   ×   ( 6 ) ==>6	-
+sci	GRAD BACK FE 1 DIV SUB GRAD 0 2 7 ASIN	Invalid input	1.e+0 - sin₉⁻¹(2.7e+1)	1	0			-
+sci	7 BACK 2 SUB MS RAD 1 5 POW10 9 FLOOR GRAD ACOTH 1	1	2 - 	0	0	2		-
+sci	3 FE SIGN EXP 6 OPENP 0 MUL	0.e+0	6.e+0 × (0.e+0 × 	0	1		negate( 3.e+0 )=>-3.e+0	-
+sci	LN 1 1 REC 0 2 PNT FE 3 8 MUL OPENP ACSCH	Cannot divide by zero	3.8e+1 × (csch⁻¹(0.e+0)	1	1		1/( 11 )=>0.09090909090909090909090909090909	-
+sci	8 DIV OPENP LOGBASEY 0 2 6 SECH RAD 0 FE EULER	2.7182818284590452353602874713527e+0	8 ÷ (0 log base 	0	1			-
+sci	SINH FE PWR 0 EXP 7 ACSCH	Cannot divide by zero	sinh(0) ^ csch⁻¹(0.e+0)	1	0			-
+sci	CLOSEP 9 MPLUS 2 FAC 0 DIV CUBEROOT OPENP	Result is undefined	0 ÷ cuberoot(0) × (	1	1	9	fact( 2 )=>2	-
+sci	0 3 SIN 7 OPENP 1 FE MPLUS 2 DIV 9	9	7 × (2.e+0 ÷ 	0	1	1.e+0	sin₀( 3 )=>0.05233595624294383272211862960908	-
+sci	MUL 0 MPLUS 5 3 1 1 OPENP BACK CSCH	Cannot divide by zero	0 × 5311 × (csch(0)	1	1	0		-
+sci	EXP ATAN CLOSEP FE MOD POW2 0 MS 8 2 ACOSH 2	2	tan₀⁻¹(0) Mod 	0	0	0.e+0		-
+sci	MC OPENP MS 7 DEGREES 2 MS 4 1 7 CLEAR EXP 4	0.e+4		0	0	2|0		-
+sci	6 3 8 2 2 9 ADD MUL 8 0 FE ATANH	Invalid input	638229 × tanh⁻¹(8.e+1)	1	0			-
+sci	9 EULER DIV DIV EXP SQRT 1 EQU 9 TAN 0 MPLUS GRAD	0		0	0	0	2.7182818284590452353602874713527   ÷   1 ==>2.7182818284590452353602874713527;tan₀( 9 )=>0.15838444032453629383888309269437	-
+sci	GRAD 3 EQU 7 EQU FE EXP 8 DEG	8.e+0	7=	0	0		3 ==>3;7 ==>7	-
+sci	CLEAR GRAD 4 EXP 7 EXP 2 0 9 PWR 7 9 MMINUS	79	4.e+7209 ^ 	0	0	-79		-
+sci	PNT 5 ASECH LOGBASEY 5 CLOSEP ROOT POW2 RAD OPENP 8 6 POWE POW10	Invalid input	sech⁻¹(0.5) log base 5 yroot 2^(0.17106870118897657284359919569003) × (10^(e^(86))	1	1			-
+sci	8 DIV FE OPENP 2 CUB 5 8 9 5 MMINUS 9 6	96	8 ÷ (	0	1	-5.895e+3		-
+sci	7 6 1 RAD ACOT 3 EXP LN CSCH DIV 2 MMINUS CLOSEP	2	csch(ln(3)) ÷ 	0	0	-2	cotᵣ⁻¹( 761 )=>0.00131405969042791555588835135196	-
+sci	9 SQRT CUB 0 SIGN GRAD OPENP MMINUS 1 1	11	(	0	1	0	cube( √( 9 ) )=>27	-
+sci	GRAD 5 9 3 2 9 CLOSEP POWE	Overflow	e^(59329)	1	0			-
+sci	SQR RAD EQU 0 ACSCH	Cannot divide by zero	csch⁻¹(0)	1	0		sqr( 0 ) ==>0	-
+sci	GRAD SUB DIV 8 OPENP 8 CENTR SUB 7 7 BACK DIV 3 CLEAR	0		0	0			-
+sci	ADD MMINUS SIGN 4 RAD ADD SUB 5 LOGBASEY EXP 4 0	40	0 + 4 - 5 log base 	0	0	0		-
+sci	0 ACOS 2 CUB 4 0 4 1 GRAD ABS FAC	Overflow	fact(abs(4041))	1	0		cos₀⁻¹( 0 )=>90;cube( 2 )=>8	-
+sci	SUB SIGN ABS PNT OPENP 0 2 SUB GRAD POWE FE 8 ADD ADD	-6.e+0	0 - 0 × (2 - 8.e+0 + 	0	1			-
+sci	0 GRAD MOD ADD 3 OPENP 1 REC RAD 5	5	0 + 3 × (	0	1			-
+sci	RAD 2 SUB MUL 9 ASINH 6 POW10 OPENP EXP 3	3	2 × 10^(6) × (	0	1			-
+sci	EQU ATANH 7 9 LOG EXP SUB 4 DIV COS OPENP 8 GRAD	8	log(79) - 4 ÷ cos₀(4) × (	0	1		0 ==>0;tanh⁻¹( 0 )=>0	-
+sci	5 FE 4 REC OPENP EXP 2	2	1/(4.e+0) × (	0	1			-
+sci	RAD 6 ASECH	Invalid input	sech⁻¹(6)	1	0			-
+sci	DEG EXP 9 DMS ABS PWR OPENP 8 LOGBASEY 3 7 ATANH	Invalid input	abs(dms(9)) ^ (8 log base tanh⁻¹(37)	1	1			-
+sci	5 ACSC PWR OPENP 0 EXP SUB SIGN GRAD PNT 7 ADD 7	7	csc₀⁻¹(5) ^ (0 - 0.7 + 	0	1			-
+sci	4 2 1 0 OPENP 6 DEG SUB 2 RAD RAD 9 CLOSEP 5	5	4210 × (6 - 9) × 	0	0			-
+sci	ADD RAD 4 9 LOG ADD MS 6 OPENP 5	5	0 + log(49) + 6 × (	0	1	1.6901960800285136614244325171853		-
+sci	MS GRAD 2 MPLUS OPENP CUBEROOT 5 6 2	562	2 × (	0	1	2		-
+sci	RAD 5 PNT EQU MC 3 9 MUL COS 5 9 FE 2	2	39 × 	0	0		5 ==>5	-
+sci	4 OPENP EULER 6 SINH FE SQR 5 CLOSEP CUB 3 DIV MUL	1.2e+1	4 × 3.e+0 × 	0	0			-
+sci	OPENP 8 3 2 ROOT PNT SQR BACK CLOSEP	Cannot divide by zero	(832 yroot sqr(0))	1	0			-
+sci	EQU 9 ACOS 0 LOGBASEY GRAD 2 8 OPENP 3 7 7 8	3,778		0	0		0 ==>0	-
+sci	PNT 3 GRAD EQU 2 0 0 0 FE POWE 6 5 0 6	6,506	e^(2.e+3)	0	0		0.3 ==>0.3;e^( 2.e+3 )=>3.8811801942843685764823220753719e+868	-
+sci	EQU MS 0 FAC OPENP 1 PNT POW10 EXP DEGREES EULER 0	0	fact(0) × (	0	1	0	0 ==>0	-
+sci	DIV 1 2 EXP EQU SQRT OPENP 2 ACSC MS EQU 1 9 6	196		0	0	30	0   ÷   12 ==>0;√( 0 )   ×   ( csc₀⁻¹( 2 ) ) ==>0	-
+sci	PI 4 4 0 OPENP ADD EQU COTH	Invalid input	coth(387200)	1	0		440   ×   ( 440   +   440 ) ==>387,200	-
+sci	5 6 8 EQU GRAD RAD	568	568=	0	0		568 ==>568	-
+sci	CLOSEP EQU 8 5 6 FE 1 8 CLOSEP 8 1 POWE ASIN	Invalid input	sin₀⁻¹(e^(8.1e+1))	1	0		0 ==>0	-
+sci	5 7 MUL 7 9 GRAD FE LOGBASEY	7.9e+1	57 × 7.9e+1 log base 	0	0			-
+sci	SQR RAD POW2 4 4 OPENP SQR 3 9 CLOSEP PNT POW10 6	6	44 × (39) × 	0	0		2^( sqr( 0 ) )=>1	-
+sci	0 5 SUB FE 2 SECH RAD DEG 0 5	5	5 - 	0	0			-
+sci	DEGREES ROOT MUL RAD GRAD ACOTH 4	4		0	0			-
+sci	DMS BACK ABS EQU 0 5 EQU 9 4 5 OPENP ROOT PNT PWR	Cannot divide by zero	945 × (945 yroot 0 ^ 	1	1		abs( dms( 0 ) ) ==>0;5 ==>5	-
+sci	MR EQU OPENP FE EQU 4 SUB ASINH	2.0947125472611012942448228460655e+0	4.e+0 - sinh⁻¹(4.e+0)	0	0		0 ==>0;( 0.e+0 ) ==>0.e+0	-
+sci	6 ACOT 9 8 EQU POW2 MS POWE	Invalid input	e^(2^(98))	1	0	316,912,650,057,057,350,374,175,801,344	cot₀⁻¹( 6 )=>9.462322208025617391140070541742;98 ==>98	-
+sci	9 FE 7 POW10 9 BACK MS PNT 9 9 MS EQU 2	2	9.9e-1=	0	0	9.9e-1|0.e+0	10^( 7.e+0 )=>1.e+7;9.9e-1 ==>9.9e-1	-
+sci	0 EXP EQU REC	Cannot divide by zero	1/(0)	1	0		0 ==>0	-
+sci	FE MS MOD 1 4 3 1 8	14,318	0.e+0 Mod 	0	0	0.e+0		-
+sci	CLOSEP ATAN RAD 8 2 MOD 3 OPENP 2 8 2	282	82 Mod 3 × (	0	1		tan₀⁻¹( 0 )=>0	-
+sci	EXP 2 LN	Invalid input	ln(0)	1	0			-
+sci	EULER MPLUS OPENP EXP 5 REC POW10	1.5848931924611134852021013733915	(10^(1/(5))	0	1	2.7182818284590452353602874713527		-
+sci	ACOS EXP PI 9 3 TANH RAD TAN 0 ATANH EQU 0	0	tanh⁻¹(0)=	0	0		cos₀⁻¹( 0 )=>90;tanᵣ( tanh( 93 ) )=>1.5574077246549022305069748074584;tanh⁻¹( 0 ) ==>0	-
+sci	1 4 9 CUBEROOT 8 0 GRAD OPENP ROOT COS 0 3	3	80 × (80 yroot 	0	1		cuberoot( 149 )=>5.3014591923809041691551388677407	-
+sci	MMINUS 4 4 1 0 TAN	Invalid input	tan₀(4410)	1	0	0		-
+sci	0 3 9 GRAD DIV 7 9 EXP 9 MOD	4.9367088607594936708860759493671e-10	39 ÷ 79000000000 Mod 	0	0			-
+sci	1 8 MPLUS 3 GRAD SQRT 7 EQU 5 DIV	5	5 ÷ 	0	0	18	√( 3 )=>1.7320508075688772935274463415059;7 ==>7	-
+sci	RAD 8 MS LN 0 7 PI	3.1415926535897932384626433832795	ln(8)	0	0	8	ln( 8 )=>2.0794415416798359282516963643745	-
+sci	MUL EXP POWE EQU 8 1 CSCH EQU GRAD 8 MUL	8	8 × 	0	0		0   ×   e^( 0 ) ==>0;csch( 81 )   ×   1 ==>1.3279354399161468801404510540857e-35	-
+sci	SUB MOD 2 CUB REC 3 3 RAD EXP 6 MUL	0	0 Mod 6 × 	0	0			-
+sci	5 EXP OPENP 5 SIGN 5 7 TAN CLOSEP	-0.30573068145866035573454195899655	5 × (tan₀(-557))	0	0			-
+sci	EQU OPENP 3 DIV FE 1 3 MUL 4 9	49	(3 ÷ 1.3e+1 × 	0	1		0 ==>0	-
+sci	4 CLEAR FAC 0 6 8 EXP 5 3 FE BACK 6 PWR	6.e+0	6.e+0 ^ 	0	0		fact( 0 )=>1	-
+sci	6 PNT RAD 0 7 FLOOR MPLUS DIV COSH CUB 2	2	floor(7) ÷ 	0	0	7		-
+sci	OPENP COT EQU 9 2 CLOSEP LOGBASEY MS PWR 1 2 6	126	92 ^ 	0	0	92		-
+sci	8 9 ADD MPLUS GRAD 2 9	29	89 + 	0	0	89		-
+sci	SIN LOGBASEY 3 0 OPENP	Invalid input	sin₀(0) log base 30 × (	1	1			-
+sci	4 BACK SUB 3 ADD LOGBASEY 0 8 8 EXP 4 FE 1	1	(0 - 3) log base 	0	0			-
+sci	4 3 TAN SQR OPENP 8 SUB GRAD SUB 4 5 EULER	2.7182818284590452353602874713527	sqr(tan₀(43)) × (8 - 	0	1			-
+sci	6 DIV 3 PNT OPENP 1 9 5 7 7 EXP 8 ADD EQU	7,830,800,000,000	6 ÷ 3 × (1957700000000 + 1957700000000)=	0	0		6   ÷   3   ×   ( 1957700000000   +   1957700000000 ) ==>7,830,800,000,000	-
+sci	MUL SINH OPENP ADD 9 ACSCH EQU 0 6 8 ADD MMINUS	68	68 + 	0	0	-68	0   ×   sinh( 0 )   ×   ( 0   +   csch⁻¹( 9 ) ) ==>0	-
+sci	RAD 6 OPENP	6	6 × (	0	1			-
+sci	6 0 OPENP 7 PNT 2 SIGN 6 FE 1 7 PWR	1.7e+1	60 × (1.7e+1 ^ 	0	1			-
+sci	3 6 EXP 6 LOG 3 7 REC OPENP 3	3	1/(37) × (	0	1		log( 36000000 )=>7.5563025007672872650175335959592	-
+sci	MUL EQU ABS 6 MS 9 TANH TANH OPENP MOD 6	6	tanh(tanh(9)) × (0.76159414316336335402644338085686 Mod 	0	1	6	0   ×   0 ==>0;abs( 0 )=>0	-
+sci	DIV SINH 5 8 ADD 7 0 MMINUS SUB EXP 1 9	19	0 ÷ 58 + 70 - 	0	0	-70		-
+sci	4 EXP SIN POW2 2 ATAN ROOT 9 9 0 CLOSEP 0 MMINUS	0	tan₀⁻¹(2) yroot 	0	0	0	2^( sin₀( 4 ) )=>1.0495395068863025633950034244835	-
+sci	EXP 8 OPENP 5 8 7 SQR 9 8 8 0	9,880	0 × (	0	1			-
+sci	5 9 0 1 5 EQU SIN LOG	Invalid input	log(sin₀(59015))	1	0		59015 ==>59,015	-
+sci	2 3 0 MS 8 3 MUL OPENP 5 CUB 0 3 MOD	3	83 × (3 Mod 	0	1	230		-
+sci	OPENP 8 SIGN 5 CLOSEP ACOS 5 8	58		0	0			-
+sci	FAC 3 3 DIV 1 GRAD DMS ADD	33	33 ÷ dms(1) + 	0	0		fact( 0 )=>1	-
+sci	6 1 REC 0 RAD 4 DEGREES ROOT 6	6	degrees(4) yroot 	0	0		1/( 61 )=>0.01639344262295081967213114754098	-
+sci	3 3 3 5 3 5 4 5 7 3 4 8 5 0 0 5 6 0 0 MUL COSH	Invalid input	3335354573485005600 × cosh(3335354573485005600)	1	0			-
+sci	9 PNT 0 6 ROOT 9 6 CLOSEP RAD	96	9.06 yroot 	0	0			-
+sci	GRAD 6 0 PI	3.1415926535897932384626433832795		0	0			-
+sci	4 FE 2 0 7 7 COSH EQU DIV 0 7	7	5.3531438926811412315000137800395e+901 ÷ 	0	0		cosh( 2.077e+3 ) ==>5.3531438926811412315000137800395e+901	-
+sci	PNT FE ASIN	0.e+0	sin₀⁻¹(0.e+0)	0	0			-
+sci	7 ADD OPENP EQU MUL 5 8 ABS PI 9	9	7 × 	0	0		7   +   ( 0 ) ==>7	-
+sci	5 MUL 4 6 EQU 5 OPENP 0	0	5 × (	0	1		5   ×   46 ==>230	-
+sci	0 7 EXP 4 7 SQR 0 8 5 EXP	85.e+0	sqr(7.e+47)	0	0		sqr( 7.e+47 )=>4.9e+95	-
+sci	ADD 4 0 REC 4 CUBEROOT EXP SQR 6 3 4 5 1 8 6 6 5 2 6 2 7 5 0 4 5 9 FAC 0	0		0	0			-
+sci	5 4 MS 3 1 9 1 EQU 1 0 4 4 8 6	104,486	3191=	0	0	54	3191 ==>3,191	-
+sci	8 PI MS COS ADD 2 CLOSEP TAN BACK PWR MUL 0	0	cos₀(3.1415926535897932384626433832795) + tan₀(2) × 	0	0	3.1415926535897932384626433832795		-
+sci	5 ROOT 3 ATAN 8 7 OPENP 3 7 5 8 OPENP SIN	0.3746065934159120354149637745012	5 yroot 87 × (3758 × (sin₀(3758)	0	2			-
+sci	6 EQU 4 1 2 2 7 0 1 9 SQRT 0 1	1	√(41227019)	0	0		6 ==>6;√( 41227019 )=>6,420.8269716602704913915085532522	-
+sci	CLOSEP 6 DEGREES 7 2	72		0	0			-
+sci	9 4 1 MS 4 RAD GRAD 1 3	13		0	0	941		-
+sci	8 9 SINH 6 SUB MC 3 EXP FE 2 OPENP LOGBASEY SIGN 2	2	6 - 2.e+0 × (2.e+0 log base 	0	1		sinh( 89 )=>2.2448064095871726231421227898227e+38	-
+sci	CEIL 8 6 2 4 6 0 4 OPENP 7 5 FE ASIN	Invalid input	8624604 × (sin₀⁻¹(7.5e+1)	1	1		ceil( 0 )=>0	-
+sci	DIV SUB OPENP 0 RAD 3 8 6 PWR OPENP ABS FE 2 5	25	0 - (386 ^ (	0	2			-
+sci	3 2 SUB 4 FE 6 FAC 3 EXP 9 6 POW10	Invalid input	32 - 10^(3.e+96)	1	0			-
+sci	6 DIV MS SQRT OPENP EQU DIV 0 OPENP	Cannot divide by zero	6 ÷ 0 × (	1	1	6	6   ÷   √( 6 )   ×   ( 2.4494897427831780981972840747059 ) ==>6	-
+sci	FLOOR 4 FE CEIL 5 OPENP MS DIV OPENP 6 8 POW10 MMINUS	1.e+68	5.e+0 × (5.e+0 ÷ (10^(6.8e+1)	0	2	-1.e+68	floor( 0 )=>0;ceil( 4.e+0 )=>4.e+0	-
+sci	SUB OPENP MPLUS 1 5 8 DIV 0 MR ACSC	Cannot divide by zero	0 - (158 ÷ csc₀⁻¹(0)	1	1	0		-
+sci	ACOSH 0 7 4 0 5 0 4 9 5 7 4 9 1 1 6 3 6 5 7 7 4 7 9 9 2 EXP CENTR FE 9 2 ROOT 4 SQRT MS CSC 0 0	0	9.2e+1 yroot 	0	0	2.e+0		-
+sci	0 1 SQRT OPENP DIV 1 MPLUS 9 CLOSEP EXP 3 LOG	0.47712125471966243729502790325512	√(1) × (1 ÷ 9) × log(3)	0	0	1		-
+sci	PNT 6 FE SUB 5 SUB SIGN 4 SIGN 3 ACOS	Invalid input	6.e-1 - 5.e+0 - cos₀⁻¹(-4.3e+1)	1	0			-
+sci	EXP 0 MMINUS 7 3 1 ASEC LOG GRAD EULER	2.7182818284590452353602874713527	log(sec₀⁻¹(731))	0	0	0	log( sec₀⁻¹( 731 ) )=>1.9538641222952208505207114055495	-
+sci	FE ADD 3 ACSC 3 MUL 7 GRAD EXP 9 EQU	2.7e+1	0.e+0 + 3.e+0 × 9.e+0=	0	0		0.e+0   +   3.e+0   ×   9.e+0 ==>2.7e+1	-
+sci	MPLUS LOGBASEY 7 5 9 TAN 1 EXP 6 ADD 0 SUB GRAD	0	0 - 	0	0	0		-
+sci	5 ABS PWR ROOT 2 MC RAD 0 OPENP	Cannot divide by zero	abs(5) yroot 0 × (	1	1			-
+sci	SIGN OPENP FE PWR 1 1 SUB 7 MS LOG OPENP 8	8	(0.e+0 ^ 1.1e+1 - log(7.e+0) × (	0	2	7.e+0		-
+sci	2 2 1 0 CSCH CLOSEP EXP 5 MUL 6 3 MS 8 RAD	8	5 × 	0	0	63	csch( 2210 )=>3.2376134045473924593211711537261e-960	-
+sci	CLOSEP CUB 5 0 9 6 DIV OPENP 2 MS SUB MS GRAD PNT	0.	5096 ÷ (2 - 	0	1	2|2	cube( 0 )=>0	-
+sci	1 0 GRAD 8 5 ADD 6 CSC ASIN	Invalid input	85 + sin₉⁻¹(csc₉(6))	1	0			-
+sci	PI REC 5 EQU 7 4 1 4 9 3 RAD POW10	Invalid input	10^(741493)	1	0		1/( 3.1415926535897932384626433832795 )=>0.31830988618379067153776752674503;5 ==>5	-
+sci	OPENP ATAN GRAD DEG CLOSEP 9 CUBEROOT 1 2 ADD 0	0	(tan₀⁻¹(0)) × 12 + 	0	0			-
+sci	MMINUS 2 MS RAD DIV 2 EXP SUB	1	2 ÷ 2 - 	0	0	2|0		-
+sci	POWE GRAD EQU LOG CLOSEP 3 CUB ASECH	Invalid input	sech⁻¹(cube(3))	1	0		e^( 0 ) ==>1;log( 1 )=>0	-
+sci	BACK 0 ADD 5 FE TANH OPENP 0 GRAD	0.e+0	0 + tanh(5.e+0) × (	0	1			-
+sci	GRAD OPENP 4 0 9 1 RAD LN 4 FLOOR	4	(floor(4)	0	1			-
+sci	6 OPENP RAD 4 EXP 6 4 3 MUL 4 0 9 7	4,097	6 × (4.e+643 × 	0	1			-
+sci	GRAD EQU 5 7 7 EXP 6 OPENP OPENP 3 COS 2 3 8	238	577000000 × ((	0	2		0 ==>0	-
+sci	5 CLEAR 6 6 EXP 0 OPENP PNT 1 1 8 FE ADD DMS	7.048e-2	66 × (1.18e-1 + dms(1.18e-1)	0	1			-
+sci	RAD 5 6 PWR ACOS	Invalid input	56 ^ cosᵣ⁻¹(56)	1	0			-
+sci	1 1 EXP BACK 5 CLEAR OPENP 5 ASIN	Invalid input	(sin₀⁻¹(5)	1	1			-
+sci	1 8 6 9 8 4 6 1 6 2 6 5 6 3 0 3 1 2 0 1 2 6 1 5 4 3 8 3 7 2 2 GRAD DIV CUB 7 1 OPENP EXP SQR 3 DIV	3	1869846162656303120126154383722 ÷ 71 × (3 ÷ 	0	1			-
+sci	OPENP CLOSEP 0 8 RAD 5	5	(0) × 	0	0			-
+sci	9 DEGREES 7 7 9 OPENP ADD MPLUS LOGBASEY RAD BACK 1	1	779 × (779 log base 	0	1	779		-
+sci	0 5 3 SUB 4 9 8 OPENP MMINUS 8 1 9 GRAD 0	0	53 - 498 × (	0	1	-498		-
+sci	PNT 6 FE 2 RAD 8 5 COTH 5 6 3	563	coth(8.5e+1)	0	0		coth( 8.5e+1 )=>1.e+0	-
+sci	FE OPENP CLOSEP	0.e+0	(0.e+0)	0	0			-
+sci	3 OPENP 7 1 7 5 PWR EQU	Overflow	3 × (7175 ^ 7175)	1	0			-
+sci	8 POW2 ACSCH GRAD 0 OPENP SUB EQU 8 1	81		0	0		csch⁻¹( 2^( 8 ) )=>0.00390624006596074891799113794273;0   ×   ( 0   -   0 ) ==>0	-
+sci	8 LOG PNT EQU 7 1 CENTR GRAD FE 8 6 BACK 1 PWR	8.1e+1	8.1e+1 ^ 	0	0		log( 8 )=>0.90308998699194358564121668417348;0 ==>0	-
+sci	TAN 6 MPLUS 0 EXP 9 1 6 SEC LN OPENP 4	4	ln(sec₀(0)) × (	0	1	6	tan₀( 0 )=>0	-
+sci	MOD 9 2 5 4 2 ROOT 4 MUL OPENP 9 MPLUS EQU EXP	0		0	0	9	0   Mod   92542   yroot   4   ×   ( 9 ) ==>0	-
+sci	8 POW2 8 2 7 7 COT SUB 8 OPENP CLEAR LOG	Invalid input	log(0)	1	0		2^( 8 )=>256	-
+sci	1 7 PWR GRAD EQU RAD 6 PNT	6.		0	0		17   ^   17 ==>827,240,261,886,336,764,177	-
+sci	ASINH 2 FE 0 9 3 5 MUL 6 MOD ROOT SIN FLOOR FAC	Invalid input	(9.35e+2 × 6.e+0) yroot fact(floor(sin₀(5.61e+3)))	1	0		sinh⁻¹( 0 )=>0	-
+sci	SUB FE GRAD	0.e+0	0 - 	0	0			-
+sci	COS 3 ACSC RAD 9 4 ACOS EQU OPENP EQU	0	(0)=	0	0		cos₀( 0 )=>1;csc₀⁻¹( 3 )=>19.471220634490691369245999339962;( 0 ) ==>0	-
+sci	LOGBASEY CLOSEP 1 RAD FE POW10 CENTR CENTR CLOSEP 9 COTH ABS FE 6	6	0 log base 	0	0			-
+sci	DIV 2 LN 8 ROOT GRAD 0 MUL 1 SIGN 6 RAD 5	5		0	0			-
+sci	4 EQU 9 DIV OPENP ACOT	Cannot divide by zero	9 ÷ (cot₀⁻¹(0)	1	1		4 ==>4	-
+sci	MOD EQU MUL FE 8 OPENP CLOSEP	0.e+0	0 × 8.e+0 × (0.e+0)	0	0		0   Mod   0 ==>0	-
+sci	1 0 DMS 6 ADD 6 CENTR MS ACOSH	Invalid input	6 + cosh⁻¹(0)	1	0	0	dms( 10 )=>10	-
+sci	DMS SINH 6 FE 8 3 8 COSH DMS MPLUS 9	9	dms(cosh(8.38e+2))	0	0	4.342560115677406897930794285531e+363	sinh( dms( 0 ) )=>0;dms( cosh( 8.38e+2 ) )=>4.342560115677406897930794285531e+363	-
+sci	9 SQRT ASINH 8 EQU EXP SQR 8 ACOS BACK 5 LOGBASEY 1 MUL	Cannot divide by zero	5 log base 1 × 	1	0		sinh⁻¹( √( 9 ) )=>1.8184464592320668234836989635607;8 ==>8;sqr( 8 )=>64	-
+sci	9 8 6 ADD 0 8 8 6 7 PWR FE MPLUS 1	1	986 + 8867 ^ 	0	0	8.867e+3		-
+sci	MR 8 7 TANH 7 5 0 2 3 0 8 9 7 2 1 4 7 7 5 5 0 6 3 8 4 1 FLOOR LOGBASEY ADD 3 LOG 6 0 SUB RAD OPENP	0	floor(7502308972147755063841) + 60 - (	0	1		tanh( 87 )=>1	-
+sci	EXP ACOS COT	Invalid input	cot₀(cos₀⁻¹(0))	1	0			-
+sci	3 MMINUS CLEAR 5 SUB DEG PNT DIV EXP SUB OPENP 3	3	5 - 0 - (	0	1	-3		-
+sci	ACOSH 7 8 EULER POW2 SQR RAD 7 EXP ASIN 7	7		0	0		sqr( 2^( 2.7182818284590452353602874713527 ) )=>43.308060426775923813044390654154	-
+sci	6 DIV 2 EQU SQRT PNT GRAD 7 OPENP	7	7 × (	0	1		6   ÷   2 ==>3;√( 3 )=>1.7320508075688772935274463415059	-
+sci	SQRT PWR MS 7 3 3 1 8 7 POWE	Invalid input	√(0) ^ e^(733187)	1	0	0		-
+sci	DIV 2 3 EXP 0 GRAD 5 6 REC 5 PNT 3	5.3	0 ÷ 	0	0			-
+sci	MS EQU ASIN ADD 3 ADD MR EQU GRAD 3 4 ROOT LOG	1.5314789170422551237539087890528	34 yroot log(34)	0	0	0	0 ==>0;sin₀⁻¹( 0 )   +   3   +   0 ==>3	-
+sci	8 CEIL RAD 8 3 PWR 4 2 0 MUL MS 4	4	83 ^ 420 × 	0	0	1.0299088687343713470627271464681e+806	ceil( 8 )=>8	-
+sci	EXP GRAD PNT 8 4 ASIN 4 DIV ABS EULER 1 7 0 6	1,706	4 ÷ 	0	0		sin₉⁻¹( 0.84 )=>63.489021801234323626013286035555	-
+sci	EXP SUB 4 8 4 3 RAD CLOSEP 8 4 2 4 3	84,243	0 - 	0	0			-
+sci	3 4 3 FAC BACK DEGREES EXP OPENP SIN 7 PNT MOD	7	7 Mod 	0	0			-
+sci	SEC 7 3 3 OPENP 2 MUL 3 MUL 5 4 FE	5.4e+1	733 × (2 × 3 × 	0	1		sec₀( 0 )=>1	-
+sci	8 8 1 FE SIGN 7 EXP 7	7.e+7	negate(8.81e+2)	0	0		negate( 8.81e+2 )=>-8.81e+2	-
+sci	SUB 1 5 9 REC 2 MPLUS SEC RAD 0 5 DIV CSC	-1.0428352127714058197831198559078	0 - 5 ÷ cscᵣ(5)	0	0	2		-
+sci	0 2 2 2 MPLUS MOD OPENP 9 CLOSEP 6 0	60	222 Mod (9) × 	0	0	222		-
+sci	2 PI DIV GRAD MMINUS CSC 4 2	42	3.1415926535897932384626433832795 ÷ 	0	0	-3.1415926535897932384626433832795		-
+sci	6 OPENP ACOS	Invalid input	6 × (cos₀⁻¹(6)	1	1			-
+sci	FE 4 8 1 DIV 8 EXP	8.e+0	4.81e+2 ÷ 	0	0			-
+sci	5 ACSC OPENP PNT 0 GRAD	0	csc₀⁻¹(5) × (	0	1			-
+sci	4 1 4 OPENP EXP 3 ABS EQU 4 EQU 0	0		0	0		414   ×   ( abs( 3 ) ) ==>1,242;4   ×   3 ==>12	-
+sci	OPENP MS POWE SINH EQU 8 DIV REC 8 MOD	1	8 ÷ 8 Mod 	0	0	0	( sinh( e^( 0 ) ) ) ==>1.1752011936438014568823818505956	-
+sci	RAD OPENP 1 1 PWR SIGN	-11	(11 ^ negate(11)	0	1			-
+sci	7 MOD 5 4 OPENP ATAN 1 FAC 0 FE SIGN 6 OPENP	6.e+0	7 Mod 54 × (6.e+0 × (	0	2			-
+sci	5 9 CENTR EQU EXP 2 6 OPENP 6 ADD	6	26 × (6 + 	0	1		0 ==>0	-
+sci	MMINUS EQU FLOOR 2 1 MPLUS CLOSEP POW2 5 MR OPENP 7	7	(	0	1	21	0 ==>0;floor( 0 )=>0;2^( 21 )=>2,097,152	-
+sci	3 2 MPLUS 2 7 8 PNT 2 MOD EXP	278.2	278.2 Mod 	0	0	32		-
+sci	2 EXP DEG CLOSEP 2 POW10 PNT 3 1 BACK MMINUS	0.3	10^(2)	0	0	-0.3	10^( 2 )=>100	-
+sci	OPENP 0 4 LOG 9 POWE ATAN 3 1 0 2 EXP DMS	3,102	(dms(3102)	0	1			-
+sci	POW2 CENTR LOG	Invalid input	log(0)	1	0		2^( 0 )=>1	-
+sci	6 7 CENTR 3 9 1 MMINUS 5 4 9 OPENP DIV 7 2	72	549 × (549 ÷ 	0	1	-391		-
+sci	OPENP 9 9 0 9 9 9 7 0 6 4 9 6 3 7 8 4 3 7 3 9 6 6 3 0 2 4 7 4 8 6 8 6 4 2 9 7 CLOSEP 4 6 DIV	4.5585986498833408120244991384396e+33	(99099970649637843739663024748686) × 46 ÷ 	0	0			-
+sci	EQU 5 4 MUL ASEC DIV ADD PI GRAD ADD 2 6 ABS	26	54 × sec₀⁻¹(54) + 3.1415926535897932384626433832795 + abs(26)	0	0		0 ==>0	-
+sci	EQU DIV 4 EULER PI RAD EQU 9 SIN 1	1		0	0		0 ==>0;0   ÷   3.1415926535897932384626433832795 ==>0;sinᵣ( 9 )=>0.41211848524175656975627256635244	-
+sci	LOGBASEY 6 9 1 9 4 0 MUL	Invalid input	0 log base 691940 × 	1	0			-
+sci	ADD SIGN RAD	0	0 + negate(0)	0	0			-
+sci	ASIN PWR GRAD 2 6 2 SQRT MR 1 CEIL PWR 0	0	sin₀⁻¹(0) ^ ceil(1) ^ 	0	0			-
+sci	ADD 2 EQU 0 8 0 COT FE 7 7	77		0	0		0   +   2 ==>2;cot₀( 80 )=>1.7632698070846497347109038686862e-1	-
+sci	5 SINH FE	7.4203210577788758977009471996065e+1	sinh(5)	0	0			-
+sci	0 SIN 9 PI 5 PNT CUB 4 9 OPENP CLEAR ASIN 7 6	76	sin₀⁻¹(0)	0	0		sin₀( 0 )=>0;cube( 5 )=>125;sin₀⁻¹( 0 )=>0	-
+sci	2 0 7 0 7 4 1 6 1 1 1 2 9 2 5 8 9 3 7 3 1 9 2 6 9 1 3 5 9 0 4 3 SEC 7 COTH OPENP	1.0000016630588210883070615776103	coth(7) × (	0	1		sec₀( 20707416111292589373192691359043 )=>4.4454114825858010392085734348867	-
+sci	ATAN 2 9 0 EXP 0 8 0 1 6 7 3 DIV	2.9e+8018	2.9e+8018 ÷ 	0	0		tan₀⁻¹( 0 )=>0	-
+sci	8 ADD 1 4 CLOSEP EXP 8 6 1 PI	3.1415926535897932384626433832795	8 + 	0	0			-
+sci	EQU 6 9 5 4 9 MOD SIGN DIV ADD MMINUS TAN	0	69549 Mod negate(69549) + tan₀(0)	0	0	0	0 ==>0	-
+sci	LOG 7 CUBEROOT MUL 0 8 LOGBASEY MPLUS COT 8 8 8 3 ADD	0.43751371254289228817643500569325	cuberoot(7) × 8 log base 8883 + 	0	0	8		-
+sci	CLOSEP CLOSEP OPENP 3 FAC REC 4 4	44	(	0	1			-
+sci	EQU 3 2	32	0=	0	0		0 ==>0	-
+sci	3 6 0 5 9 5 1 3 9 3 8 2 1 8 6 6 9 8 8 0 3 4 2 5 6 7 6 7 7 3 8 PNT 1	3,605,951,393,821,866,988,034,256,767,738.1		0	0			-
+sci	CLEAR EXP 1 4 6 FE 3 2 CLOSEP 7 1 MPLUS 1 8	18		0	0	7.1e+1		-
+sci	SQRT EXP DIV OPENP 7 9 5 8 2 OPENP SINH 0 MMINUS 5	5		0	0	0		-
+sci	MR DIV 9 4 FE 7 ASECH	Invalid input	0 ÷ sech⁻¹(7.e+0)	1	0			-
+sci	6 SIGN GRAD EXP 1 MPLUS 9 4 CLOSEP EQU 1 9	19	94=	0	0	1	94 ==>94	-
+sci	SEC GRAD EQU FE 0 0 2 2 SUB CUBEROOT EXP CLOSEP 8	8	2.2e+1 - 	0	0		sec₀( 0 ) ==>1	-
+sci	1 SUB GRAD 6 SQRT PWR EXP 5 6 5 MMINUS	565	1 - √(6) ^ 	0	0	-565		-
+sci	OPENP MOD MUL 1 8 9 1 ROOT RAD 0 ADD	Cannot divide by zero	(0 × 1891 yroot 0 + 	1	1			-
+sci	4 6 OPENP FE 8 5 7 5 4 1 0 4 9 1 0 1 3 6 5 7 2 8 8 5 1 1 8 2 2 5 ADD 8 5 PNT MPLUS	8.5e+1	46 × (8.5754104910136572885118225e+25 + 	0	1	8.5e+1		-
+sci	9 EQU MPLUS LOGBASEY EQU EXP EXP RAD	1		0	0	9	9 ==>9;9   log base   9 ==>1	-
+sci	4 PWR MMINUS GRAD EQU 4 EQU 0 SUB MOD DEGREES MUL OPENP	0	0 Mod degrees(0) × (	0	1	-4	4   ^   4 ==>256;4   ^   4 ==>256	-
+sci	CUBEROOT SUB GRAD PWR DMS CSCH	Cannot divide by zero	cuberoot(0) ^ csch(dms(0))	1	0			-
+sci	RAD 4 SINH PNT 6 9 6 ADD 0 ACSC	Cannot divide by zero	0.696 + cscᵣ⁻¹(0)	1	0		sinh( 4 )=>27.289917197127752448908271590794	-
+sci	0 SUB 2 OPENP PNT CLOSEP 5 PNT PNT GRAD 2 GRAD 4 ACOT	15.595826075473865092102577954626	0 - 2 × (0) × cot₉⁻¹(4)	0	0			-
+sci	MS 9 DIV 2 4 RAD EXP SIGN PWR ADD	-24	9 ÷ negate(24) + 	0	0	0		-
+sci	7 1 REC 7 2 GRAD 8 9 6 6 ASIN	Invalid input	sin₉⁻¹(8966)	1	0		1/( 71 )=>0.01408450704225352112676056338028	-
+sci	ROOT FE SQR 2 SIGN BACK GRAD 4 OPENP 5 3 ADD SIGN	-5.3e+1	0 yroot 4.e+0 × (5.3e+1 + negate(5.3e+1)	0	1			-
+sci	RAD DIV OPENP CUB FLOOR 7 7 GRAD 9 ADD COS LN SUB	8.9899735605443688509961670881919	0 ÷ (9 + ln(cos₉(9)) - 	0	1			-
+sci	OPENP SIGN EXP SQR PNT 0 1 3 CEIL CUBEROOT TAN RAD 1	1	(	0	1			-
+sci	9 8 CLOSEP SIGN EQU 2 4 EXP 8 OPENP OPENP 6 OPENP GRAD	6	2400000000 × ((6 × (	0	3		negate( 98 ) ==>-98	-
+sci	FE OPENP 7 1 0 9 4 FE PI 6 8 EXP	68.e+0	(	0	1			-
+sci	PWR 6 LOGBASEY 9 EULER CLOSEP 0 RAD SEC MUL	Invalid input	0 ^ 6 log base secᵣ(0) × 	1	0			-
+sci	9 EXP MUL ADD EXP 7 MUL 6 OPENP ATANH	Invalid input	9 + 7 × 6 × (tanh⁻¹(42)	1	1			-
+sci	2 PI OPENP EXP COTH SQR 2 6 ROOT GRAD	26	(26 yroot 	0	1			-
+sci	8 RAD 6 PWR 2 0 DIV LOG 8 OPENP ASECH 6 7	67		0	0			-
+sci	MUL RAD SQR MS PWR 9 ADD OPENP 2 9	29	0 × sqr(0) ^ 9 + (	0	1	0		-
+sci	5 8 OPENP ATAN 1 6 9 CUBEROOT MPLUS 1 9 GRAD DIV	19	58 × (19 ÷ 	0	1	5.5287748136788721414723447730853		-
+sci	SUB 4 SUB 1 6 1 7 4 RAD FE 1 EQU EQU	-6.e+0	-5.e+0 - 1.e+0=	0	0		0   -   4   -   1.e+0 ==>-5.e+0;-5.e+0   -   1.e+0 ==>-6.e+0	-
+sci	FE 7 4 9 OPENP 9 6 6 CLOSEP 5 7 PNT 9	57.9	7.49e+2 × (9.66e+2) × 	0	0			-
+sci	3 7 PNT LOGBASEY COSH OPENP CLOSEP 4 7 SUB ASIN	Invalid input	37 log base cosh(37) × (0.09945554715529634582888719252294) × 47 - sin₀⁻¹(4.6744107162989282539576980485784)	1	0			-
+sci	COS ADD 7 4 4 OPENP 2 EQU 0 SQRT GRAD	0		0	0		cos₀( 0 )   +   744   ×   ( 2 ) ==>1,489	-
+sci	1 COS TAN 8 SQRT FE DEGREES GRAD	3.3900753465171947155649373567205e+0	degrees(√(8))	0	0		tan₀( cos₀( 1 ) )=>0.01745240589744836148881146834305	-
+sci	8 9 EQU ADD 8 0 MPLUS EXP OPENP 9 DEGREES MUL 5	5	89 + 80 × (degrees(9) × 	0	1	80	89 ==>89	-
+sci	5 DMS OPENP 5 EXP 5 3 5 MMINUS 4 2 CUB ROOT EQU	5.0007567930991670026139152188725	dms(5) × (cube(42) yroot 74088)=	0	0	-5.e+535	dms( 5 )   ×   ( cube( 42 )   yroot   74088 ) ==>5.0007567930991670026139152188725	-
+sci	CLOSEP PNT 7 OPENP SQRT ADD EQU PWR ROOT CLOSEP SIGN LOG	Invalid input	1.1713240371477057671694408360993 yroot log(negate(1.1713240371477057671694408360993))	1	0		0.7   ×   ( √( 0.7 )   +   0.83666002653407554797817202578519 ) ==>1.1713240371477057671694408360993	-
+sci	3 5 CEIL 4 DIV 3 9 1 RAD GRAD	391	4 ÷ 	0	0		ceil( 35 )=>35	-
+sci	0 PNT ACOS 2 3 FE 5 1 5 4 ASIN	Invalid input	sin₀⁻¹(5.154e+3)	1	0		cos₀⁻¹( 0 )=>90	-
+sci	DEGREES CLOSEP PI BACK 3 FE GRAD	3.e+0		0	0			-
+sci	2 RAD 5 CENTR OPENP ATANH ADD COS 2 EQU EQU CENTR	0	2=	0	0		( tanh⁻¹( 0 )   +   2 ) ==>2;2 ==>2	-
+sci	5 FE RAD DIV 0 TAN 0 ROOT	0.e+0	5.e+0 ÷ 0.e+0 yroot 	0	0			-
+sci	9 0 GRAD RAD ATANH EQU 4 CLOSEP 4	4		0	0			-
+prog	0	0		0	0		-	0|0|0|0
+prog	1	1		0	0		-	1|1|1|1
+prog	2	2		0	0		-	2|2|2|10
+prog	7	7		0	0		-	7|7|7|111
+prog	9	9		0	0		-	9|9|11|1001
+prog	A	0		0	0		-	0|0|0|0
+prog	F	0		0	0		-	0|0|0|0
+prog	ADD	0	0 + 	0	0		-	0|0|0|0
+prog	SUB	0	0 - 	0	0		-	0|0|0|0
+prog	MUL	0	0 × 	0	0		-	0|0|0|0
+prog	DIV	0	0 ÷ 	0	0		-	0|0|0|0
+prog	MOD	0	0 % 	0	0		-	0|0|0|0
+prog	EQU	0	0=	0	0		-	0|0|0|0
+prog	SIGN	0		0	0		-	0|0|0|0
+prog	AND	0	0 AND 	0	0		-	0|0|0|0
+prog	OR	0	0 OR 	0	0		-	0|0|0|0
+prog	XOR	0	0 XOR 	0	0		-	0|0|0|0
+prog	NAND	0	0 NAND 	0	0		-	0|0|0|0
+prog	NOR	0	0 NOR 	0	0		-	0|0|0|0
+prog	LSHF	0	0 Lsh 	0	0		-	0|0|0|0
+prog	RSHF	0	0 Rsh 	0	0		-	0|0|0|0
+prog	RSHFL	0	0 Rsh 	0	0		-	0|0|0|0
+prog	ROL	0	RoL(0)	0	0		-	0|0|0|0
+prog	ROR	0	RoR(0)	0	0		-	0|0|0|0
+prog	ROLC	0	RoL(0)	0	0		-	0|0|0|0
+prog	RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	NOT	-1	NOT(0)	0	0		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	OPENP	0	(	0	1		-	0|0|0|0
+prog	CLOSEP	0		0	0		-	0|0|0|0
+prog	CLEAR	0		0	0		-	0|0|0|0
+prog	CENTR	0		0	0		-	0|0|0|0
+prog	BACK	0		0	0		-	0|0|0|0
+prog	MS	0		0	0	0	-	0|0|0|0
+prog	MR	0		0	0		-	0|0|0|0
+prog	MPLUS	0		0	0	0	-	0|0|0|0
+prog	MMINUS	0		0	0	0	-	0|0|0|0
+prog	HEX	0		0	0		-	0|0|0|0
+prog	DEC	0		0	0		-	0|0|0|0
+prog	OCT	0		0	0		-	0|0|0|0
+prog	BIN	0		0	0		-	0|0|0|0
+prog	QWORD	0		0	0		-	0|0|0|0
+prog	DWORD	0		0	0		-	0|0|0|0
+prog	WORD	0		0	0		-	0|0|0|0
+prog	BYTE	0		0	0		-	0|0|0|0
+prog	BINPOS0	1		0	0		-	1|1|1|1
+prog	BINPOS7	128		0	0		-	80|128|200|10000000
+prog	BINPOS63	-9,223,372,036,854,775,808		0	0		-	8000000000000000|-9223372036854775808|1000000000000000000000|1000000000000000000000000000000000000000000000000000000000000000
+prog	MUL F	0	0 × 	0	0		-	0|0|0|0
+prog	BINPOS63 DWORD	0		0	0		-	0|0|0|0
+prog	F RSHF	0	0 Rsh 	0	0		-	0|0|0|0
+prog	A CENTR	0		0	0		-	0|0|0|0
+prog	DEC OPENP	0	(	0	1		-	0|0|0|0
+prog	RSHF BACK	0	0 Rsh 	0	0		-	0|0|0|0
+prog	CLEAR MPLUS	0		0	0	0	-	0|0|0|0
+prog	CENTR 0	0		0	0		-	0|0|0|0
+prog	ROR ROL	0	RoL(RoR(0))	0	0		-	0|0|0|0
+prog	BINPOS7 ROLC	256	RoL(128)	0	0		-	100|256|400|100000000
+prog	2 CLOSEP	2		0	0		-	2|2|2|10
+prog	XOR CLOSEP	0	0 XOR 	0	0		-	0|0|0|0
+prog	BIN A	0		0	0		-	0|0|0|0
+prog	SUB DWORD	0	0 - 	0	0		-	0|0|0|0
+prog	RSHFL NOR	0	0 NOR 	0	0		-	0|0|0|0
+prog	MMINUS BACK	0		0	0	0	-	0|0|0|0
+prog	EQU CENTR	0	0=	0	0		-	0|0|0|0
+prog	RSHFL SUB	0	0 - 	0	0		-	0|0|0|0
+prog	CLOSEP NOT	-1	NOT(0)	0	0		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	DEC ROLC	0	RoL(0)	0	0		-	0|0|0|0
+prog	OPENP BYTE	0	(	0	1		-	0|0|0|0
+prog	2 MR	2		0	0		-	2|2|2|10
+prog	OCT RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	NOR NOT	-1	0 NOR NOT(0)	0	0		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	7 QWORD	7		0	0		-	7|7|7|111
+prog	AND WORD	0	0 AND 	0	0		-	0|0|0|0
+prog	ROLC 7	7	RoL(0)	0	0		-	7|7|7|111
+prog	ROLC RSHF	0	RoL(0) Rsh 	0	0		-	0|0|0|0
+prog	SUB XOR	0	0 XOR 	0	0		-	0|0|0|0
+prog	BINPOS7 EQU	128	128=	0	0		-	80|128|200|10000000
+prog	SIGN SIGN	0		0	0		-	0|0|0|0
+prog	XOR WORD	0	0 XOR 	0	0		-	0|0|0|0
+prog	2 SIGN	-2		0	0		-	FFFFFFFFFFFFFFFE|-2|1777777777777777777776|1111111111111111111111111111111111111111111111111111111111111110
+prog	OPENP ROR	0	(RoR(0)	0	1		-	0|0|0|0
+prog	ADD SIGN	0	0 + negate(0)	0	0		-	0|0|0|0
+prog	BINPOS63 RSHF	-9,223,372,036,854,775,808	-9223372036854775808 Rsh 	0	0		-	8000000000000000|-9223372036854775808|1000000000000000000000|1000000000000000000000000000000000000000000000000000000000000000
+prog	BACK A	0		0	0		-	0|0|0|0
+prog	CENTR HEX	0		0	0		-	0|0|0|0
+prog	ROR AND	0	RoR(0) AND 	0	0		-	0|0|0|0
+prog	9 MPLUS	9		0	0	9	-	9|9|11|1001
+prog	ROL BYTE	0	RoL(0)	0	0		-	0|0|0|0
+prog	BINPOS63 DEC	-9,223,372,036,854,775,808		0	0		-	8000000000000000|-9223372036854775808|1000000000000000000000|1000000000000000000000000000000000000000000000000000000000000000
+prog	MMINUS RORC	0	RoR(0)	0	0	0	-	0|0|0|0
+prog	MR 7	7		0	0		-	7|7|7|111
+prog	1 QWORD	1		0	0		-	1|1|1|1
+prog	NAND CENTR	0	0 NAND 	0	0		-	0|0|0|0
+prog	NOT CLEAR	0		0	0		-	0|0|0|0
+prog	BIN BINPOS0	1		0	0		-	1|1|1|1
+prog	BYTE SUB	0	0 - 	0	0		-	0|0|0|0
+prog	CLEAR MMINUS	0		0	0	0	-	0|0|0|0
+prog	BYTE DEC	0		0	0		-	0|0|0|0
+prog	F BACK	0		0	0		-	0|0|0|0
+prog	7 CLEAR	0		0	0		-	0|0|0|0
+prog	BINPOS63 RORC	4,611,686,018,427,387,904	RoR(-9223372036854775808)	0	0		-	4000000000000000|4611686018427387904|400000000000000000000|100000000000000000000000000000000000000000000000000000000000000
+prog	BACK SIGN	0		0	0		-	0|0|0|0
+prog	0 QWORD	0		0	0		-	0|0|0|0
+prog	MOD OR	0	0 OR 	0	0		-	0|0|0|0
+prog	ADD RORC	0	0 + RoR(0)	0	0		-	0|0|0|0
+prog	OR WORD	0	0 OR 	0	0		-	0|0|0|0
+prog	BACK LSHF	0	0 Lsh 	0	0		-	0|0|0|0
+prog	BACK 0	0		0	0		-	0|0|0|0
+prog	OCT BACK	0		0	0		-	0|0|0|0
+prog	DEC 1	1		0	0		-	1|1|1|1
+prog	LSHF EQU	0	0 Lsh 0=	0	0		-	0|0|0|0
+prog	2 NOT	-3	NOT(2)	0	0		-	FFFFFFFFFFFFFFFD|-3|1777777777777777777775|1111111111111111111111111111111111111111111111111111111111111101
+prog	QWORD OR	0	0 OR 	0	0		-	0|0|0|0
+prog	NOR NAND	0	0 NAND 	0	0		-	0|0|0|0
+prog	NOT ROLC	-2	RoL(NOT(0))	0	0		-	FFFFFFFFFFFFFFFE|-2|1777777777777777777776|1111111111111111111111111111111111111111111111111111111111111110
+prog	MPLUS WORD	0		0	0	0	-	0|0|0|0
+prog	0 CLOSEP	0		0	0		-	0|0|0|0
+prog	BINPOS0 2	2		0	0		-	2|2|2|10
+prog	1 RSHFL	1	1 Rsh 	0	0		-	1|1|1|1
+prog	WORD EQU	0	0=	0	0		-	0|0|0|0
+prog	MMINUS 0	0		0	0	0	-	0|0|0|0
+prog	0 ROR	0	RoR(0)	0	0		-	0|0|0|0
+prog	CENTR RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	2 BINPOS7	130		0	0		-	82|130|202|10000010
+prog	ROR CENTR	0	RoR(0)	0	0		-	0|0|0|0
+prog	LSHF OCT	0	0 Lsh 	0	0		-	0|0|0|0
+prog	ROR OPENP	0	RoR(0) × (	0	1		-	0|0|0|0
+prog	QWORD AND	0	0 AND 	0	0		-	0|0|0|0
+prog	OR ROL	0	0 OR RoL(0)	0	0		-	0|0|0|0
+prog	CENTR NOT	-1	NOT(0)	0	0		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	OCT 9	0		0	0		-	0|0|0|0
+prog	RSHFL RSHFL	0	0 Rsh 	0	0		-	0|0|0|0
+prog	ROR RSHF	0	RoR(0) Rsh 	0	0		-	0|0|0|0
+prog	MMINUS 7	7		0	0	0	-	7|7|7|111
+prog	RSHF A	0	0 Rsh 	0	0		-	0|0|0|0
+prog	XOR EQU	0	0 XOR 0=	0	0		-	0|0|0|0
+prog	SUB LSHF	0	0 Lsh 	0	0		-	0|0|0|0
+prog	MOD 2	2	0 % 	0	0		-	2|2|2|10
+prog	LSHF MR	0	0 Lsh 	0	0		-	0|0|0|0
+prog	BACK BINPOS0	1		0	0		-	1|1|1|1
+prog	OCT F	0		0	0		-	0|0|0|0
+prog	RORC MMINUS	0	RoR(0)	0	0	0	-	0|0|0|0
+prog	CLEAR DWORD	0		0	0		-	0|0|0|0
+prog	AND HEX	0	0 AND 	0	0		-	0|0|0|0
+prog	OR BINPOS7	128	0 OR 	0	0		-	80|128|200|10000000
+prog	BYTE MR	0		0	0		-	0|0|0|0
+prog	NOT HEX	FFFF FFFF FFFF FFFF	NOT(0)	0	0		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	EQU NOT	-1	NOT(0)	0	0		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	RSHFL 0	0	0 Rsh 	0	0		-	0|0|0|0
+prog	XOR CLEAR	0		0	0		-	0|0|0|0
+prog	2 LSHF	2	2 Lsh 	0	0		-	2|2|2|10
+prog	7 CLOSEP	7		0	0		-	7|7|7|111
+prog	OR F	0	0 OR 	0	0		-	0|0|0|0
+prog	WORD XOR	0	0 XOR 	0	0		-	0|0|0|0
+prog	SIGN RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	9 MOD	9	9 % 	0	0		-	9|9|11|1001
+prog	XOR OPENP	0	0 XOR (	0	1		-	0|0|0|0
+prog	QWORD OPENP	0	(	0	1		-	0|0|0|0
+prog	DEC OR	0	0 OR 	0	0		-	0|0|0|0
+prog	MOD 1	1	0 % 	0	0		-	1|1|1|1
+prog	9 DIV	9	9 ÷ 	0	0		-	9|9|11|1001
+prog	MS DIV	0	0 ÷ 	0	0	0	-	0|0|0|0
+prog	MR CLOSEP	0		0	0		-	0|0|0|0
+prog	MOD RORC	0	0 % RoR(0)	0	0		-	0|0|0|0
+prog	OCT MMINUS	0		0	0	0	-	0|0|0|0
+prog	A MUL	0	0 × 	0	0		-	0|0|0|0
+prog	SUB ROLC	0	0 - RoL(0)	0	0		-	0|0|0|0
+prog	MS ROR	0	RoR(0)	0	0	0	-	0|0|0|0
+prog	RORC MUL	0	RoR(0) × 	0	0		-	0|0|0|0
+prog	9 CLOSEP	9		0	0		-	9|9|11|1001
+prog	RSHFL WORD	0	0 Rsh 	0	0		-	0|0|0|0
+prog	BINPOS7 BINPOS7	0		0	0		-	0|0|0|0
+prog	0 DEC	0		0	0		-	0|0|0|0
+prog	F 7	7		0	0		-	7|7|7|111
+prog	NAND BINPOS7	128	0 NAND 	0	0		-	80|128|200|10000000
+prog	SIGN DIV	0	0 ÷ 	0	0		-	0|0|0|0
+prog	MPLUS EQU	0	0=	0	0	0	-	0|0|0|0
+prog	SUB RSHF	0	0 Rsh 	0	0		-	0|0|0|0
+prog	AND MS	0	0 AND 	0	0	0	-	0|0|0|0
+prog	WORD OR	0	0 OR 	0	0		-	0|0|0|0
+prog	SUB RSHFL	0	0 Rsh 	0	0		-	0|0|0|0
+prog	AND NOR	0	0 NOR 	0	0		-	0|0|0|0
+prog	ADD QWORD	0	0 + 	0	0		-	0|0|0|0
+prog	RSHFL RSHF	0	0 Rsh 	0	0		-	0|0|0|0
+prog	OCT 2	2		0	0		-	2|2|2|10
+prog	WORD QWORD	0		0	0		-	0|0|0|0
+prog	CLOSEP OR	0	0 OR 	0	0		-	0|0|0|0
+prog	SUB WORD	0	0 - 	0	0		-	0|0|0|0
+prog	MR EQU	0	0=	0	0		-	0|0|0|0
+prog	A LSHF	0	0 Lsh 	0	0		-	0|0|0|0
+prog	F EQU	0	0=	0	0		-	0|0|0|0
+prog	CLEAR ADD	0	0 + 	0	0		-	0|0|0|0
+prog	MS BINPOS0	1		0	0	0	-	1|1|1|1
+prog	WORD 0	0		0	0		-	0|0|0|0
+prog	ROR RSHFL	0	RoR(0) Rsh 	0	0		-	0|0|0|0
+prog	WORD OPENP	0	(	0	1		-	0|0|0|0
+prog	WORD MS	0		0	0	0	-	0|0|0|0
+prog	9 OCT	11		0	0		-	9|9|11|1001
+prog	CLOSEP F	0		0	0		-	0|0|0|0
+prog	F NAND	0	0 NAND 	0	0		-	0|0|0|0
+prog	1 RORC	0	RoR(1)	0	0		-	0|0|0|0
+prog	CENTR NOR	0	0 NOR 	0	0		-	0|0|0|0
+prog	SIGN OCT	0		0	0		-	0|0|0|0
+prog	WORD DWORD	0		0	0		-	0|0|0|0
+prog	BINPOS7 RSHFL	128	128 Rsh 	0	0		-	80|128|200|10000000
+prog	RORC A	0	RoR(0)	0	0		-	0|0|0|0
+prog	WORD ADD	0	0 + 	0	0		-	0|0|0|0
+prog	CENTR OCT	0		0	0		-	0|0|0|0
+prog	RSHFL 7	7	0 Rsh 	0	0		-	7|7|7|111
+prog	ROL 1	1	RoL(0)	0	0		-	1|1|1|1
+prog	ADD ROLC	0	0 + RoL(0)	0	0		-	0|0|0|0
+prog	CLEAR EQU	0	0=	0	0		-	0|0|0|0
+prog	SUB A	0	0 - 	0	0		-	0|0|0|0
+prog	BYTE WORD	0		0	0		-	0|0|0|0
+prog	F CLOSEP	0		0	0		-	0|0|0|0
+prog	AND F	0	0 AND 	0	0		-	0|0|0|0
+prog	RORC ROLC	0	RoL(RoR(0))	0	0		-	0|0|0|0
+prog	F F	0		0	0		-	0|0|0|0
+prog	OCT WORD	0		0	0		-	0|0|0|0
+prog	BINPOS63 ROLC	0	RoL(-9223372036854775808)	0	0		-	0|0|0|0
+prog	RSHF SIGN	0	0 Rsh negate(0)	0	0		-	0|0|0|0
+prog	MR BACK	0		0	0		-	0|0|0|0
+prog	CLOSEP MOD	0	0 % 	0	0		-	0|0|0|0
+prog	MS ROLC	0	RoL(0)	0	0	0	-	0|0|0|0
+prog	ROR EQU	0	RoR(0)=	0	0		-	0|0|0|0
+prog	BINPOS7 9	9		0	0		-	9|9|11|1001
+prog	MPLUS CLEAR	0		0	0	0	-	0|0|0|0
+prog	SUB BIN	0	0 - 	0	0		-	0|0|0|0
+prog	NAND WORD	0	0 NAND 	0	0		-	0|0|0|0
+prog	OPENP CENTR	0	(	0	1		-	0|0|0|0
+prog	BIN RSHF	0	0 Rsh 	0	0		-	0|0|0|0
+prog	DIV ROL	0	0 ÷ RoL(0)	0	0		-	0|0|0|0
+prog	CENTR MS	0		0	0	0	-	0|0|0|0
+prog	XOR XOR	0	0 XOR 	0	0		-	0|0|0|0
+prog	LSHF BACK	0	0 Lsh 	0	0		-	0|0|0|0
+prog	DEC RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	QWORD SIGN	0	negate(0)	0	0		-	0|0|0|0
+prog	QWORD BINPOS7	128		0	0		-	80|128|200|10000000
+prog	SIGN ADD	0	0 + 	0	0		-	0|0|0|0
+prog	MMINUS MUL	0	0 × 	0	0	0	-	0|0|0|0
+prog	AND 7	7	0 AND 	0	0		-	7|7|7|111
+prog	QWORD RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	BINPOS0 7	7		0	0		-	7|7|7|111
+prog	MOD 9	9	0 % 	0	0		-	9|9|11|1001
+prog	RSHFL HEX	0	0 Rsh 	0	0		-	0|0|0|0
+prog	RSHF HEX	0	0 Rsh 	0	0		-	0|0|0|0
+prog	WORD BINPOS63	0		0	0		-	0|0|0|0
+prog	A DEC	0		0	0		-	0|0|0|0
+prog	BYTE BIN	0		0	0		-	0|0|0|0
+prog	HEX NOR	0	0 NOR 	0	0		-	0|0|0|0
+prog	2 BACK	0		0	0		-	0|0|0|0
+prog	CLOSEP MUL	0	0 × 	0	0		-	0|0|0|0
+prog	QWORD NOR	0	0 NOR 	0	0		-	0|0|0|0
+prog	DWORD OCT	0		0	0		-	0|0|0|0
+prog	MS MS	0		0	0	0|0	-	0|0|0|0
+prog	OR SUB	0	0 - 	0	0		-	0|0|0|0
+prog	LSHF A	0	0 Lsh 	0	0		-	0|0|0|0
+prog	QWORD DEC	0		0	0		-	0|0|0|0
+prog	DEC NOT	-1	NOT(0)	0	0		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	OPENP HEX	0	(	0	1		-	0|0|0|0
+prog	2 DEC	2		0	0		-	2|2|2|10
+prog	RSHFL ROR	0	0 Rsh RoR(0)	0	0		-	0|0|0|0
+prog	RORC OCT	0	RoR(0)	0	0		-	0|0|0|0
+prog	SIGN BINPOS7	128		0	0		-	80|128|200|10000000
+prog	MS AND	0	0 AND 	0	0	0	-	0|0|0|0
+prog	MMINUS F	0		0	0	0	-	0|0|0|0
+prog	MOD NAND	0	0 NAND 	0	0		-	0|0|0|0
+prog	QWORD ROL	0	RoL(0)	0	0		-	0|0|0|0
+prog	BINPOS0 CLOSEP	1		0	0		-	1|1|1|1
+prog	7 NAND	7	7 NAND 	0	0		-	7|7|7|111
+prog	ROR MR	0	RoR(0)	0	0		-	0|0|0|0
+prog	OPENP MR	0	(	0	1		-	0|0|0|0
+prog	7 2	72		0	0		-	48|72|110|1001000
+prog	2 NAND	2	2 NAND 	0	0		-	2|2|2|10
+prog	MPLUS ROL	0	RoL(0)	0	0	0	-	0|0|0|0
+prog	MOD MUL	0	0 × 	0	0		-	0|0|0|0
+prog	CENTR MOD	0	0 % 	0	0		-	0|0|0|0
+prog	MOD MMINUS	0	0 % 	0	0	0	-	0|0|0|0
+prog	9 RORC	4	RoR(9)	0	0		-	4|4|4|100
+prog	CENTR ROL	0	RoL(0)	0	0		-	0|0|0|0
+prog	DWORD ROLC	0	RoL(0)	0	0		-	0|0|0|0
+prog	BIN CLOSEP	0		0	0		-	0|0|0|0
+prog	CLEAR F	0		0	0		-	0|0|0|0
+prog	XOR RSHF	0	0 Rsh 	0	0		-	0|0|0|0
+prog	MUL 1	1	0 × 	0	0		-	1|1|1|1
+prog	RSHFL F	0	0 Rsh 	0	0		-	0|0|0|0
+prog	NAND RSHFL	0	0 Rsh 	0	0		-	0|0|0|0
+prog	ROLC CLOSEP	0	RoL(0)	0	0		-	0|0|0|0
+prog	RSHFL OPENP	0	0 Rsh (	0	1		-	0|0|0|0
+prog	XOR CENTR	0	0 XOR 	0	0		-	0|0|0|0
+prog	CLEAR NAND	0	0 NAND 	0	0		-	0|0|0|0
+prog	OPENP F	0	(	0	1		-	0|0|0|0
+prog	MS EQU	0	0=	0	0	0	-	0|0|0|0
+prog	BIN BINPOS63	1000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000		0	0		-	8000000000000000|-9223372036854775808|1000000000000000000000|1000000000000000000000000000000000000000000000000000000000000000
+prog	CLOSEP BINPOS63	-9,223,372,036,854,775,808		0	0		-	8000000000000000|-9223372036854775808|1000000000000000000000|1000000000000000000000000000000000000000000000000000000000000000
+prog	BINPOS7 RORC	64	RoR(128)	0	0		-	40|64|100|1000000
+prog	MR BINPOS7	128		0	0		-	80|128|200|10000000
+prog	MUL NAND	0	0 NAND 	0	0		-	0|0|0|0
+prog	OPENP NOT	-1	(NOT(0)	0	1		-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	BYTE ROLC	0	RoL(0)	0	0		-	0|0|0|0
+prog	HEX 3 E C OCT 5 MOD 5 BIN 0 BACK EQU	Result is undefined	101 % 	1	0		-	-
+prog	BYTE 5 0 DIV 1 NOR NOR 5 3 OCT MS 6 HEX MPLUS	6	32 ÷ 1 NOR 	0	0	3B	-	6|6|6|110
+prog	9 HEX B C 8 A BIN 0 WORD OCT MUL 0 SUB	0	0 × 0 - 	0	0		-	0|0|0|0
+prog	SUB 0 NAND MS 0 MOD 4 4 OCT BINPOS36 WORD OPENP 4	4	0 - 0 NAND 0 % (	0	1	0	-	4|4|4|100
+prog	1 4 BIN 0 OPENP WORD 1 MMINUS BINPOS3 EQU EQU 0	0		0	0	1111 1111 1111 1111	-	0|0|0|0
+prog	OPENP OCT 6 6 QWORD MOD RSHFL 2 BINPOS37 DIV	Result not defined	(66 Rsh 2000000000002 ÷ 	1	1		-	-
+prog	WORD RSHF BYTE 3 7 DWORD MPLUS 6 1 HEX	3D	0 Rsh 	0	0	25	-	3D|61|75|111101
+prog	BIN OR CLOSEP LSHF DIV BINPOS61 1 OPENP HEX SIGN WORD D AND 5 3 8 5 4 0 D 2	5385	0 ÷ 1 × (D AND 	0	1		-	5385|21381|51605|101001110000101
+prog	7 9 6 3 OPENP CLOSEP BIN RSHFL ROLC EQU	Result not defined	1111100011011 × (1111100011011) Rsh RoL(11110001111000110011011001)	1	0		-	-
+prog	DWORD RSHF AND 5 LSHF 2 5 4 4 OPENP	Result not defined	0 AND 5 Lsh 2544 × (	1	1		-	-
+prog	AND BIN MPLUS AND OCT BYTE 0 EQU MOD	0	0 % 	0	0	0	-	0|0|0|0
+prog	OCT RSHFL 0 WORD 7 SUB RSHF HEX OCT 5 3 6 NOR	Result not defined	0 Rsh 7 Rsh 536 NOR 	1	0		-	-
+prog	8 OR HEX BIN MR DWORD OPENP 0 HEX MS 1 ADD 3 AND	4	8 OR (1 + 3 AND 	0	1	0	-	4|4|4|100
+prog	4 BIN CLOSEP NAND ROLC MUL HEX 1 E B DWORD BYTE RSHFL 5	5	4 NAND RoL(4) × EB Rsh 	0	0		-	5|5|5|101
+prog	BIN ROLC 0 OPENP XOR 0 EQU WORD MOD QWORD OR DIV DWORD DIV	0	0 ÷ 	0	0		-	0|0|0|0
+prog	2 0 BIN BACK 0 MMINUS EQU OPENP OPENP BINPOS51 OCT HEX B	B	((	0	2	0	-	B|11|13|1011
+prog	DWORD BIN CLOSEP DEC RSHF 0 MUL 0 4 OCT 0 BYTE 6	6	0 Rsh 0 × 	0	0		-	6|6|6|110
+prog	7 MUL HEX 0 SIGN F NOT A OPENP 1 OCT DWORD	1	7 × 12 × (	0	1		-	1|1|1|1
+prog	EQU 9 MPLUS SUB 0 OPENP DWORD HEX 2 3 RSHFL	23	9 - 0 × (23 Rsh 	0	1	9	-	23|35|43|100011
+prog	BINPOS47 RORC 0 BIN WORD AND 1 CENTR SIGN SIGN DWORD DIV SUB HEX	0	0 AND negate(negate(0)) - 	0	0		-	0|0|0|0
+prog	4 CENTR DWORD 0 2 SUB MUL 9 2 RORC CLOSEP BIN LSHF EQU	Result not defined	10 × RoR(1011100) Lsh 	1	0		-	-
+prog	7 8 BYTE 2 HEX MUL 2 EQU 6 LSHF F OCT AND	Result not defined	6 Lsh 17 AND 	1	0		-	-
+prog	5 BYTE 1 OCT MUL DWORD 5 4 7 HEX 0 F	F	1 × 	0	0		-	F|15|17|1111
+prog	0 CLOSEP CLOSEP HEX BINPOS32 A OR SUB ROR RSHF 3 E 2 OPENP	Result not defined	A - RoR(A) Rsh 3E2 × (	1	1		-	-
+prog	OCT ROL HEX C 8 A BIN 0 MMINUS MOD CENTR MUL	Result is undefined	0 % 0 × 	1	0	0	-	-
+prog	AND CENTR CLOSEP 1 4 OPENP OCT RORC BYTE NOT BIN OCT NOR 5	5	0 AND 16 × (NOT(RoR(16)) NOR 	0	1		-	5|5|5|101
+prog	OPENP 5 2 DIV BIN BYTE EQU BIN LSHF OPENP RSHFL MMINUS OPENP EQU	1	1 Lsh (0 Rsh (0))=	0	0	0	-	1|1|1|1
+prog	EQU 7 BIN BYTE DWORD AND OPENP BINPOS23 BINPOS14	1000 0000 0100 0000 0000 0000	111 AND (	0	1		-	804000|8404992|40040000|100000000100000000000000
+prog	7 WORD BIN MPLUS SUB NAND SIGN DWORD 1 SUB	1	111 NAND 1 - 	0	0	111	-	1|1|1|1
+prog	OCT DIV BACK 1 4 OPENP 5 NAND EQU 1 BINPOS19 DWORD BYTE 2	2		0	0		-	2|2|2|10
+prog	HEX F BINPOS60 CLEAR ADD BINPOS63 4 D WORD BYTE HEX 3 0	30	0 + 	0	0		-	30|48|60|110000
+prog	0 DWORD SUB NOR 0 AND HEX OPENP RSHF D A LSHF	Result not defined	0 NOR 0 AND (0 Rsh DA Lsh 	1	1		-	-
+prog	EQU 4 5 OPENP CLOSEP SIGN 1 BYTE NOR 2 WORD NOT RSHFL	-3	45 × 1 NOR NOT(2) Rsh 	0	0		-	FFFD|-3|177775|1111111111111101
+prog	EQU 3 BINPOS41 BIN OPENP MMINUS SIGN SIGN 0 NAND MOD 0 EQU	Result is undefined	(0 % 0)	1	0	1111 1111 1111 1111 1111 1101 1111 1111 1111 1111 1111 1111 1111 1111 1111 1101	-	-
+prog	OPENP 5 MPLUS OCT 4 MOD 1 LSHF SUB OPENP BYTE	0	(4 % 1 - (	0	2	5	-	0|0|0|0
+prog	DWORD 6 SUB 5 6 MOD 5 OCT MS BYTE MUL 5 1	51	6 - 70 % 5 × 	0	0	5	-	29|41|51|101001
+prog	DEC DIV 4 AND BIN RSHFL HEX MPLUS 6 1 MPLUS OPENP 4 D	4D		0	0	61	-	4D|77|115|1001101
+prog	EQU BIN MOD WORD MS EQU	Result is undefined	0 % 	1	0	0	-	-
+prog	HEX MC A 7 BINPOS44 WORD MOD 5 OCT LSHF OPENP	0	247 % 5 Lsh (	0	1		-	0|0|0|0
+prog	4 5 NOT DIV ADD OCT MOD 3 DWORD 0 RSHFL	Result is undefined	NOT(55) % 0 Rsh 	1	0		-	-
+prog	5 2 4 WORD BIN EQU DWORD SUB OCT 1 RORC ADD 4	4	1014 - RoR(1) + 	0	0		-	4|4|4|100
+prog	2 XOR BIN ROR RSHFL CENTR 0 RSHF DIV RORC HEX SUB	Cannot divide by zero	2 XOR RoR(2) Rsh 0 ÷ RoR(1) - 	1	0		-	-
+prog	1 SIGN 4 ADD WORD LSHF BYTE RSHF BYTE 0 NOT MMINUS CLOSEP MUL	Result not defined	-14 Rsh NOT(0) × 	1	0	1	-	-
+prog	5 MS 1 2 RORC OPENP 6 6 4 RSHFL DIV 0 MUL	Cannot divide by zero	RoR(12) × (664 ÷ 0 × 	1	1	5	-	-
+prog	7 HEX 5 BIN NAND OCT MMINUS DIV 6	6	5 ÷ 	0	0	1 777 777 777 777 777 777 773	-	6|6|6|110
+prog	DEC 0 OCT 4 1 CLEAR AND 3 EQU OPENP BIN EQU DWORD RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	1 3 OCT 2 WORD DIV 2 3 MS ADD DIV 0 ADD	Result is undefined	2 ÷ 23 ÷ 0 + 	1	0	23	-	-
+prog	LSHF MUL 2 LSHF RSHFL 9 3 0 BINPOS21 WORD BIN ADD	Result not defined	0 × 10 Rsh 1110100010 + 	1	0		-	-
+prog	OPENP WORD DIV CLOSEP HEX D 9 6 0 MPLUS 2 B	2B		0	0	D960	-	2B|43|53|101011
+prog	XOR BIN MMINUS MOD BYTE DIV DWORD EQU	Result is undefined	0 ÷ 	1	0	0	-	-
+prog	HEX D 2 B C A DWORD C 5 E RSHFL BINPOS20 DIV	Result not defined	C5E Rsh 100C5E ÷ 	1	0		-	-
+prog	NAND MPLUS BIN BYTE CLOSEP NOT MOD OPENP LSHF 0 SUB ADD	0	0 NAND NOT(0) % (0 Lsh 0 + 	0	1	0	-	0|0|0|0
+prog	ADD OCT BYTE OPENP CLEAR WORD 5 WORD ADD LSHF NOR	5	5 NOR 	0	0		-	5|5|5|101
+prog	OPENP DEC MOD CLEAR BYTE RSHF 3 8 MOD	Result not defined	0 Rsh 38 % 	1	0		-	-
+prog	MS ROR HEX B OPENP WORD F A 1 B	FA1B	B × (	0	1	0	-	FA1B|-1509|175033|1111101000011011
+prog	6 1 OCT 3 RSHFL 1 DWORD 2 NOR HEX A DEC MS 4	4	3 Rsh 2 NOR 	0	0	10	-	4|4|4|100
+prog	2 OPENP 9 HEX SUB RSHF OCT MS EQU SIGN 1 SIGN SUB CENTR	0	negate(1) - 	0	0	11	-	0|0|0|0
+prog	BIN DWORD BYTE RSHF MPLUS BYTE 0 ROLC QWORD NOT 1 BIN MC MMINUS	1	0 Rsh 	0	0	1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111	-	1|1|1|1
+prog	OCT CENTR 0 0 MS DWORD OR EQU CLOSEP OPENP	0	(	0	1	0	-	0|0|0|0
+prog	3 4 OPENP CLOSEP 3 BYTE BIN NAND EQU OCT	231		0	0		-	99|-103|231|10011001
+prog	MS OPENP CLOSEP HEX 8 2 E D B EQU A BYTE 3	3		0	0	0	-	3|3|3|11
+prog	OCT SIGN 5 BINPOS33 3 BIN ROR BINPOS29 WORD MS EQU 1 OR	1	1 OR 	0	0	1	-	1|1|1|1
+prog	OR OCT 2 RSHF DIV 0 BIN NAND	Cannot divide by zero	0 OR 10 ÷ 0 NAND 	1	0		-	-
+prog	8 BINPOS53 BIN 0 MMINUS WORD 0 RSHFL HEX D 1 DEC 2	2	0 Rsh 	0	0	0	-	2|2|2|10
+prog	MUL ADD BIN WORD OCT 7 5 NOR 3	3	0 + 75 NOR 	0	0		-	3|3|3|11
+prog	MOD BYTE WORD OPENP 0 SIGN	0	0 % (	0	1		-	0|0|0|0
+prog	OPENP DIV 0 BYTE DEC EQU 9 3 MC DWORD 2 XOR NAND EQU	-3	2 NAND 2=	0	0		-	FFFFFFFD|-3|37777777775|11111111111111111111111111111101
+prog	BIN DIV BINPOS26 EQU BYTE 1 OCT SIGN 5 WORD OR MMINUS	5	5 OR 	0	0	177 773	-	5|5|5|101
+prog	8 6 6 5 CENTR SUB DIV 6 MR BYTE 0 MS MOD	Result is undefined	0 ÷ 0 % 	1	0	0	-	-
+prog	4 MUL DWORD 3 SUB 3 EQU OR 3 4 EQU DIV OPENP EQU	Cannot divide by zero	43 ÷ (0)	1	0		-	-
+prog	MS DWORD RSHF 2 HEX C NOT C OR BYTE 3 5	35	0 Rsh C OR 	0	0	0	-	35|53|65|110101
+prog	AND HEX 1 F DIV 7 E 6 6 OPENP EQU DWORD 1 RSHFL	1	1 Rsh 	0	0		-	1|1|1|1
+prog	OPENP EQU 7 MUL 6 MUL WORD DIV 5 RSHF BIN	1000	111 × 110 ÷ 101 Rsh 	0	0		-	8|8|10|1000
+prog	BINPOS62 6 DIV WORD 2 ROL 3 6 OPENP ADD DIV EQU	Result is undefined	6 ÷ 36 × (0 ÷ 0)	1	0		-	-
+prog	3 MMINUS 4 RORC OPENP HEX 6 BACK C 0 EQU 9 2	92		0	0	FFFF FFFF FFFF FFFD	-	92|146|222|10010010
+prog	3 CLOSEP CLOSEP BACK OCT OR 4 BACK OPENP EQU 1 CLOSEP HEX	1		0	0		-	1|1|1|1
+prog	MS RSHF 6 OPENP 5 BINPOS20 ROR RSHF 3 WORD RORC XOR 4 CLOSEP	5	0 Rsh 6 × (RoR(1048581) Rsh RoR(3) XOR 4)	0	0	0	-	5|5|5|101
+prog	3 SUB EQU OPENP BACK 0 DWORD 6 BIN LSHF OR RSHFL MPLUS 1	1	(110 Rsh 	0	1	110	-	1|1|1|1
+prog	WORD BIN 0 MUL 1 DIV NOT MS EQU OPENP	0	(	0	1	1111 1111 1111 1111	-	0|0|0|0
+prog	0 OCT DIV ROLC RORC DIV 5 3 XOR HEX 1 B BINPOS53 BYTE	1B	2B XOR 	0	0		-	1B|27|33|11011
+prog	BYTE 5 2 3 DEC 9 0 2 5 BIN OPENP CLOSEP EQU XOR	1010 0100	10100100 XOR 	0	0		-	A4|-92|244|10100100
+prog	SUB OCT ROL BIN ROL 1 ADD OPENP BINPOS36 HEX	10 0000 0000	0 - 1 + (	0	1		-	1000000000|68719476736|1000000000000|1000000000000000000000000000000000000
+prog	1 LSHF 0 OR BINPOS15 RSHF OCT 0 DWORD BACK MUL 4 BYTE MUL	4	1 Lsh 0 OR 100001 Rsh 0 × 4 × 	0	0		-	4|4|4|100
+prog	MOD 2 4 9 BYTE LSHF BIN 1 MMINUS 1 WORD 1 ROL	10	0 % 11111001 Lsh RoL(1)	0	0	1111 1111	-	2|2|2|10
+prog	6 5 BINPOS8 BIN OPENP NAND 1 MMINUS NOR HEX A ADD 2	2	(141 NAND 1 NOR A + 	0	1	FFFF FFFF FFFF FFFF	-	2|2|2|10
+prog	DIV MUL QWORD WORD 0 DEC 0 7 BYTE LSHF LSHF DWORD EQU	0	0 × 7 Lsh 0=	0	0		-	0|0|0|0
+prog	BYTE OPENP OPENP 7 HEX MC NOR MUL C	C	((7 × 	0	2		-	C|12|14|1100
+prog	BYTE 5 1 1 ADD DWORD HEX B BYTE	B	33 + 	0	0		-	B|11|13|1011
+prog	BIN BINPOS34 SUB MUL XOR ADD AND 1 OPENP OCT DWORD 3	3	200000000000 AND 1 × (	0	1		-	3|3|3|11
+prog	OPENP 5 BYTE MUL EQU 8 OCT BYTE 7 AND	7	7 AND 	0	0		-	7|7|7|111
+prog	7 2 3 7 WORD 6 HEX 8 ROLC ADD OCT 0 5	5	RoL(10) + 	0	0		-	5|5|5|101
+prog	9 1 OPENP 5 6 BIN DIV 0 ADD	Cannot divide by zero	1011011 × (111000 ÷ 0 + 	1	1		-	-
+prog	CENTR 8 BIN ROR 0 BACK CLOSEP BINPOS41 OCT SIGN ROLC ROR SUB BYTE	0	RoR(RoL(negate(40000000000000))) - 	0	0		-	0|0|0|0
+prog	5 4 6 BIN SUB DWORD DIV OPENP EQU DEC	0		0	0		-	0|0|0|0
+prog	NOT MOD BINPOS18 OR DWORD MMINUS DIV 2 MOD 0 DIV	Result is undefined	NOT(0) % -262145 ÷ 2 % 0 ÷ 	1	0	1	-	-
+prog	5 2 0 7 OPENP BYTE MS CLEAR 1 SUB ROLC	2	1 - RoL(1)	0	0	87	-	2|2|2|10
+prog	7 AND DWORD 9 OPENP SUB CLOSEP 2 6 WORD 5	5	7 AND 9 × (9 - 9) × 	0	0		-	5|5|5|101
+prog	ROL 4 MOD 7 OPENP MPLUS 0 NOT 3 CLOSEP LSHF DWORD 0	0	4 % 7 × (3) Lsh 	0	0	4	-	0|0|0|0
+prog	DWORD WORD 5 OCT	5		0	0		-	5|5|5|101
+prog	AND MS EQU 9 DWORD DEC ADD 3 WORD XOR 3	3	9 + 3 XOR 	0	0	0	-	3|3|3|11
+prog	4 BINPOS63 6 BIN XOR LSHF BINPOS7 DEC MPLUS BINPOS48 ADD	Result not defined	6 Lsh 281474976710790 + 	1	0	134	-	-
+prog	5 WORD BYTE MS BACK 9 MR DIV	5	5 ÷ 	0	0	5	-	5|5|5|101
+prog	MR OPENP BIN MPLUS OPENP RSHF BACK OPENP OCT	0	((0 Rsh (	0	3	0	-	0|0|0|0
+prog	WORD BIN DIV WORD ADD DWORD	0	0 + 	0	0		-	0|0|0|0
+prog	MOD SUB DWORD SIGN 0 BYTE RSHF 0 2 RSHFL MMINUS 6	6	0 - 0 Rsh 2 Rsh 	0	0	0	-	6|6|6|110
+prog	ADD OPENP BIN HEX D 9 DIV MUL A CLOSEP EQU	87A	0 + (D9 × A)=	0	0		-	87A|2170|4172|100001111010
+prog	LSHF 3 OPENP EQU 9 7 1 4 AND QWORD ADD WORD AND HEX	25F2	25F2 AND 	0	0		-	25F2|9714|22762|10010111110010
+prog	6 1 1 7 SIGN 3 BACK BYTE NOT BIN HEX	E4	NOT(1B)	0	0		-	E4|-28|344|11100100
+prog	0 BIN BACK 0 MUL OCT OPENP EQU DIV 0	0	0 ÷ 	0	0		-	0|0|0|0
+prog	DWORD 3 HEX 6 A OCT ADD NOT ADD	37 777 777 777	152 + NOT(152) + 	0	0		-	FFFFFFFF|-1|37777777777|11111111111111111111111111111111
+prog	OPENP 7 BYTE ROL 0 LSHF 1 MC DWORD MOD	0	(0 Lsh 1 % 	0	1		-	0|0|0|0
+prog	AND WORD BIN 1 0 SUB BYTE 0 MUL 1	1	0 AND 10 - 0 × 	0	0		-	1|1|1|1
+prog	1 WORD HEX 9 OPENP 7 5 LSHF NOT 2	2	9 × (75 Lsh 	0	1		-	2|2|2|10
+prog	BINPOS24 5 4 8 MMINUS 7 5 4 ADD AND 4 DWORD 1 OCT	1	1362 AND 	0	0	37 777 776 734	-	1|1|1|1
+prog	1 3 BIN LSHF CENTR RSHFL ROR DWORD CLOSEP MPLUS 0	0	1101 Lsh 0 Rsh 	0	0	110	-	0|0|0|0
+prog	8 WORD 5 0 0 CLEAR 6 AND MC RSHFL ROR 4 4 ADD	Result not defined	6 Rsh 44 + 	1	0		-	-
+prog	OPENP 0 RSHF DWORD 6 MOD OCT RSHFL 4	4	(0 Rsh 6 Rsh 	0	1		-	4|4|4|100
+prog	BYTE SUB HEX MPLUS C 8 MUL NOT 0	0	0 - C8 × 	0	0	0	-	0|0|0|0
+prog	DWORD ROL 8 4 CLEAR OPENP BINPOS17 ADD 2 8 RSHF 3 HEX 8	8	(20000 + 1C Rsh 	0	1		-	8|8|10|1000
+prog	ROR MOD 6 BINPOS13 DWORD 0 5 LSHF OPENP WORD RSHF 0 1 6 5 0 2 7 3 1 8 3 7 4 9 0 1	16,502	RoR(0) % 5 Lsh (0 Rsh 	0	1		-	4076|16502|40166|100000001110110
+prog	AND NAND MUL 0 7 MUL OPENP OCT WORD 5 DIV MOD	5	0 × 7 × (5 % 	0	1		-	5|5|5|101
+prog	9 MUL EQU 9 1 MPLUS BINPOS4 WORD HEX E	E		0	0	5B	-	E|14|16|1110
+prog	HEX BIN MUL BINPOS45 XOR 1 MUL XOR DWORD 0 1 BACK 1 SIGN	1111 1111 1111 1111 1111 1111 1111 1111	0 × 1000000000000000000000000000000000000000000000 XOR 1 XOR negate(1)	0	0		-	FFFFFFFF|-1|37777777777|11111111111111111111111111111111
+prog	HEX 2 C WORD MUL BIN NOR 1	1	101100 NOR 	0	0		-	1|1|1|1
+prog	0 DWORD RSHFL 5 DIV 0 MOD	Result is undefined	0 Rsh 5 ÷ 0 % 	1	0		-	-
+prog	ADD CLOSEP RSHF 4 CLOSEP RSHFL 1 2 2 6 9 BYTE LSHF	Result not defined	0 Rsh 4 Rsh -19 Lsh 	1	0		-	-
+prog	0 BINPOS60 OPENP AND HEX OR ROL 3 C MMINUS BINPOS46 DIV RSHF 8	8	(1000000000000000 OR 40000000003C Rsh 	0	1	FFFF FFFF FFFF FFC4	-	8|8|10|1000
+prog	3 NOR MUL LSHF 5 EQU BIN BINPOS0 ROLC SIGN DWORD RSHF ROR BYTE	1001 1111	negate(RoL(1100001)) Rsh RoR(11111111111111111111111100111110)	0	0		-	9F|-97|237|10011111
+prog	OCT NOT 4 ADD 5 ADD MS BYTE XOR MPLUS 3 RSHF DEC 6	6	4 + 5 XOR 3 Rsh 	0	0	18	-	6|6|6|110
+prog	RSHFL 4 8 1 BINPOS12 8 LSHF OPENP 9 3 EQU	Result not defined	0 Rsh 8 Lsh (93)	1	0		-	-
+prog	MUL DIV BINPOS58 SUB 4 OCT EQU NOT BYTE MOD MR DIV WORD	3	NOT(1777777777777777777774) ÷ 	0	0		-	3|3|3|11
+prog	OPENP 2 MS DIV 4 NOT 6 DWORD 1 9 RSHFL	0	(2 ÷ 19 Rsh 	0	1	2	-	0|0|0|0
+prog	ADD BIN OCT 5 7 1 0 HEX HEX	BC8	0 + 	0	0		-	BC8|3016|5710|101111001000
+prog	0 BIN OPENP RSHF BIN SUB MS CLOSEP XOR 0 1 ROR MUL CLOSEP	1000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000	0 × (0 - 0) XOR RoR(1) × 	0	0	0	-	8000000000000000|-9223372036854775808|1000000000000000000000|1000000000000000000000000000000000000000000000000000000000000000
+prog	DEC EQU BYTE MS XOR OPENP DIV	0	0 XOR (0 ÷ 	0	1	0	-	0|0|0|0
+prog	WORD MPLUS OCT EQU SIGN XOR 0	0	negate(0) XOR 	0	0	0	-	0|0|0|0
+prog	1 3 OR BIN OPENP WORD ADD 0 1 MUL	1	1101 OR (0 + 1 × 	0	1		-	1|1|1|1
+prog	6 3 4 4 9 HEX 2 9 DWORD MS 9 B	9B		0	0	29	-	9B|155|233|10011011
+prog	0 7 ADD 8 2 BINPOS62 5 ROR BINPOS32 BYTE 0 BIN OPENP	0	111 + 0 × (	0	1		-	0|0|0|0
+prog	EQU MOD OR 4 XOR 5 RSHFL 2 BINPOS10 HEX MR BINPOS23 OR	Result not defined	0 OR 4 XOR 5 Rsh 800402 OR 	1	0		-	-
+prog	1 2 OPENP 6 MR RORC OCT 6 MMINUS CLEAR NAND 7 ROR AND	1 777 777 777 777 777 777 777	0 NAND RoR(7) AND 	0	0	1 777 777 777 777 777 777 772	-	FFFFFFFFFFFFFFFF|-1|1777777777777777777777|1111111111111111111111111111111111111111111111111111111111111111
+prog	BIN DIV 1 SUB 1 OPENP DIV 1 BINPOS34 OR MOD DWORD DIV	0	0 ÷ 1 - 1 × (1 ÷ 10000000000000000000000000000000001 ÷ 	0	1		-	0|0|0|0
+prog	9 BYTE OPENP 7 7 4 OCT BINPOS5 4 ADD	4	11 × (4 + 	0	1		-	4|4|4|100
+prog	5 LSHF BINPOS22 DEC OCT BINPOS17 ROL LSHF	Result not defined	5 Lsh RoL(20400005) Lsh 	1	0		-	-
+prog	0 DIV 0 OPENP	Result is undefined	0 ÷ 0 × (	1	1		-	-
+prog	CLEAR CLOSEP 0 RSHF BIN NOT 0 DWORD EQU OCT 4 3	43		0	0		-	23|35|43|100011
+prog	3 9 BIN AND 0 1 WORD CENTR NOT 1 MPLUS ROR DIV DEC	-32,768	39 AND RoR(1) ÷ 	0	0	1	-	8000|-32768|100000|1000000000000000
+prog	HEX BIN RSHF OPENP 0 SUB HEX 7 5 0 5 8 A 9 9 8 5 3 A A C E 3 0 B A C	7505 8A99 853A ACE3	0 Rsh (0 - 	0	1		-	75058A99853AACE3|8432298269290966243|724054251460516526343|111010100000101100010101001100110000101001110101010110011100011
+prog	9 2 7 OCT BINPOS59 BACK AND OPENP HEX D 4 B	D4B	80000000000039F AND (	0	1		-	D4B|3403|6513|110101001011
+prog	OCT OPENP 6 7 SIGN 1 BIN	1	(	0	1		-	1|1|1|1
+prog	RSHFL 3 AND NAND RSHFL 0 3 MMINUS SIGN DIV	Result not defined	0 Rsh 3 Rsh negate(3) ÷ 	1	0	-3	-	-
+prog	DIV 3 BIN SUB EQU LSHF BINPOS0 ROL NOT MOD	Result not defined	0 Lsh NOT(RoL(1)) % 	1	0		-	-
+prog	0 7 6 OPENP RSHFL 0 1 6 NOT 0 WORD MS 0 LSHF	76	76 × (76 Rsh 0 Lsh 	0	1	0	-	4C|76|114|1001100
+prog	OCT DIV MS BINPOS56 6 OR 3 1 OPENP 4 6 0 MMINUS	460	0 ÷ 6 OR 31 × (	0	1	1 777 777 777 777 777 777 320	-	130|304|460|100110000
+prog	MPLUS EQU BYTE 2 ADD OR BIN SIGN	1111 1110	10 OR negate(10)	0	0	0	-	FE|-2|376|11111110
+prog	OCT MUL 0 1 SIGN HEX C MUL MC 9 3 MS DIV	0	0 × C × 93 ÷ 	0	0	93	-	0|0|0|0
+prog	OPENP XOR 7 2 6 OR 1 EQU WORD 7 6 RORC DIV	38	RoR(76) ÷ 	0	0		-	26|38|46|100110
+prog	BYTE 4 DEC OPENP SUB 3 2 EQU NOR 6 5 CLOSEP 1	1	-112 NOR 	0	0		-	1|1|1|1
+prog	0 BIN ADD HEX MOD 2 A 0 MPLUS 6	6	0 % 	0	0	2A0	-	6|6|6|110
+prog	3 OPENP 9 NOR 2 SUB ADD EQU XOR 1 NAND DWORD	1	-42 XOR 1 NAND 	0	0		-	1|1|1|1
+prog	4 MPLUS BIN RSHF MUL SUB CENTR QWORD 0 OCT SUB	4	4 - 0 - 	0	0	4	-	4|4|4|100
+prog	MUL 0 BIN NOR ADD MPLUS BIN OR LSHF OPENP	0	0 × 0 Lsh (	0	1	0	-	0|0|0|0
+prog	4 HEX B 7 8 4 EQU OPENP 9 CLOSEP 2	2	(9) × 	0	0		-	2|2|2|10
+prog	OCT BINPOS51 1 4 AND MOD 6 OPENP 4 EQU	0	14 % 6 × (4)=	0	0		-	0|0|0|0
+prog	BINPOS44 2 XOR 8 AND BYTE DIV 1 DWORD 9 8	98	2 XOR 8 ÷ 	0	0		-	62|98|142|1100010
+prog	8 DEC WORD BYTE DIV MUL 2 5 BACK BACK 4 AND	32	8 × 4 AND 	0	0		-	20|32|40|100000
+prog	MS MUL 5 OPENP BACK EQU EQU EQU 8 1 BACK	8		0	0	0	-	8|8|10|1000
+prog	WORD 7 ADD 0 8 4 DWORD	84	7 + 	0	0		-	54|84|124|1010100
+prog	BIN ROL SIGN DIV OPENP 0 LSHF SIGN EQU DEC SUB	0	0 - 	0	0		-	0|0|0|0
+prog	9 NOT WORD 1 ROL BIN	10	RoL(1)	0	0		-	2|2|2|10
+prog	9 DWORD 1 MUL 4 8 OCT BINPOS17 1	1	1 × 	0	0		-	1|1|1|1
+prog	BYTE EQU 6 CLOSEP 7 1 1 ADD XOR RSHF BIN 0 RORC	0	1000111 Rsh RoR(0)	0	0		-	0|0|0|0
+prog	DWORD ROR EQU HEX NAND 8 ADD 8 1 DIV	81	0 NAND 8 + 81 ÷ 	0	0		-	81|129|201|10000001
+prog	SUB SUB HEX 6 DIV XOR WORD	6	0 - 6 XOR 	0	0		-	6|6|6|110
+prog	2 3 1 7 DIV OCT 3 RORC BYTE 7 EQU OR 4	4	113 OR 	0	0		-	4|4|4|100
+prog	EQU 1 OCT WORD	1	0=	0	0		-	1|1|1|1
+prog	ADD RSHFL 0 ADD 9 3 BIN MUL HEX D 3 8 D 5 A 3 9	D38D 5A39	0 Rsh 0 + 5D × 	0	0		-	D38D5A39|3549256249|32343255071|11010011100011010101101000111001
+prog	BYTE EQU 7 BACK MOD 2 HEX	2	0 % 	0	0		-	2|2|2|10
+prog	OPENP WORD MUL ADD ADD	0	(0 + 	0	1		-	0|0|0|0
+prog	DWORD BINPOS10 CENTR BIN BACK 0 BINPOS28	1 0000 0000 0000 0000 0000 0000 0000		0	0		-	10000000|268435456|2000000000|10000000000000000000000000000
+prog	LSHF HEX 5 OCT HEX 7 B 8 NAND DEC DIV 0	0	0 ÷ 	0	0		-	0|0|0|0
+prog	0 3 ROLC CLOSEP 3 7 SIGN 4 OCT 4 BIN	100	RoL(3)	0	0		-	4|4|4|100
+prog	BYTE 7 0 MMINUS 5 6 1 7 1 4 1 9 9 1 9 0 1 7	56		0	0	-70	-	38|56|70|111000
+prog	DWORD 5 DIV OPENP MR NOT NAND	-1	5 ÷ (NOT(0) NAND 	0	1		-	FFFFFFFF|-1|37777777777|11111111111111111111111111111111
+prog	BINPOS28 WORD MS OR 8	8	0 OR 	0	0	0	-	8|8|10|1000
+prog	XOR 5 3 BYTE 5 OPENP	5	0 XOR 5 × (	0	1		-	5|5|5|101
+prog	ADD MS DIV DWORD ROR NAND 7 3 2 CENTR 8 SUB 5	5	8 - 	0	0	0	-	5|5|5|101
+prog	1 HEX D 5 9 ADD OPENP 7 1 0 MUL B BINPOS51	8 0000 0000 000B	D59 + (710 × 	0	1		-	800000000000B|2251799813685259|100000000000000013|1000000000000000000000000000000000000000000000001011
+prog	7 8 BIN 0 OPENP NAND NOT NAND 0 MUL XOR OR 1	1	0 × (0 NAND NOT(0) NAND 0 OR 	0	1		-	1|1|1|1
+prog	OPENP 5 8 BACK BINPOS45 OCT 5 0	50	(	0	1		-	28|40|50|101000
+prog	OR MPLUS 5 RORC DIV HEX 5 SUB MUL 1 BINPOS17 NOT D 6 6 E B 6 F D 6 8 D 8 B E F 7 2 3 C	D66E B6FD 68D8 BEF7	0 OR RoR(5) ÷ 5 × 	0	0	0	-	D66EB6FD68D8BEF7|-2995255502652784905|1531565557655066137367|1101011001101110101101101111110101101000110110001011111011110111
+prog	7 MPLUS 3 SUB MOD XOR 6 8 5 BIN MUL DIV ADD LSHF	10 1010 1101	11 XOR 1010101101 Lsh 	0	0	111	-	2AD|685|1255|1010101101
+prog	0 4 1 7 0 7 EQU 7 EQU ADD EQU OCT MS 7	7		0	0	16	-	7|7|7|111
+prog	2 6 SIGN DEC RSHFL EQU	Result not defined	-26 Rsh 	1	0		-	-
+prog	MPLUS OR 5 OPENP SIGN NOR MUL DIV	-5	0 OR 5 × (negate(5) ÷ 	0	1	0	-	FFFFFFFFFFFFFFFB|-5|1777777777777777777773|1111111111111111111111111111111111111111111111111111111111111011
+prog	OPENP MUL ROR NAND CLOSEP 6 5 7 6 9 6 3 2 2 8 6 5 9 2 7 6 1 3 9 5	6,576,963,228,659,276,139	(0 × RoR(0) NAND 0) × 	0	0		-	5B461135D10AD96B|6576963228659276139|555060423272102554553|101101101000110000100010011010111010001000010101101100101101011
+prog	SIGN 1 6 3 RSHF 3 DWORD	3	163 Rsh 	0	0		-	3|3|3|11
+prog	NAND ADD 5 9 5 BYTE 6 6	66	0 + 	0	0		-	42|66|102|1000010
+prog	1 7 EQU 6 EQU 1 6 0 MUL BIN	1010 0000	10100000 × 	0	0		-	A0|160|240|10100000
+prog	8 WORD CLOSEP 4 0 8 8 DIV RSHF ROR	2,044	4088 Rsh RoR(4088)	0	0		-	7FC|2044|3774|11111111100
+prog	DIV 2 1 3 OCT MOD LSHF 7 ROLC 7	7	0 ÷ 325 Lsh 	0	0		-	7|7|7|111
+prog	HEX 9 EQU SUB ADD 4 BACK 0 CENTR EQU	9	9 + 0=	0	0		-	9|9|11|1001
+prog	8 OR OPENP 6	6	8 OR (	0	1		-	6|6|6|110
+prog	4 CLOSEP MS LSHF NAND 6 RSHFL 0 5	5	4 NAND 6 Rsh 	0	0	4	-	5|5|5|101
+prog	MOD 1 LSHF	0	0 % 1 Lsh 	0	0		-	0|0|0|0
+prog	9 5 MUL MS 2 MUL 3 EQU DWORD OCT OPENP	1 072	(	0	1	137	-	23A|570|1072|1000111010
+prog	OCT 0 QWORD 6 5 BINPOS53 OPENP BYTE EQU BIN	11 0101	(65)=	0	0		-	35|53|65|110101
+prog	MMINUS OPENP 9 ROL HEX BYTE D F EQU 5 F 2	5F	(DF)=	0	0	0	-	5F|95|137|1011111
+prog	MUL 9 OCT 7 2 WORD 6 ROLC BIN MMINUS SUB WORD CLOSEP ADD	0	0 × RoL(110) + 	0	0	1111 1111 1111 0100	-	0|0|0|0
+prog	EQU DIV 8 BIN BINPOS35 MOD MUL LSHF RSHF SIGN OCT 2 BINPOS57 ADD	Result not defined	0 ÷ 400000000010 Rsh 10000000000000000002 + 	1	0		-	-
+prog	6 BIN LSHF 0 ADD OR MPLUS WORD DIV NAND HEX	6	6 Lsh 0 NAND 	0	0	6	-	6|6|6|110
+prog	0 MPLUS 8 BIN MC OCT WORD 4 4 OCT 3 DIV NOR	3	3 NOR 	0	0		-	3|3|3|11
+prog	OPENP NOT 8 WORD MUL 6 BYTE	6	(8 × 	0	1		-	6|6|6|110
+prog	OPENP CLEAR 7 BINPOS26 BYTE ROR BACK DWORD ROLC 4 AND	4	4 AND 	0	0		-	4|4|4|100
+prog	WORD BYTE BIN 1 EQU CLOSEP MPLUS EQU ADD OCT SUB RSHF 0	0	1 Rsh 	0	0	1	-	0|0|0|0
+prog	NAND MMINUS RSHF 4 SUB DIV LSHF 3 BYTE 8 ADD	Result not defined	0 Rsh 4 Lsh 8 + 	1	0	0	-	-
+prog	OPENP RSHFL DWORD 6 0 EQU	Result not defined	(0 Rsh 60)	1	0		-	-
+prog	MMINUS BACK 5 DWORD BYTE 2 5 4 EQU HEX	19	25=	0	0	0	-	19|25|31|11001
+prog	1 HEX OPENP 7 8 DIV 6 2 CLEAR 7 MOD DWORD D B	DB	7 % 	0	0		-	DB|219|333|11011011
+prog	OPENP BINPOS9 4 DIV BIN MOD NOT SUB SUB WORD CLOSEP	0	(100 % NOT(100) - 100)	0	0		-	0|0|0|0
+prog	XOR 6 OPENP 5 5 0 5 WORD RSHF EQU	Result not defined	0 XOR 6 × (5505 Rsh 5505)	1	0		-	-
+prog	5 6 OPENP EQU MS ROLC DIV 9 MUL HEX 1 7 3 3 9 2 2 B 6 9 D 9 F 6	17 3392 2B69 D9F6	RoL(C40) ÷ 9 × 	0	0	C40	-	1733922B69D9F6|6530627350944246|271471105332354766|10111001100111001001000101011011010011101100111110110
+prog	EQU 0 OCT SUB DIV 0 BINPOS45 2 OPENP HEX EQU 4 0 2	402		0	0		-	402|1026|2002|10000000010
+prog	5 RORC OPENP 4 6 WORD 1 7 5 CLOSEP ROL RORC MPLUS OR	350	RoR(5) × RoR(RoL(175)) OR 	0	0	-32,593	-	15E|350|536|101011110
+prog	OR ADD DEC 9 EQU 9 3 8 DWORD BIN MMINUS OPENP OPENP	11 1010 1010	1110101010 × ((	0	2	1111 1111 1111 1111 1111 1100 0101 0110	-	3AA|938|1652|1110101010
+prog	1 CLOSEP 0 SUB BIN EQU WORD 1 1 MS SUB OPENP MUL BACK	0	11 - (0 × 	0	1	11	-	0|0|0|0
+prog	BACK OCT HEX 0 LSHF BYTE SUB LSHF 2 AND	0	0 Lsh 2 AND 	0	0		-	0|0|0|0
+prog	OPENP EQU 6 CLOSEP BIN BYTE NAND CENTR DIV	0	110 NAND 0 ÷ 	0	0		-	0|0|0|0
+prog	NOT 5 EQU OCT 3 OPENP 0 3 BIN OPENP 1 HEX 0	0	3 × (3 × (	0	2		-	0|0|0|0
+prog	SUB 9 OR 3 8 0 OCT MC 6 BYTE RSHF DWORD EQU	37 777 777 767	0 - 11 OR 6 Rsh 6=	0	0		-	FFFFFFF7|-9|37777777767|11111111111111111111111111110111
+prog	8 BIN WORD MPLUS BYTE XOR 0 NOT NOT 0	0	1000 XOR 	0	0	1000	-	0|0|0|0
+prog	6 BIN MPLUS 1 0 HEX 4 BINPOS18 OPENP	4 0004	(	0	1	6	-	40004|262148|1000004|1000000000000000100
+prog	4 DWORD BYTE 1 WORD 2	2		0	0		-	2|2|2|10
+prog	9 0 BYTE MUL 9 OPENP AND MOD HEX F D B 7	FD	5A × 9 × (2A % 	0	1		-	FD|-3|375|11111101
+prog	MUL MC HEX D BYTE 1 1 DWORD MUL EQU RORC	0	RoR(0)	0	0		-	0|0|0|0
+prog	NOR 2 3 8 1 OCT OPENP BIN SUB DWORD RSHF	1001 0100 1101	0 NOR 100101001101 × (100101001101 Rsh 	0	1		-	94D|2381|4515|100101001101
+prog	0 OPENP DIV OCT 5 SUB BYTE EQU OR EQU	0	0 OR 0=	0	0		-	0|0|0|0
+prog	EQU MUL EQU NOT 8 WORD 7 OCT SUB LSHF WORD HEX	7	7 Lsh 	0	0		-	7|7|7|111
+prog	6 ADD BIN OPENP MOD SIGN RORC ROL MUL	Result is undefined	110 + (0 % RoL(RoR(negate(0))) × 	1	1		-	-
+prog	ADD OCT DIV 7 3 BYTE BIN EQU 1 DIV SUB	1	1 - 	0	0		-	1|1|1|1
+prog	OPENP AND AND DWORD 9 6 EQU 4 BIN RSHF	100	100 Rsh 	0	0		-	4|4|4|100
+prog	RSHF DWORD 5 4 3 MPLUS 9 7 1 8 MOD	Result not defined	0 Rsh 9718 % 	1	0	543	-	-
+prog	0 0 MS BYTE ADD BACK 5 ADD MOD OPENP CLOSEP 9 4	94	(0 + 5) % (0) × 	0	0	0	-	5E|94|136|1011110
+prog	WORD OPENP NAND SIGN EQU 9 DWORD	9	(0 NAND negate(0))=	0	0		-	9|9|11|1001
+prog	OR 0 MUL 1 MPLUS NOR DWORD OPENP CLEAR	0		0	0	1	-	0|0|0|0
+prog	DWORD WORD MUL 8 2 EQU OCT XOR MOD 6 6 4 2 6	66 426	0 % 	0	0		-	6D16|27926|66426|110110100010110
+prog	8 WORD 9 MPLUS 5 SUB XOR NOR DWORD 3 0	30	5 NOR 	0	0	9	-	1E|30|36|11110
+prog	BACK 2 RSHF ROR 2 6 9 2 BIN MMINUS BINPOS22 ADD	Result not defined	10 Rsh 10000000000101010000100 + 	1	0	1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 1111 0101 0111 1100	-	-
+prog	0 4 SUB BYTE 3 MS WORD 6 NOT MUL 5 XOR	39	4 - NOT(6) × 5 XOR 	0	0	3	-	27|39|47|100111
+prog	5 EQU 1 DIV OPENP RSHF BIN DIV DIV OCT MS 5 MPLUS 1	1	1 ÷ (0 ÷ 	0	1	5	-	1|1|1|1
+prog	3 WORD BIN DIV DIV MOD 0 1 0 DIV MUL DEC DWORD	1	3 % 2 × 	0	0		-	1|1|1|1
+prog	MMINUS MOD OR BYTE OR DWORD ADD EQU ADD MOD	0	0 % 	0	0	0	-	0|0|0|0
+prog	OPENP BIN 0 MUL CLOSEP SUB HEX NOR B ADD ADD A	A	(0 × 0) NOR B + 	0	0		-	A|10|12|1010
+prog	MOD HEX OPENP 1 4 9 EQU RORC 2 WORD 2	2		0	0		-	2|2|2|10
+prog	0 BIN LSHF 1 DIV DIV DIV BYTE MUL HEX SIGN	0	0 Lsh 1 × negate(0)	0	0		-	0|0|0|0
+prog	7 OPENP BIN BINPOS12 EQU DIV AND AND OCT 1	1	70061 AND 	0	0		-	1|1|1|1
+prog	SUB 6 DWORD CENTR CENTR HEX F 4 OCT EQU	37 777 777 414	0 - 364=	0	0		-	FFFFFF0C|-244|37777777414|11111111111111111111111100001100
+prog	OR EQU SUB DWORD ROLC ADD 0 OPENP OR 6 ROL BYTE MOD 4	4	0 - RoL(0) + 0 × (0 OR RoL(6) % 	0	1		-	4|4|4|100
+prog	2 SUB BINPOS53 1 BYTE 3 7 WORD BIN 0 NAND	10	10 - 0 NAND 	0	0		-	2|2|2|10
+prog	OPENP RSHF SUB 7 2 WORD HEX RSHF 7 RORC 8	8	(0 - 48 Rsh 	0	1		-	8|8|10|1000
+prog	OR DWORD MPLUS EQU 1 EQU OCT DIV QWORD 4	4	1 ÷ 	0	0	0	-	4|4|4|100
+prog	SUB 2 8 ROLC 8 BIN DWORD EQU BINPOS13 MS MUL ROR	111 1111 1111 1111 1110 1111 1111 1100	11111111111111111101111111111000 × RoR(11111111111111111101111111111000)	0	0	1111 1111 1111 1111 1101 1111 1111 1000	-	7FFFEFFC|2147479548|17777767774|1111111111111111110111111111100
+prog	RSHF RSHFL WORD 2 1 8 CENTR 5 6 9 LSHF	Result not defined	0 Rsh 569 Lsh 	1	0		-	-
+prog	DEC 8 8 OPENP OCT 0 BINPOS39 DWORD 0 OCT 3	3	130 × (	0	1		-	3|3|3|11
+prog	MS AND 6 6 HEX 0 AND BACK BYTE 0 SUB 4 0	40	0 AND 0 AND 0 - 	0	0	0	-	40|64|100|1000000
+prog	4 OPENP DWORD MOD 8 BINPOS29 HEX ADD	4	4 × (4 % 20000008 + 	0	1		-	4|4|4|100
+prog	OPENP DWORD 4 8 8 2 MUL 5 WORD 8	8	(4882 × 	0	1		-	8|8|10|1000
+prog	OCT WORD 0 7 EQU 2 OPENP 6 LSHF RSHF 0	0	2 × (6 Rsh 	0	1		-	0|0|0|0
+prog	0 RSHF 1 WORD MMINUS CLEAR HEX 6 B 6 5 6 0 E 7 8 6 1 5 5 8 0 D C	6B65		0	0	FFFF	-	6B65|27493|65545|110101101100101
+prog	8 DIV BIN RSHF ROR HEX 7 DWORD	7	8 Rsh 	0	0		-	7|7|7|111
+prog	MOD BIN WORD NOR AND AND SIGN HEX 8 A 5 5	8A55	0 AND 	0	0		-	8A55|-30123|105125|1000101001010101
+prog	CLOSEP DWORD 5 7 QWORD 1 DIV LSHF ROLC 1 4 9 0 ADD	Result not defined	1 Lsh 1490 + 	1	0		-	-
+prog	BINPOS24 MUL ROR DIV 3 0 9 ROR BYTE 0 DIV	Cannot divide by zero	16777216 × RoR(16777216) ÷ 0 ÷ 	1	0		-	-
+prog	2 SUB BINPOS54 DEC HEX SUB DEC MMINUS XOR OPENP 3	3	2 - 18014398509481986 XOR (	0	1	18,014,398,509,481,984	-	3|3|3|11
+prog	SUB 6 BIN MR BINPOS17 AND AND MUL BYTE SUB LSHF DIV DWORD	1111 1111 1111 1111 1111 1111 1111 1010	(0 - 100000000000000110) ÷ 	0	0		-	FFFFFFFA|-6|37777777772|11111111111111111111111111111010
+prog	BYTE 6 RSHFL CENTR 6 EQU MS OCT OR 3 OR	3	0 OR 3 OR 	0	0	0	-	3|3|3|11
+prog	LSHF OPENP BACK 8 2 4 ADD EQU	Result not defined	0 Lsh (824 + 824)	1	0		-	-
+prog	4 ADD 5 9 1 OCT BYTE DIV BACK WORD 5 2	52	4 + 117 ÷ 	0	0		-	2A|42|52|101010
+prog	QWORD 4 EQU OPENP 5 MC MS DWORD	5	(	0	1	5	-	5|5|5|101
+prog	4 CLEAR BINPOS48 BIN 1 HEX OCT OR EQU 3 5 4	354		0	0		-	EC|236|354|11101100
+prog	1 4 7 1 OPENP 7 BIN EQU BINPOS36 MS 0	0		0	0	1 0000 0000 0000 0000 0000 0010 1000 0011 1001	-	0|0|0|0
+prog	5 RSHFL 8 BINPOS55 3 5 OPENP SUB 7 BYTE MPLUS ADD 2 4	24	5 Rsh 35 × (0 - 7 + 	0	1	7	-	18|24|30|11000
+prog	9 4 MMINUS SUB 7 4 BINPOS24 WORD XOR OCT XOR	24	136 - 112 XOR 	0	0	177 642	-	14|20|24|10100
+prog	SUB DIV 8 2 OPENP 2 BIN 0 CENTR WORD ADD RSHF	0	0 ÷ 1010010 × (0 Rsh 	0	1		-	0|0|0|0
+prog	DWORD HEX ROLC MUL SIGN 2 B NAND DIV D C MMINUS	DC	RoL(0) × 2B ÷ 	0	0	FFFF FF24	-	DC|220|334|11011100
+prog	OPENP EQU MR 2 BYTE 5 BIN DIV MOD OPENP ADD RSHFL	0	101 % (0 Rsh 	0	1		-	0|0|0|0
+prog	9 LSHF HEX 1 6 0 SUB	Result not defined	9 Lsh 160 - 	1	0		-	-
+prog	1 MUL 2 7 OCT MMINUS OPENP BACK EQU SUB 3 3 ADD 3	3	1331 - 33 + 	0	0	1 777 777 777 777 777 777 745	-	3|3|3|11
+prog	BIN MUL CLOSEP CLOSEP BACK OPENP 0 XOR DWORD	0	0 × (0 XOR 	0	1		-	0|0|0|0
+prog	SUB DIV EQU 8 1 6 2 OCT 7 OPENP MR BYTE 2	2	7 × (	0	1		-	2|2|2|10
+prog	MUL 2 DIV ADD EQU 6 9 5 OCT OR RSHF EQU	Result not defined	1267 Rsh 	1	0		-	-
+prog	OPENP 4 8 RSHF 8 4 7 6 DIV	Result not defined	(48 Rsh 8476 ÷ 	1	1		-	-
+prog	MUL OCT NOR MC 6 BIN NAND DWORD NOT OCT RSHF RSHFL 6 CLEAR	0		0	0		-	0|0|0|0
+prog	8 BIN ROL ADD 0 WORD 0 EQU ROR MMINUS DIV 0	0	RoR(10000) ÷ 	0	0	1111 1111 1111 1000	-	0|0|0|0
+prog	OR 7 4 OR BIN MR DIV HEX OPENP 6 SUB BINPOS62	4000 0000 0000 0006	(0 OR 4A) ÷ (6 - 	0	1		-	4000000000000006|4611686018427387910|400000000000000000006|100000000000000000000000000000000000000000000000000000000000110
+prog	SUB OPENP MOD 8 6 OCT HEX	56	0 - (0 % 	0	1		-	56|86|126|1010110
+prog	1 DIV 5 6 OPENP OCT NOT BIN DEC 4 9	49	1 ÷ 56 × (	0	1		-	31|49|61|110001
+prog	LSHF 0 MPLUS 3 1 ROR BINPOS20 6 9 0 6 NOR	Result not defined	0 Lsh 6906 NOR 	1	0	0	-	-
+prog	ROLC 0 BIN BINPOS32 OR DIV 0 0 ADD	Cannot divide by zero	100000000000000000000000000000000 ÷ 0 + 	1	0		-	-
+prog	MR 0 RSHFL OPENP MMINUS 3 7 DIV MUL WORD 6 3 ADD 9	9	0 Rsh (37 × 63 + 	0	1	0	-	9|9|11|1001

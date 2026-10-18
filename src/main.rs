@@ -8,6 +8,8 @@ mod engine;
 mod graphing;
 mod icon;
 mod locale;
+#[cfg(test)]
+mod monkey;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {

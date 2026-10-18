@@ -1,0 +1,405 @@
+# Unit tables of microsoft/calculator, as UnitConverterDataLoader.cs writes them.
+# Source: https://github.com/microsoft/calculator, commit d125246a4e19842ce1332e6c7839cf0e110027d8 (2026-09-28),
+#   src/Calculator.ViewModels/DataLoaders/UnitConverterDataLoader.cs (AddUnit calls, conversionFactors,
+#   explicitConversions, and the region flags of LoadData) and src/CalcManager/UnitConverter.cpp
+#   (InitializeSelectedUnits: the first unit flagged as source / target is selected).
+# Extracted by a script, not by running the port. Fields are tab separated:
+#   unit    <category> <id> <resource key> <order> <factor>      units of the drop-down lists, by Windows' order
+#   whimsy  <category> <id> <resource key> <order> <factor>      the everyday comparison units
+#   temp    <from> <to> <ratio> <offset> <offset first>          explicit temperature conversions
+#   default <region> <category> <source id> <target id>          the units a category starts with
+unit	Volume	75	Milliliter	1	1.0
+unit	Volume	64	CubicCentimeter	2	1.0
+unit	Volume	74	Liter	3	1000.0
+unit	Volume	67	CubicMeter	4	1000000.0
+unit	Volume	79	TeaspoonUS	5	4.92892159375
+unit	Volume	78	TablespoonUS	6	14.78676478125
+unit	Volume	71	FluidOunceUS	7	29.5735295625
+unit	Volume	69	CupUS	8	236.588237
+unit	Volume	77	PintUS	9	473.176473
+unit	Volume	81	QuartUS	10	946.352946
+unit	Volume	73	GallonUS	11	3785.411784
+unit	Volume	66	CubicInch	12	16.387064
+unit	Volume	65	CubicFoot	13	28316.846592
+unit	Volume	68	CubicYard	14	764554.857984
+unit	Volume	115	TeaspoonUK	15	5.919388020833333
+unit	Volume	116	TablespoonUK	16	17.7581640625
+unit	Volume	70	FluidOunceUK	17	28.4130625
+unit	Volume	76	PintUK	18	568.26125
+unit	Volume	80	QuartUK	19	1136.5225
+unit	Volume	72	GallonUK	20	4546.09
+whimsy	Volume	124	CoffeeCup	22	236.5882
+whimsy	Volume	111	Bathtub	23	378541.2
+whimsy	Volume	125	SwimmingPool	24	3750000000.0
+unit	Length	168	Angstrom	1	1e-10
+unit	Length	38	Nanometer	2	1e-09
+unit	Length	35	Micron	3	1e-06
+unit	Length	37	Millimeter	4	0.001
+unit	Length	30	Centimeter	5	0.01
+unit	Length	34	Meter	6	1.0
+unit	Length	33	Kilometer	7	1000.0
+unit	Length	32	Inch	8	0.0254
+unit	Length	31	Foot	9	0.3048
+unit	Length	40	Yard	10	0.9144
+unit	Length	36	Mile	11	1609.344
+unit	Length	39	NauticalMile	12	1852.0
+whimsy	Length	105	Paperclip	13	0.035052
+whimsy	Length	131	Hand	14	0.18669
+whimsy	Length	107	JumboJet	15	76.0
+unit	Weight	82	Carat	1	0.0002
+unit	Weight	90	Milligram	2	1e-06
+unit	Weight	83	Centigram	3	1e-05
+unit	Weight	84	Decigram	4	0.0001
+unit	Weight	86	Gram	5	0.001
+unit	Weight	85	Decagram	6	0.01
+unit	Weight	87	Hectogram	7	0.1
+unit	Weight	88	Kilogram	8	1.0
+unit	Weight	95	Tonne	9	1000.0
+unit	Weight	91	Ounce	10	0.028349523125
+unit	Weight	92	Pound	11	0.45359237
+unit	Weight	94	Stone	12	6.35029318
+unit	Weight	93	ShortTon	13	907.18474
+unit	Weight	89	LongTon	14	1016.0469088
+whimsy	Weight	113	Snowflake	15	2e-06
+whimsy	Weight	133	SoccerBall	16	0.4325
+whimsy	Weight	114	Elephant	17	4000.0
+whimsy	Weight	123	Whale	18	90000.0
+unit	Temperature	46	DegreesCelsius	1	1.0
+unit	Temperature	47	DegreesFahrenheit	2	1.0
+unit	Temperature	48	Kelvin	3	1.0
+unit	Energy	25	Electron-Volt	1	1.602176565e-19
+unit	Energy	27	Joule	2	1.0
+unit	Energy	29	Kilojoule	3	1000.0
+unit	Energy	24	Calorie	4	4.184
+unit	Energy	28	Kilocalorie	5	4184.0
+unit	Energy	26	Foot-Pound	6	1.3558179483314
+unit	Energy	23	BritishThermalUnit	7	1055.056
+unit	Energy	166	Kilowatthour	166	3600000.0
+whimsy	Energy	103	Battery	8	9000.0
+whimsy	Energy	129	Banana	9	439614.0
+whimsy	Energy	130	SliceOfCake	10	1046700.0
+unit	Area	9	SquareMillimeter	1	1e-06
+unit	Area	3	SquareCentimeter	2	0.0001
+unit	Area	7	SquareMeter	3	1.0
+unit	Area	2	Hectare	4	10000.0
+unit	Area	6	SquareKilometer	5	1000000.0
+unit	Area	5	SquareInch	6	0.00064516
+unit	Area	4	SquareFoot	7	0.09290304
+unit	Area	10	SquareYard	8	0.83612736
+unit	Area	1	Acre	9	4046.8564224
+unit	Area	8	SquareMile	10	2589988.110336
+unit	Area	165	Pyeong	15	3.3057851239669422
+whimsy	Area	118	Hand	11	0.012516104
+whimsy	Area	127	Paper	12	0.06032246
+whimsy	Area	99	SoccerField	13	10869.66
+whimsy	Area	128	Castle	14	100000.0
+unit	Speed	57	CentimetersPerSecond	1	1.0
+unit	Speed	62	MetersPerSecond	2	100.0
+unit	Speed	59	KilometersPerHour	3	27.77777777777778
+unit	Speed	58	FeetPerSecond	4	30.48
+unit	Speed	63	MilesPerHour	5	44.7
+unit	Speed	60	Knot	6	51.44
+unit	Speed	61	Mach	7	34030.0
+whimsy	Speed	121	Turtle	8	8.94
+whimsy	Speed	126	Horse	9	2011.5
+whimsy	Speed	122	Jet	10	24585.0
+unit	Time	51	Microsecond	1	1e-06
+unit	Time	52	Millisecond	2	0.001
+unit	Time	54	Second	3	1.0
+unit	Time	53	Minute	4	60.0
+unit	Time	50	Hour	5	3600.0
+unit	Time	49	Day	6	86400.0
+unit	Time	55	Week	7	604800.0
+unit	Time	56	Year	8	31557600.0
+unit	Power	45	Watt	1	1.0
+unit	Power	44	Kilowatt	2	1000.0
+unit	Power	43	Horsepower	3	745.6998715822702
+unit	Power	42	Foot-PoundPerMinute	4	0.0225969658055233
+unit	Power	41	BTUPerMinute	5	17.58426666666667
+whimsy	Power	108	LightBulb	6	60.0
+whimsy	Power	109	Horse	7	745.7
+whimsy	Power	132	TrainEngine	8	2982799.486329081
+unit	Data	11	Bit	1	1.25e-07
+unit	Data	167	Nibble	2	5e-07
+unit	Data	12	Byte	3	1e-06
+unit	Data	15	Kilobit	4	0.000125
+unit	Data	149	Kibibits	5	0.000128
+unit	Data	16	Kilobyte	6	0.001
+unit	Data	150	Kibibytes	7	0.001024
+unit	Data	17	Megabit	8	0.125
+unit	Data	151	Mebibits	9	0.131072
+unit	Data	18	Megabyte	10	1.0
+unit	Data	152	Mebibytes	11	1.048576
+unit	Data	13	Gigabit	12	125.0
+unit	Data	147	Gibibits	13	134.217728
+unit	Data	14	Gigabyte	14	1000.0
+unit	Data	148	Gibibytes	15	1073.741824
+unit	Data	21	Terabit	16	125000.0
+unit	Data	155	Tebibits	17	137438.953472
+unit	Data	22	Terabyte	18	1000000.0
+unit	Data	156	Tebibytes	19	1099511.627776
+unit	Data	19	Petabit	20	125000000.0
+unit	Data	153	Pebibits	21	140737488.355328
+unit	Data	20	Petabyte	22	1000000000.0
+unit	Data	154	Pebibytes	23	1125899906.842624
+unit	Data	143	Exabits	24	125000000000.0
+unit	Data	145	Exbibits	25	144115188075.85587
+unit	Data	144	Exabytes	26	1000000000000.0
+unit	Data	146	Exbibytes	27	1152921504606.847
+unit	Data	163	Zetabits	28	125000000000000.0
+unit	Data	161	Zebibits	29	147573952589676.4
+unit	Data	164	Zetabytes	30	1000000000000000.0
+unit	Data	162	Zebibytes	31	1180591620717411.2
+unit	Data	159	Yottabit	32	1.25e+17
+unit	Data	157	Yobibits	33	1.5111572745182864e+17
+unit	Data	160	Yottabyte	34	1e+18
+unit	Data	158	Yobibytes	35	1.208925819614629e+18
+whimsy	Data	100	FloppyDisk	13	1.47456
+whimsy	Data	101	CD	14	700.0
+whimsy	Data	102	DVD	15	4700.0
+unit	Pressure	137	Atmosphere	1	1.0
+unit	Pressure	138	Bar	2	0.9869232667160128
+unit	Pressure	139	KiloPascal	3	0.0098692326671601
+unit	Pressure	140	MillimeterOfMercury	4	0.0013155687145324
+unit	Pressure	141	Pascal	5	9.869232667160129e-06
+unit	Pressure	142	PSI	6	0.068045961016531
+unit	Angle	134	Degree	1	1.0
+unit	Angle	135	Radian	2	57.29577951308233
+unit	Angle	136	Gradian	3	0.9
+temp	DegreesCelsius	DegreesCelsius	1.0	0.0	false
+temp	DegreesCelsius	DegreesFahrenheit	1.8	32.0	false
+temp	DegreesCelsius	Kelvin	1.0	273.15	false
+temp	DegreesFahrenheit	DegreesCelsius	0.5555555555555556	-32.0	true
+temp	DegreesFahrenheit	DegreesFahrenheit	1.0	0.0	false
+temp	DegreesFahrenheit	Kelvin	0.5555555555555556	459.67	true
+temp	Kelvin	DegreesCelsius	1.0	-273.15	true
+temp	Kelvin	DegreesFahrenheit	1.8	-459.67	false
+temp	Kelvin	Kelvin	1.0	0.0	false
+default	US	Volume	75	79
+default	US	Length	30	32
+default	US	Weight	88	92
+default	US	Temperature	46	47
+default	US	Energy	27	28
+default	US	Area	7	4
+default	US	Speed	59	63
+default	US	Time	50	53
+default	US	Power	44	43
+default	US	Data	14	18
+default	US	Pressure	137	138
+default	US	Angle	134	135
+default	FM	Volume	75	79
+default	FM	Length	30	32
+default	FM	Weight	88	92
+default	FM	Temperature	46	47
+default	FM	Energy	27	28
+default	FM	Area	7	4
+default	FM	Speed	59	63
+default	FM	Time	50	53
+default	FM	Power	44	43
+default	FM	Data	14	18
+default	FM	Pressure	137	138
+default	FM	Angle	134	135
+default	MH	Volume	75	79
+default	MH	Length	30	32
+default	MH	Weight	88	92
+default	MH	Temperature	46	47
+default	MH	Energy	27	28
+default	MH	Area	7	4
+default	MH	Speed	59	63
+default	MH	Time	50	53
+default	MH	Power	44	43
+default	MH	Data	14	18
+default	MH	Pressure	137	138
+default	MH	Angle	134	135
+default	PW	Volume	75	79
+default	PW	Length	30	32
+default	PW	Weight	88	92
+default	PW	Temperature	46	47
+default	PW	Energy	27	28
+default	PW	Area	7	4
+default	PW	Speed	59	63
+default	PW	Time	50	53
+default	PW	Power	44	43
+default	PW	Data	14	18
+default	PW	Pressure	137	138
+default	PW	Angle	134	135
+default	LR	Volume	75	79
+default	LR	Length	30	32
+default	LR	Weight	88	92
+default	LR	Temperature	46	47
+default	LR	Energy	27	28
+default	LR	Area	7	4
+default	LR	Speed	59	63
+default	LR	Time	50	53
+default	LR	Power	44	43
+default	LR	Data	14	18
+default	LR	Pressure	137	138
+default	LR	Angle	134	135
+default	BS	Volume	79	75
+default	BS	Length	32	30
+default	BS	Weight	92	88
+default	BS	Temperature	46	47
+default	BS	Energy	27	28
+default	BS	Area	4	7
+default	BS	Speed	63	59
+default	BS	Time	50	53
+default	BS	Power	44	43
+default	BS	Data	14	18
+default	BS	Pressure	137	138
+default	BS	Angle	134	135
+default	KY	Volume	79	75
+default	KY	Length	32	30
+default	KY	Weight	92	88
+default	KY	Temperature	46	47
+default	KY	Energy	27	28
+default	KY	Area	4	7
+default	KY	Speed	63	59
+default	KY	Time	50	53
+default	KY	Power	44	43
+default	KY	Data	14	18
+default	KY	Pressure	137	138
+default	KY	Angle	134	135
+default	GB	Volume	79	75
+default	GB	Length	32	30
+default	GB	Weight	92	88
+default	GB	Temperature	47	46
+default	GB	Energy	27	28
+default	GB	Area	4	7
+default	GB	Speed	63	59
+default	GB	Time	50	53
+default	GB	Power	45	43
+default	GB	Data	14	18
+default	GB	Pressure	137	138
+default	GB	Angle	134	135
+default	DE	Volume	79	75
+default	DE	Length	32	30
+default	DE	Weight	92	88
+default	DE	Temperature	47	46
+default	DE	Energy	27	28
+default	DE	Area	4	7
+default	DE	Speed	63	59
+default	DE	Time	50	53
+default	DE	Power	44	43
+default	DE	Data	14	18
+default	DE	Pressure	137	138
+default	DE	Angle	134	135
+default	FR	Volume	79	75
+default	FR	Length	32	30
+default	FR	Weight	92	88
+default	FR	Temperature	47	46
+default	FR	Energy	27	28
+default	FR	Area	4	7
+default	FR	Speed	63	59
+default	FR	Time	50	53
+default	FR	Power	44	43
+default	FR	Data	14	18
+default	FR	Pressure	137	138
+default	FR	Angle	134	135
+default	CA	Volume	79	75
+default	CA	Length	32	30
+default	CA	Weight	92	88
+default	CA	Temperature	47	46
+default	CA	Energy	27	28
+default	CA	Area	4	7
+default	CA	Speed	63	59
+default	CA	Time	50	53
+default	CA	Power	44	43
+default	CA	Data	14	18
+default	CA	Pressure	137	138
+default	CA	Angle	134	135
+default	CN	Volume	79	75
+default	CN	Length	32	30
+default	CN	Weight	92	88
+default	CN	Temperature	47	46
+default	CN	Energy	27	28
+default	CN	Area	4	7
+default	CN	Speed	63	59
+default	CN	Time	50	53
+default	CN	Power	44	43
+default	CN	Data	14	18
+default	CN	Pressure	137	138
+default	CN	Angle	134	135
+default	IN	Volume	79	75
+default	IN	Length	32	30
+default	IN	Weight	92	88
+default	IN	Temperature	47	46
+default	IN	Energy	27	28
+default	IN	Area	4	7
+default	IN	Speed	63	59
+default	IN	Time	50	53
+default	IN	Power	44	43
+default	IN	Data	14	18
+default	IN	Pressure	137	138
+default	IN	Angle	134	135
+default	JP	Volume	79	75
+default	JP	Length	32	30
+default	JP	Weight	92	88
+default	JP	Temperature	47	46
+default	JP	Energy	27	28
+default	JP	Area	4	7
+default	JP	Speed	63	59
+default	JP	Time	50	53
+default	JP	Power	44	43
+default	JP	Data	14	18
+default	JP	Pressure	137	138
+default	JP	Angle	134	135
+default	TW	Volume	79	75
+default	TW	Length	32	30
+default	TW	Weight	92	88
+default	TW	Temperature	47	46
+default	TW	Energy	27	28
+default	TW	Area	4	7
+default	TW	Speed	63	59
+default	TW	Time	50	53
+default	TW	Power	44	43
+default	TW	Data	14	18
+default	TW	Pressure	137	138
+default	TW	Angle	134	135
+default	KP	Volume	79	75
+default	KP	Length	32	30
+default	KP	Weight	92	88
+default	KP	Temperature	47	46
+default	KP	Energy	27	28
+default	KP	Area	4	7
+default	KP	Speed	63	59
+default	KP	Time	50	53
+default	KP	Power	44	43
+default	KP	Data	14	18
+default	KP	Pressure	137	138
+default	KP	Angle	134	135
+default	KR	Volume	79	75
+default	KR	Length	32	30
+default	KR	Weight	92	88
+default	KR	Temperature	47	46
+default	KR	Energy	27	28
+default	KR	Area	4	7
+default	KR	Speed	63	59
+default	KR	Time	50	53
+default	KR	Power	44	43
+default	KR	Data	14	18
+default	KR	Pressure	137	138
+default	KR	Angle	134	135
+default	AU	Volume	79	75
+default	AU	Length	32	30
+default	AU	Weight	92	88
+default	AU	Temperature	47	46
+default	AU	Energy	27	28
+default	AU	Area	4	7
+default	AU	Speed	63	59
+default	AU	Time	50	53
+default	AU	Power	44	43
+default	AU	Data	14	18
+default	AU	Pressure	137	138
+default	AU	Angle	134	135
+default	BR	Volume	79	75
+default	BR	Length	32	30
+default	BR	Weight	92	88
+default	BR	Temperature	47	46
+default	BR	Energy	27	28
+default	BR	Area	4	7
+default	BR	Speed	63	59
+default	BR	Time	50	53
+default	BR	Power	44	43
+default	BR	Data	14	18
+default	BR	Pressure	137	138
+default	BR	Angle	134	135

@@ -18,6 +18,8 @@
 
 mod integer;
 mod math;
+#[cfg(test)]
+mod ms_oracle;
 
 use std::cmp::Ordering;
 
@@ -3512,6 +3514,11 @@ mod tests {
         assert_eq!(calc.display(), "80");
         press_programmer(&mut calc, "c 1 rorc rolc");
         assert_eq!(calc.display(), "1");
+        // A carry bit that is set doesn't come back in after C.
+        press_programmer(&mut calc, "c 80 rolc");
+        assert_eq!(calc.display(), "0");
+        press_programmer(&mut calc, "c 1 rolc");
+        assert_eq!(calc.display(), "2");
     }
 
     #[test]
