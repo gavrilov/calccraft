@@ -7,6 +7,12 @@ description = "A clone of the Windows 11 Calculator (Standard, Scientific, Graph
 readme = "README.md"
 publish = false
 
+# The app is a library that `main.rs` starts on desktops and in the browser, and that Android
+# loads as `libcalculator.so` (see android/README.md).
+[lib]
+path = "src/lib.rs"
+doctest = false
+
 [dependencies]
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 num-bigint = "0.4"
@@ -16,10 +22,29 @@ num-traits = "0.2.19"
 web-time = "1.1"
 
 # eframe is listed per target: a dependency in both [dependencies] and a target table gets
-# the union of their features, and the web build wants glow instead of the default wgpu.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# the union of their features, and the web and Android builds want glow instead of the
+# default wgpu.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
 arboard = { version = "3.6", default-features = false }
 eframe = { version = "0.36.2", features = ["persistence"] }
+
+# The Android app (see android/README.md): a NativeActivity drawn with OpenGL ES through glow,
+# as in egui's hello_android, and JNI for what only Java can tell (insets, languages).
+# eframe's screen reader support (`accesskit`) needs GameActivity on Android, so TalkBack
+# can't read the app yet.
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.15"
+eframe = { version = "0.36.2", default-features = false, features = [
+    "android-native-activity",
+    "default_fonts",
+    "glow",
+    "persistence",
+] }
+jni = "0.21"
+log = "0.4"
+ndk-context = "0.1"
+# eframe's `NativeOptions::android_app` is winit's `AndroidApp`; the version eframe uses.
+winit = { version = "0.30", default-features = false }
 
 # The web version (see docs/web-version-plan.md): WebGL through glow, which every current
 # browser has, and the browser's own APIs for the language, formats, clipboard and downloads.

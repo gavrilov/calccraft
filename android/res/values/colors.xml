@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's light background (palette.rs), as on the web version's maskable icons. -->
+    <color name="ic_launcher_background">#F3EBF3</color>
+</resources>

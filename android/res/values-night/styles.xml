@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The dark theme: the app's dark background (palette.rs) and light status bar icons. -->
+    <style name="CalcCraft" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <color name="background">#291A29</color>
+</resources>

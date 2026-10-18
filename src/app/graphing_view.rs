@@ -2893,7 +2893,7 @@ fn tooltip(ui: &Ui, rect: Rect, id: Id, text: &str) {
 }
 
 /// The clipboard's text, for Paste from the menu (keyboard pastes come as egui events).
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn clipboard_text() -> Option<String> {
     arboard::Clipboard::new().ok()?.get_text().ok()
 }
@@ -2903,6 +2903,12 @@ fn clipboard_text() -> Option<String> {
 #[cfg(target_arch = "wasm32")]
 fn clipboard_text() -> Option<String> {
     super::web::clipboard_text()
+}
+
+/// No clipboard in the Android app yet: Paste from the menu does nothing.
+#[cfg(target_os = "android")]
+fn clipboard_text() -> Option<String> {
+    None
 }
 
 /// An analysis value in the region's format: a decimal comma takes `;` between the

@@ -1,6 +1,8 @@
 //! User interface styled after the Windows 11 calculator, in a dark or light theme.
 
 mod access;
+#[cfg(target_os = "android")]
+mod android;
 mod converter_view;
 mod date_view;
 mod graph_canvas;
@@ -475,6 +477,12 @@ impl WindowSizes {
         }
         self.full.take().unwrap_or(MIN_SIZE).max(MIN_SIZE)
     }
+}
+
+/// Where the app is drawn: the whole window, except on phones, which draw apps under the
+/// status bar, the navigation bar and a camera cutout (egui's safe area leaves them out).
+fn app_rect(ui: &Ui) -> Rect {
+    ui.ctx().content_rect().intersect(ui.max_rect())
 }
 
 /// The window's content size: the size of egui's area, which every platform reports.
@@ -1163,8 +1171,10 @@ impl CalculatorApp {
         );
         // Keep on top exists only in the Standard mode, the history in the Standard and
         // Scientific modes, and its button only while the history isn't docked. A browser
-        // tab can't stay on top or change its size, so the web version has no keep on top.
-        if self.mode == Mode::Standard && !cfg!(target_arch = "wasm32") {
+        // tab can't stay on top or change its size, so the web version has no keep on top, and
+        // neither has the Android app, which fills the screen.
+        if self.mode == Mode::Standard && !cfg!(any(target_arch = "wasm32", target_os = "android"))
+        {
             let label = icon_label(ICON_KEEP_ON_TOP, 14.0);
             let keep_on_top = icon_button(title.right() + 26.0);
             if self.button(
@@ -2691,6 +2701,13 @@ impl eframe::App for CalculatorApp {
         self.window_sizes.save(storage);
     }
 
+    /// On Android: the system bars' part of the screen as egui's safe area, and the back
+    /// button as Esc.
+    #[cfg(target_os = "android")]
+    fn raw_input_hook(&mut self, ctx: &Context, raw_input: &mut egui::RawInput) {
+        android::input_hook(ctx, raw_input);
+    }
+
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         // egui resolves "Use system setting" and reports when Windows switches modes.
@@ -2701,7 +2718,7 @@ impl eframe::App for CalculatorApp {
             self.title_bar_theme = Some(theme);
         }
         self.docked =
-            self.mode.is_calculator() && !self.compact && ui.max_rect().width() >= DOCK_WIDTH;
+            self.mode.is_calculator() && !self.compact && app_rect(ui).width() >= DOCK_WIDTH;
 
         // The controls under an open popup leave the Tab order, and the control a popup
         // was opened from with the keyboard gets the focus back when it closes.
@@ -2740,8 +2757,10 @@ impl CalculatorApp {
         }
         let now = ctx.input(|i| i.time);
 
-        let full = ui.max_rect();
-        ui.painter().rect_filled(full, 0.0, self.palette.background);
+        // The background fills the screen, under a phone's system bars too.
+        ui.painter()
+            .rect_filled(ui.max_rect(), 0.0, self.palette.background);
+        let full = app_rect(ui);
         if self.page == Page::Settings {
             self.draw_settings(ui, full);
             return;
@@ -3535,11 +3554,11 @@ fn needed_fonts(language: &str, region: &str, all: bool) -> Vec<strings::ScriptF
 /// `assets/fonts/README.md`.
 const INTER: &[u8] = include_bytes!("../assets/fonts/Inter.ttf");
 
-/// Noto Sans Math, the web version's font for the mathematical symbols that Segoe UI Symbol
-/// has on Windows and Inter lacks (the analysis' `ℝ ℤ ∖ ∈ ∪ ∀`, the Scientific mode's
-/// `⌊ ⌋ ⌈ ⌉ ∛`): a browser page can't read the system's fonts. SIL Open Font License, see
-/// `assets/fonts/README.md`.
-#[cfg(target_arch = "wasm32")]
+/// Noto Sans Math, the web version's and the Android app's font for the mathematical symbols
+/// that Segoe UI Symbol has on Windows and Inter lacks (the analysis' `ℝ ℤ ∖ ∈ ∪ ∀`, the
+/// Scientific mode's `⌊ ⌋ ⌈ ⌉ ∛`): a browser page can't read the system's fonts, and Android
+/// has no Segoe UI. SIL Open Font License, see `assets/fonts/README.md`.
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
 const NOTO_SANS_MATH: &[u8] = include_bytes!("../assets/fonts/NotoSansMath-Regular.ttf");
 
 /// Loads the fonts: Segoe UI in its regular, semibold and light weights (or Inter at the same
@@ -3569,7 +3588,7 @@ fn setup_fonts(ctx: &Context, script_fonts: &[strings::ScriptFont]) {
     let light_font = add("light", segoe_or_inter("segoeuil.ttf", 300.0));
     let symbol_font = load("seguisym.ttf").map(|d| add("symbols", egui::FontData::from_owned(d)));
     let icon_font = add("icons", egui::FontData::from_static(icons::FONT));
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
     let math_font = add("math", egui::FontData::from_static(NOTO_SANS_MATH));
     let scripts: Vec<String> = script_fonts
         .iter()
@@ -3587,10 +3606,10 @@ fn setup_fonts(ctx: &Context, script_fonts: &[strings::ScriptFont]) {
     for (i, name) in scripts.into_iter().enumerate() {
         proportional.insert(1 + i, name);
     }
-    // The web version's math font (`NOTO_SANS_MATH`), then egui's Hack: without Segoe UI
-    // Symbol (Linux and macOS) Hack still has the analysis' `∈ ∪ ∀` and the Scientific mode's
-    // `⌊ ⌋ ⌈ ⌉ ∛`, which Inter lacks.
-    #[cfg(target_arch = "wasm32")]
+    // The web version's and the Android app's math font (`NOTO_SANS_MATH`), then egui's Hack:
+    // without Segoe UI Symbol (Linux and macOS) Hack still has the analysis' `∈ ∪ ∀` and the
+    // Scientific mode's `⌊ ⌋ ⌈ ⌉ ∛`, which Inter lacks.
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
     proportional.push(math_font);
     if fonts.font_data.contains_key("Hack") {
         proportional.push("Hack".to_owned());

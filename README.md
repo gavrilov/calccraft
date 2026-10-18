@@ -287,6 +287,14 @@ How the browser version differs:
 - **Screen readers:** egui has no screen reader tree in the browser yet, only spoken focus
   changes; the desktop app serves screen reader users better.
 
+## Android app (prototype)
+
+The same app also builds as a native Android app for 64-bit ARM phones and tablets (Android 7.0
+and later): `pwsh android/build-apk.ps1` writes `target/android/CalcCraft-<version>-arm64.apk`,
+which installs with `adb install -r`. It isn't in Google Play yet and still lacks the clipboard,
+Share and regional formats; [`android/README.md`](android/README.md) has the requirements and
+the details.
+
 ## Development
 
 ```bash
