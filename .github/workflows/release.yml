@@ -1,7 +1,8 @@
 name: Release
 
 # Pushing a tag such as v1.0.0 builds the app for Windows and Linux (x64) and macOS (Apple silicon
-# and Intel) and publishes them as a GitHub release.
+# and Intel) and publishes them as a GitHub release. When it succeeds, pages.yml deploys the web
+# version of the same commit.
 on:
   push:
     tags:

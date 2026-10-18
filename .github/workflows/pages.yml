@@ -1,16 +1,18 @@
 name: Web
 
 # Builds the web version (index.html, Trunk) and deploys it to GitHub Pages, at
-# https://gavrilov.github.io/calccraft/. It runs for every release tag, alongside release.yml,
-# so the site matches the latest desktop release, and on demand from the Actions tab.
+# https://gavrilov.github.io/calccraft/. It runs after every successful release (release.yml),
+# so the site matches the latest desktop release, and on demand from the Actions tab (from main).
 #
-# Once, in the repository's settings: Pages → Build and deployment → Source: GitHub Actions,
-# and Environments → github-pages → Deployment branches and tags: add the tag pattern `v*`
-# (by default only the default branch may deploy).
+# After a release it builds the release's commit, but the run itself is on the default branch,
+# as every workflow_run is: the github-pages environment lets only the default branch deploy,
+# so a run on the tag would be rejected ("Tag … is not allowed to deploy to github-pages").
+#
+# Once, in the repository's settings: Pages → Build and deployment → Source: GitHub Actions.
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -29,9 +31,14 @@ env:
 jobs:
   build:
     name: Build the web version
+    # Not after a release that failed: the site waits for the desktop builds.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The released commit after a release, else the commit the run is on.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:

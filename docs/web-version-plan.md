@@ -16,7 +16,7 @@ the date picker, the function analysis, and F5 in the Programmer mode (HEX, no r
 | 3. Browser features | Mostly done (`src/app/web.rs`): language and formats from the browser and `Intl`, `?lang=` and `?region=`, Paste through the async clipboard, Share downloads `graph.png`, keep-on-top hidden, browser shortcuts blocked. The mathematical symbols come from an embedded Noto Sans Math (OFL). **Open:** CJK, Thai and Amharic are left out; touch and screen readers aren't tested on real phones yet. |
 | 4. Size and speed | Measured: 11.2 MB `.wasm`, **3.9 MB gzipped** (Noto Sans Math adds 0.4 MB), within the target. No web-only profile yet. |
 | 5. CI | Done: the `web` job in `ci.yml` (clippy for wasm32 and `trunk build --release`). |
-| 6. Pages | Done in code (`pages.yml`). **Open:** the repository settings of step 6.1, then a first run. |
+| 6. Pages | Done (`pages.yml`): deployed after every successful release, from `main`. |
 | 7.–9. | Docs updated (README, AGENTS.md); release asset, wasm tests and Playwright not started. |
 | 10. Installable and offline | Done: app manifest, maskable icons, a service worker (page from the network first, the app's hashed files kept), safe areas for notches. Tested locally: installable manifest, offline start, old build files cleared after an update. |
 
@@ -401,9 +401,10 @@ AGENTS.md's definition of done.
 6.1. **Repository settings** (done once, by a maintainer, in the GitHub web UI):
 
 - Settings → Pages → Build and deployment → Source: **GitHub Actions**.
-- Settings → Environments → `github-pages` → Deployment branches and tags: add the tag
-  pattern **`v*`**. By default only the default branch may deploy, so a deploy from a release
-  tag would be rejected without it.
+- ~~Settings → Environments → `github-pages` → Deployment branches and tags: add the tag
+  pattern `v*`.~~ Not needed: by default only the default branch may deploy, which rejected
+  v1.2.0's deploy from its tag, so `pages.yml` now runs after the Release workflow
+  (`workflow_run`, whose runs are on `main`) and checks out the released commit.
 
 6.2. **New workflow `.github/workflows/pages.yml`:**
 
@@ -573,5 +574,5 @@ macOS work, which has the same gaps.
 | `libm` differences in the last digit | Some Graphing analysis values may differ from the desktop. | Wasm test run (8.2); the engine's exact maths isn't affected. |
 | Long computations on the main thread | A frozen tab instead of a frozen window. | Time budgets (4.3). |
 | Shared `localStorage` on `gavrilov.github.io` | Settings could mix with another egui app on the same account. | Check the keys (3.1), or use a custom domain. |
-| The Pages environment rejects tag deploys | The first release deploy fails. | Add the `v*` rule (6.1). |
+| The Pages environment rejects tag deploys | The first release deploy fails. | Happened with v1.2.0; `pages.yml` now deploys from `main` after the release (6.1). |
 | A contributor PR breaks the web build | Silent until the next release. | The CI `web` job (phase 5) runs on every PR. |

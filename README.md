@@ -230,8 +230,9 @@ handy for logging.
 ## Web version
 
 The same app runs in the browser, compiled to WebAssembly: <https://gavrilov.github.io/calccraft/>.
-Every release tag deploys it to GitHub Pages ([`pages.yml`](.github/workflows/pages.yml)), and it
-can be deployed by hand from the Actions tab. It works in current Chrome, Edge, Firefox and
+Every release deploys it to GitHub Pages once its desktop builds are out
+([`pages.yml`](.github/workflows/pages.yml)), and it can be deployed by hand from the Actions
+tab (Web → Run workflow, from `main`). It works in current Chrome, Edge, Firefox and
 Safari, on desktops and phones, and keeps its settings in the browser's local storage.
 
 It installs as an app (a PWA), which then starts from the home screen without the browser's
