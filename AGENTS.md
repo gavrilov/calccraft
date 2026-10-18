@@ -662,8 +662,9 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
   - `std::time::SystemTime::now()` and `Instant::now()` panic there; use `web_time`.
   - `std::fs` and `std::env::var` find nothing, threads can't be spawned, and `arboard` doesn't
     build. Code that needs the browser goes into `src/app/web.rs`.
-  - The page can't read the system's fonts. Hack, egui's own font, comes last in every family for
-    the symbols Inter lacks, but `ℝ`, `ℤ` and `∖` still have no glyph there.
+  - The page can't read the system's fonts. The web version embeds Noto Sans Math
+    (`assets/fonts/`) for the symbols Inter lacks (`ℝ ℤ ∖ ∈ ⌊ ⌋ ∛`), before egui's Hack, which
+    comes last in every family on all systems.
   - Browsers keep some keys: eframe never stops F5 or Ctrl+R (the calculator's GRAD and MR), so
     `web::guard_shortcuts` does, with the other browser shortcuts the calculator uses.
   - The canvas has a CSS minimum of 320 × 500 (`MIN_SIZE`): the layout code never sees a smaller

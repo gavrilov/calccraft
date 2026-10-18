@@ -3293,6 +3293,13 @@ fn needed_fonts(language: &str, region: &str, all: bool) -> Vec<strings::ScriptF
 /// `assets/fonts/README.md`.
 const INTER: &[u8] = include_bytes!("../assets/fonts/Inter.ttf");
 
+/// Noto Sans Math, the web version's font for the mathematical symbols that Segoe UI Symbol
+/// has on Windows and Inter lacks (the analysis' `ℝ ℤ ∖ ∈ ∪ ∀`, the Scientific mode's
+/// `⌊ ⌋ ⌈ ⌉ ∛`): a browser page can't read the system's fonts. SIL Open Font License, see
+/// `assets/fonts/README.md`.
+#[cfg(target_arch = "wasm32")]
+const NOTO_SANS_MATH: &[u8] = include_bytes!("../assets/fonts/NotoSansMath-Regular.ttf");
+
 /// Loads the fonts: Segoe UI in its regular, semibold and light weights (or Inter at the same
 /// weights where a Segoe UI file is missing), Segoe UI Symbol, the embedded icon font, and the
 /// fonts for scripts that Segoe UI doesn't have (files in the Fonts folder and their index in
@@ -3320,6 +3327,8 @@ fn setup_fonts(ctx: &Context, script_fonts: &[strings::ScriptFont]) {
     let light_font = add("light", segoe_or_inter("segoeuil.ttf", 300.0));
     let symbol_font = load("seguisym.ttf").map(|d| add("symbols", egui::FontData::from_owned(d)));
     let icon_font = add("icons", egui::FontData::from_static(icons::FONT));
+    #[cfg(target_arch = "wasm32")]
+    let math_font = add("math", egui::FontData::from_static(NOTO_SANS_MATH));
     let scripts: Vec<String> = script_fonts
         .iter()
         .filter_map(|&(file, index)| {
@@ -3336,8 +3345,11 @@ fn setup_fonts(ctx: &Context, script_fonts: &[strings::ScriptFont]) {
     for (i, name) in scripts.into_iter().enumerate() {
         proportional.insert(1 + i, name);
     }
-    // Last, egui's Hack: without Segoe UI Symbol (the web version, Linux and macOS) it has
-    // the analysis' `∈ ∪ ∀` and the Scientific mode's `⌊ ⌋ ⌈ ⌉ ∛`, which Inter lacks.
+    // The web version's math font (`NOTO_SANS_MATH`), then egui's Hack: without Segoe UI
+    // Symbol (Linux and macOS) Hack still has the analysis' `∈ ∪ ∀` and the Scientific mode's
+    // `⌊ ⌋ ⌈ ⌉ ∛`, which Inter lacks.
+    #[cfg(target_arch = "wasm32")]
+    proportional.push(math_font);
     if fonts.font_data.contains_key("Hack") {
         proportional.push("Hack".to_owned());
     }

@@ -1,12 +1,13 @@
 # Fonts
 
-Both fonts are compiled into `calculator.exe` with `include_bytes!`, so the app needs no font
-files next to it.
+The fonts are compiled into the app with `include_bytes!`, so it needs no font files next to
+it. Noto Sans Math goes only into the web version, which can't read the system's fonts.
 
 | File | What | Source | License |
 | --- | --- | --- | --- |
 | `CalcCraftIcons.ttf` | Every icon of the app | A subset of [Fluent System Icons](https://github.com/microsoft/fluentui-system-icons) (`FluentSystemIcons-Resizable.ttf`, commit `a347af9`), built by `tools/icon-font.py` | MIT, [`LICENSE-FluentSystemIcons.txt`](LICENSE-FluentSystemIcons.txt) |
 | `Inter.ttf` | The text font where Segoe UI is missing (other systems, or a Windows without it) | [Inter](https://fonts.google.com/specimen/Inter) 4.001, `Inter[opsz,wght].ttf` from [google/fonts](https://github.com/google/fonts/tree/main/ofl/inter), unmodified | SIL Open Font License 1.1, [`OFL-Inter.txt`](OFL-Inter.txt) |
+| `NotoSansMath-Regular.ttf` | The web version's mathematical symbols that Inter lacks and Segoe UI Symbol has on Windows (`ℝ ℤ ∖ ∈ ∪ ∀ ⌊ ⌋ ⌈ ⌉ ∛`) | [Noto Sans Math](https://github.com/notofonts/math) 3.000, `fonts/NotoSansMath/unhinted/ttf/NotoSansMath-Regular.ttf` from [notofonts/notofonts.github.io](https://github.com/notofonts/notofonts.github.io), unmodified | SIL Open Font License 1.1, [`OFL-NotoSansMath.txt`](OFL-NotoSansMath.txt) |
 
 `tools/icon-font.py` puts each icon at the code point of the Segoe Fluent Icons glyph that the
 Windows Calculator uses for it (`src/app/icons.rs` lists them), scales it to fill the em like

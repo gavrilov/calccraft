@@ -13,8 +13,8 @@ the date picker, the function analysis, and F5 in the Programmer mode (HEX, no r
 |---|---|
 | 1. Compile for wasm32 | Done: dependencies per target, `web_time` for `rand`'s seed, chrono's `wasmbind`, the clipboard behind `cfg`. Clippy is clean for wasm32 and native. |
 | 2. Entry point and page | Done: `main.rs`, `index.html`, `Trunk.toml`, icons from `src/icon.rs` (`assets/web/`), loading message, CSS minimum of 320 × 500. |
-| 3. Browser features | Mostly done (`src/app/web.rs`): language and formats from the browser and `Intl`, `?lang=` and `?region=`, Paste through the async clipboard, Share downloads `graph.png`, keep-on-top hidden, browser shortcuts blocked. **Open:** `ℝ`, `ℤ` and `∖` in the function analysis have no glyph (no free font on hand has them; a subset of Noto Sans Math would fix it); CJK, Thai and Amharic are left out; touch and screen readers aren't tested on real phones yet. |
-| 4. Size and speed | Measured: 10.6 MB `.wasm`, **3.5 MB gzipped**, within the target. No web-only profile yet. |
+| 3. Browser features | Mostly done (`src/app/web.rs`): language and formats from the browser and `Intl`, `?lang=` and `?region=`, Paste through the async clipboard, Share downloads `graph.png`, keep-on-top hidden, browser shortcuts blocked. The mathematical symbols come from an embedded Noto Sans Math (OFL). **Open:** CJK, Thai and Amharic are left out; touch and screen readers aren't tested on real phones yet. |
+| 4. Size and speed | Measured: 11.2 MB `.wasm`, **3.9 MB gzipped** (Noto Sans Math adds 0.4 MB), within the target. No web-only profile yet. |
 | 5. CI | Done: the `web` job in `ci.yml` (clippy for wasm32 and `trunk build --release`). |
 | 6. Pages | Done in code (`pages.yml`). **Open:** the repository settings of step 6.1, then a first run. |
 | 7.–10. | Docs updated (README, AGENTS.md); release asset, wasm tests, Playwright and PWA not started. |
