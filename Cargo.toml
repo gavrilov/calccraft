@@ -64,7 +64,12 @@ windows = { version = "0.62", features = [
     "Win32_System_WinRT",
     "Win32_UI_Shell",
 ] }
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Graphics_Dwm"] }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Graphics_Dwm",
+    "Win32_UI_Input_KeyboardAndMouse",
+] }
 
 [dev-dependencies]
 # For `icon::tests::write_web_icons`, on every system.
