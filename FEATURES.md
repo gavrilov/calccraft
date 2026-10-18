@@ -274,12 +274,16 @@ UI code and is covered by unit tests.*
 - **Status:** `[x] COMPLETED`
 - **Priority:** `P2`
 - **Depends On:** `FEAT-STD-001`
-- **Windows ref:** `src/Calculator/Views/MainPage.xaml.cs`, `src/Calculator/Views/Calculator.xaml`
-- **Rust:** `src/app.rs` (`set_compact`)
+- **Windows ref:** `src/Calculator/Views/MainPage.xaml.cs`, `src/Calculator/Views/Calculator.xaml`,
+  `src/Calculator.ViewModels/ApplicationViewModel.cs` (`ToggleAlwaysOnTop`)
+- **Rust:** `src/app.rs` (`set_compact`, `WindowSizes`, `keep_on_top_commands`)
 - **Description:** A small window that stays above other windows.
 - **Acceptance Criteria:**
-  - The window is always on top and shrinks to 320 × 394; leaving the mode restores the
-    previous size.
+  - The window is always on top and shrinks to 320 × 394 the first time; after that it opens at
+    the size it had when the mode was last left, which the settings keep, as Windows does
+    (`calculatorAlwaysOnTopLastWidth` and `…Height`). Leaving the mode restores the previous size.
+  - Like Windows' compact overlay, the keep-on-top window isn't maximized and its maximize button
+    is off (on Windows and macOS; X11 and Wayland don't let an app turn it off).
   - The menu, title, history button and memory row are hidden; a back button returns to full view.
   - Only the result shows, without the expression line (`DisplayModeAlwaysOnTop`), and the
     history and memory shortcuts do nothing.
