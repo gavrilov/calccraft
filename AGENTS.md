@@ -60,6 +60,9 @@ src/app/strings.rs       the interface's text in the user's language (from local
 src/app/region.rs        the user's regional formats, read from Windows (or the browser's Intl)
 src/app/web.rs           the web version's ties to the browser: URL parameters, languages, Intl,
                          clipboard, downloads, browser shortcuts (wasm32 only)
+src/app/palette.rs       the dark and light color palettes (`DARK`, `LIGHT`)
+src/app/share.rs         the graph's share: Windows' share sheet (`IDataTransferManagerInterop`),
+                         or a PNG download in the browser
 src/app/date_view.rs     the date calculation mode's UI (a child module of app.rs)
 src/app/converter_view.rs  the converters' UI (a child module of app.rs)
 src/app/scientific_view.rs  the Scientific mode's UI (a child module of app.rs)
