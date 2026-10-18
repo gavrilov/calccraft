@@ -341,7 +341,9 @@ UI code and is covered by unit tests.*
     (a `-` at the start or after an operator becomes `±` after the first non-zero digit).
   - Invalid clipboard text shows `Invalid input`, as in Windows.
   - Copy in the history menu copies the result as the list shows it (`1,236`).
-  - The menu opens at the pointer; a click outside it or `Esc` closes it.
+  - The menu opens at the pointer; a click outside it or `Esc` closes it, and the list under it
+    doesn't scroll. A history item's menu also closes if the history changes, so Delete never
+    deletes another entry.
 - **Also:** numbers in e-notation (`1e5`, `1.5e-3`) paste through `exp` (`FEAT-SCI-006`).
 - **Differences:** the memory menu shows `MC`, `M+` and `M−` as text, since CalcCraft doesn't
   ship the Calculator's own icon font.
@@ -930,6 +932,10 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
   - Line options (14 colors, solid, dash or dot), the box's context menu (cut, copy, paste,
     undo, select all, analyze, style, remove), and Windows' grid colors (#C6C6C6 and #E3E3E3 on
     white by default, "Always light").
+  - While the line thickness or line style list is open, the rest of its flyout takes no input:
+    a click there or `Esc` closes only the list, even with `Esc` held down, and `Tab` goes
+    from the list's combo to the list. When the list closes with the keyboard focus in it, or
+    with `Esc`, its combo gets the focus back.
 - **Differences:** the equation boxes are plain text laid out like math (italic variables,
   raised exponents, spaced relations) rather than Windows' math editor, so a fraction stays
   `1/x` instead of being built up. The engine is CalcCraft's own: functions Windows' engine
@@ -955,6 +961,8 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
   - "Reset view" restores the automatic view; an empty graph shows −10 to 10 on both axes.
   - `Ctrl` + `+` / `Ctrl` + `-` zoom.
   - For x² in a 1.64 : 1 graph, the automatic view is Windows' (x ±27.2204, y −3.025 to 30.25).
+  - Under an open popup (the graph options, line options, a menu), dragging or the wheel moves
+    neither the graph nor the equation list.
 - **Differences:** Windows' engine picks its automatic view with rules that aren't public;
   CalcCraft's `best_fit` (the key points near the origin, the values there, a tenth more where a
   curve turns, proportional axes) matches it for x² and gives similar views elsewhere. egui's
@@ -994,7 +1002,8 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
   chevron. Variables that stay keep their values.
 - **Acceptance Criteria:** value, minimum, maximum and step can be set; the curve updates while
   dragging. A value beyond the slider moves its end, a minimum above the maximum moves the
-  maximum 10 above it (and the other way around), and a step of 0 or less is refused.
+  maximum 10 above it (and the other way around), and a step of 0 or less is refused. A click on
+  a slider under an open popup only closes the popup.
 
 #### `FEAT-GRAPH-005` Key Graph Features Analysis
 - **Status:** `[x] COMPLETED`
@@ -1169,6 +1178,9 @@ code, unit tests); UI in `src/app/graphing_view.rs`, `src/app/graph_canvas.rs` a
   - The display ("Display is 7", "Display is 5 point" while typing a decimal point), the date
     results ("Difference 1 week", "Resulting date …") and the converted value are live regions
     that Narrator reads when they change.
+  - Narrator can't press or focus the controls under an open popup (the menu, a context menu,
+    a drop-down or the calendar), just as the mouse can't, except the Graphing mode's text
+    boxes, which it can still focus.
 - **Differences:** Windows announces results with UI Automation notifications (and some events,
   like "Memory cleared", have their own); CalcCraft uses live regions through AccessKit and has
   no event announcements. The expression line is read as it's shown, not as Windows' spoken

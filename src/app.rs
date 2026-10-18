@@ -16,6 +16,7 @@ mod strings;
 #[cfg(target_arch = "wasm32")]
 mod web;
 
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
@@ -27,7 +28,7 @@ use eframe::egui::{
 };
 
 use crate::converter::Category;
-use crate::engine::{Angle, Calculator, Command, Func, Op, Radix};
+use crate::engine::{Angle, Calculator, Command, Func, HistoryEntry, Op, Radix};
 use icons::{
     ICON_BACK, ICON_BACK_TO_FULL, ICON_BACKSPACE, ICON_CALCULATOR, ICON_CALENDAR,
     ICON_CHEVRON_DOWN, ICON_CHEVRON_UP, ICON_CODE, ICON_COPY, ICON_DELETE, ICON_DIVIDE,
@@ -1421,9 +1422,9 @@ impl CalculatorApp {
         let p = self.palette;
         let painter = ui.painter();
         let history = panel == Panel::History;
-        // A menu whose item is gone (or that belongs to the other panel) closes.
+        // A menu whose item is gone or moved (or that belongs to the other panel) closes.
         self.context_menu = self.context_menu.filter(|menu| match menu.target {
-            MenuTarget::History(i) => history && i < self.engine().history().len(),
+            MenuTarget::History(_, key) => history && history_key(self.engine().history()) == key,
             MenuTarget::Memory(i) => !history && i < self.engine().memory().len(),
             MenuTarget::Radix(_) => true,
         });
@@ -1458,6 +1459,7 @@ impl CalculatorApp {
             egui::ScrollArea::vertical()
                 .id_salt(("list", history))
                 .auto_shrink(false)
+                .scroll_source(access::scroll_source(ui, Default::default()))
                 .show(ui, |ui| {
                     ui.spacing_mut().item_spacing.y = 0.0;
                     // A flyout opened with the keyboard focuses its first item.
@@ -1583,7 +1585,8 @@ impl CalculatorApp {
         paint_right(&painter, result, pos2(right, y + expression_height), p.text);
         if response.secondary_clicked() {
             let pos = response.interact_pointer_pos().unwrap_or(rect.center());
-            return Some(FlyoutAction::OpenMenu(MenuTarget::History(index), pos));
+            let target = MenuTarget::History(index, history_key(self.engine().history()));
+            return Some(FlyoutAction::OpenMenu(target, pos));
         }
         response
             .clicked()
@@ -1687,7 +1690,7 @@ impl CalculatorApp {
 
         // The memory items show the Calculator font's MC, M+ and M− glyphs as text.
         let items = match menu.target {
-            MenuTarget::History(i) => vec![
+            MenuTarget::History(i, _) => vec![
                 (
                     icon_label(ICON_COPY, 16.0),
                     tr("CopyHistoryMenuItem.Text"),
@@ -2546,7 +2549,10 @@ enum FlyoutAction {
 /// The item a context menu belongs to.
 #[derive(Clone, Copy)]
 enum MenuTarget {
-    History(usize),
+    /// A history entry: its index, and the history's `history_key` when the menu opened.
+    /// The menu closes if the history changes under it, as the index would then name
+    /// another entry.
+    History(usize, u64),
     Memory(usize),
     /// A row of the Programmer mode's radix list.
     Radix(Radix),
@@ -2557,6 +2563,16 @@ enum MenuTarget {
 struct ContextMenu {
     target: MenuTarget,
     pos: Pos2,
+}
+
+/// A fingerprint of the history's entries, to tell when the history changed under an open
+/// context menu.
+fn history_key(history: &[HistoryEntry]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    for entry in history {
+        (&entry.expression, &entry.text).hash(&mut hasher);
+    }
+    hasher.finish()
 }
 
 impl eframe::App for CalculatorApp {
@@ -3575,6 +3591,9 @@ pub fn window_icon() -> egui::IconData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use egui::accesskit::{Action, NodeId, Role};
+
+    const GRAPH_WINDOW: egui::Vec2 = vec2(1000.0, 700.0);
 
     fn key(key: Key, modifiers: Modifiers) -> Event {
         Event::Key {
@@ -4296,5 +4315,477 @@ mod tests {
         let mut events = vec![ctrl_alt.clone()];
         latin_letters(&mut events, greek, false);
         assert_eq!(events, [ctrl_alt]);
+    }
+
+    /// A screen reader's `action` on the AccessKit node `node`.
+    fn screen_reader(action: Action, node: NodeId) -> Event {
+        Event::AccessKitActionRequest(egui::accesskit::ActionRequest {
+            action,
+            target_node: node,
+            target_tree: egui::accesskit::TreeId::ROOT,
+            data: None,
+        })
+    }
+
+    /// Runs a frame of `app` and returns the AccessKit nodes a screen reader gets from it.
+    fn accesskit_nodes(
+        ctx: &Context,
+        app: &mut CalculatorApp,
+        size: egui::Vec2,
+    ) -> Vec<(NodeId, egui::accesskit::Node)> {
+        let input = egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            ..Default::default()
+        };
+        let mut frame = eframe::Frame::_new_kittest();
+        let mut output = ctx.run_ui(input, |ui| eframe::App::ui(app, ui, &mut frame));
+        output.textures_delta.clear();
+        output.platform_output.accesskit_update.unwrap().nodes
+    }
+
+    /// The mouse wheel turned 3 lines down at `at`, and the frames that egui spreads the
+    /// scrolling over.
+    fn wheel_down(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, at: Pos2) {
+        let wheel = Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: vec2(0.0, -3.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: Modifiers::NONE,
+        };
+        run(ctx, app, size, vec![Event::PointerMoved(at), wheel]);
+        for _ in 0..20 {
+            run(ctx, app, size, vec![]);
+        }
+    }
+
+    /// Drags with the pointer from `from` by `by`: it presses there, moves in 8 frames and
+    /// lets go.
+    fn drag(ctx: &Context, app: &mut CalculatorApp, size: egui::Vec2, from: Pos2, by: egui::Vec2) {
+        let button = |pos, pressed| Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        run(ctx, app, size, vec![Event::PointerMoved(from)]);
+        run(ctx, app, size, vec![button(from, true)]);
+        for i in 1..=8 {
+            let to = from + by * (i as f32 / 8.0);
+            run(ctx, app, size, vec![Event::PointerMoved(to)]);
+        }
+        run(ctx, app, size, vec![button(from + by, false)]);
+    }
+
+    /// The Graphing mode in a `GRAPH_WINDOW` with a box for each of `equations`, and the
+    /// graph options open over the graph's left side, away from the boxes.
+    fn graph_options_over(ctx: &Context, equations: &[&str]) -> CalculatorApp {
+        let mut app = start_in(ctx);
+        app.set_mode(Mode::Graphing);
+        run(ctx, &mut app, GRAPH_WINDOW, vec![]);
+        for (i, text) in equations.iter().enumerate() {
+            if i > 0 {
+                app.graphing.add_row();
+            }
+            app.graphing.rows[i].text = (*text).into();
+            app.graphing.submit(i, crate::graphing::Syntax::default());
+        }
+        let anchor = Rect::from_min_size(pos2(20.0, 50.0), vec2(40.0, 32.0));
+        app.graphing.popup = Some(graphing_view::Popup::Settings {
+            anchor,
+            widths_open: false,
+        });
+        for _ in 0..3 {
+            run(ctx, &mut app, GRAPH_WINDOW, vec![]);
+        }
+        app
+    }
+
+    #[test]
+    fn screen_readers_cannot_click_under_popups() {
+        // The menu over the Standard keypad: the covered 7 does nothing.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        app.flyout = Flyout::Navigation;
+        run(&ctx, &mut app, MIN_SIZE, vec![]);
+        let seven = Id::new("key").with(8).with("covered");
+        run(&ctx, &mut app, MIN_SIZE, vec![screen_reader_click(seven)]);
+        assert_eq!(app.display_text(), "0", "the 7 under the menu");
+        assert!(app.flyout == Flyout::Navigation);
+
+        // A converter's unit list over its keypad: no covered key types.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        app.set_mode(Mode::Converter(Category::Length));
+        run(&ctx, &mut app, MIN_SIZE, vec![]);
+        let unit = ctx.read_response(Id::new("converter-unit").with(true));
+        click(&ctx, &mut app, MIN_SIZE, unit.unwrap().rect.center());
+        assert!(app.converter.popup_open());
+        for i in 0..15 {
+            let key = Id::new("converter-key").with(i).with("covered");
+            run(&ctx, &mut app, MIN_SIZE, vec![screen_reader_click(key)]);
+            let converter = &app.converter.converter;
+            assert_eq!(converter.value1(), "0", "the key {i} under the unit list");
+            assert!(app.converter.popup_open());
+        }
+
+        // The date mode's page list over the From date picker, which the test finds by its
+        // name, as a screen reader does: the From calendar doesn't open.
+        let ctx = Context::default();
+        ctx.enable_accesskit();
+        let mut app = start_in(&ctx);
+        app.set_mode(Mode::DateCalculation);
+        run(&ctx, &mut app, MIN_SIZE, vec![]);
+        let page = ctx.read_response(Id::new("date-page"));
+        click(&ctx, &mut app, MIN_SIZE, page.unwrap().rect.center());
+        assert!(app.date.popup_open());
+        let nodes = accesskit_nodes(&ctx, &mut app, MIN_SIZE);
+        let (from, _) = nodes
+            .into_iter()
+            .find(|(_, node)| node.role() == Role::ComboBox && node.label() == Some("From"))
+            .expect("the From date picker");
+        run(
+            &ctx,
+            &mut app,
+            MIN_SIZE,
+            vec![screen_reader(Action::Click, from)],
+        );
+        run(&ctx, &mut app, MIN_SIZE, vec![]);
+        let calendar = ctx.read_response(Id::new("calendar-day").with(0));
+        assert!(
+            calendar.is_none(),
+            "the From calendar opened under the page list"
+        );
+        assert!(app.date.popup_open());
+    }
+
+    #[test]
+    fn history_menu_deletes_the_entry_it_was_opened_on() {
+        // The docked history, with "2 + 3 = 5".
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        for command in [
+            Command::Digit(2),
+            Command::Operator(Op::Add),
+            Command::Digit(3),
+            Command::Equals,
+        ] {
+            app.engine_mut().execute(command);
+        }
+        let size = vec2(DOCK_WIDTH + 100.0, 600.0);
+        run(&ctx, &mut app, size, vec![]);
+        let history = |app: &CalculatorApp| -> Vec<String> {
+            let entries = app.engine().history().iter();
+            entries
+                .map(|e| format!("{} {}", e.expression, e.text))
+                .collect()
+        };
+        let item = ctx.read_response(Id::new("history-item").with(0));
+        let item = item.unwrap().rect.center();
+        let right_click = |pressed| Event::PointerButton {
+            pos: item,
+            button: egui::PointerButton::Secondary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        let open_menu = |app: &mut CalculatorApp| {
+            for event in [
+                Event::PointerMoved(item),
+                right_click(true),
+                right_click(false),
+            ] {
+                run(&ctx, app, size, vec![event]);
+            }
+            assert!(app.context_menu.is_some());
+        };
+        let delete = screen_reader_click(Id::new("context-menu-item").with(1));
+
+        // A screen reader's click on the covered = adds nothing, and Delete then deletes
+        // the entry the menu was opened on.
+        open_menu(&mut app);
+        let equals = Id::new("key").with(23).with("covered");
+        run(&ctx, &mut app, size, vec![screen_reader_click(equals)]);
+        run(&ctx, &mut app, size, vec![delete.clone()]);
+        assert_eq!(
+            history(&app),
+            [] as [&str; 0],
+            "Delete removed another entry"
+        );
+
+        // If the history changes under the menu anyway, the menu closes: its entry moved.
+        app.engine_mut().execute(Command::Equals);
+        run(&ctx, &mut app, size, vec![]);
+        open_menu(&mut app);
+        app.engine_mut().execute(Command::Equals);
+        run(&ctx, &mut app, size, vec![]);
+        assert!(
+            app.context_menu.is_none(),
+            "the menu stays on a moved entry"
+        );
+        run(&ctx, &mut app, size, vec![delete]);
+        assert_eq!(history(&app).len(), 2);
+    }
+
+    #[test]
+    fn graph_controls_ignore_the_pointer_under_popups() {
+        // y = ax: the graph options' backdrop senses only clicks, so the graph and a's slider
+        // under it must not take the pointer's drags, wheel or presses.
+        let ctx = Context::default();
+        let mut app = graph_options_over(&ctx, &["y=ax"]);
+        let view = app.graphing.view;
+        let graph = ctx.read_response(Id::new("graph").with("covered"));
+        let from = graph.unwrap().rect.right_bottom() - vec2(200.0, 100.0);
+        drag(&ctx, &mut app, GRAPH_WINDOW, from, vec2(80.0, 0.0));
+        wheel_down(&ctx, &mut app, GRAPH_WINDOW, from);
+        let moved = app.graphing.view != view;
+        assert!(!moved, "the graph moved under the graph options");
+        assert!(app.graphing.popup.is_some());
+
+        // A click on the slider closes the popup and leaves the slider alone.
+        let slider = ctx.read_response(Id::new("graph-var-slider").with('a').with("covered"));
+        let at = slider.unwrap().rect.left_center() + vec2(14.0, 0.0);
+        click(&ctx, &mut app, GRAPH_WINDOW, at);
+        assert!(app.graphing.popup.is_none());
+        let value = app.graphing.variables[0].value;
+        assert_eq!(value, 1.0, "the slider under the graph options");
+    }
+
+    #[test]
+    fn lists_under_popups_ignore_the_wheel() {
+        // A history item's menu over the docked history, 20 entries long.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        for command in [
+            Command::Digit(1),
+            Command::Operator(Op::Add),
+            Command::Digit(1),
+        ] {
+            app.engine_mut().execute(command);
+        }
+        for _ in 0..20 {
+            app.engine_mut().execute(Command::Equals);
+        }
+        let size = vec2(DOCK_WIDTH + 100.0, 600.0);
+        run(&ctx, &mut app, size, vec![]);
+        let item = ctx.read_response(Id::new("history-item").with(0));
+        let item = item.unwrap().rect.center();
+        let right_click = |pressed| Event::PointerButton {
+            pos: item,
+            button: egui::PointerButton::Secondary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        for event in [
+            Event::PointerMoved(item),
+            right_click(true),
+            right_click(false),
+        ] {
+            run(&ctx, &mut app, size, vec![event]);
+        }
+        assert!(app.context_menu.is_some());
+        run(&ctx, &mut app, size, vec![]);
+        let row = Id::new("history-item").with(4).with("covered");
+        let before = ctx.read_response(row).unwrap().rect;
+        wheel_down(&ctx, &mut app, size, before.center());
+        let after = ctx.read_response(row).unwrap().rect;
+        assert_eq!(after, before, "the history under the menu scrolled");
+        assert!(app.context_menu.is_some());
+
+        // The graph options over a full equation list.
+        let ctx = Context::default();
+        let mut app = graph_options_over(&ctx, &[""; 14]);
+        let row = Id::new("graph-eq-button").with(app.graphing.rows[1].id);
+        let row = row.with("covered");
+        let before = ctx.read_response(row).unwrap().rect;
+        wheel_down(
+            &ctx,
+            &mut app,
+            GRAPH_WINDOW,
+            before.center() + vec2(100.0, 0.0),
+        );
+        let after = ctx.read_response(row).unwrap().rect;
+        assert_eq!(
+            after, before,
+            "the equations under the graph options scrolled"
+        );
+        assert!(app.graphing.popup.is_some());
+    }
+
+    #[test]
+    fn nested_lists_cover_their_flyout() {
+        // The graph options with their line thickness list open: the flyout's other controls
+        // take no input, so neither a screen reader nor a click picks Degrees, and a click on
+        // the flyout closes only the list.
+        let ctx = Context::default();
+        let mut app = graph_options_over(&ctx, &["y=x"]);
+        ctx.enable_accesskit();
+        let anchor = Rect::from_min_size(pos2(20.0, 50.0), vec2(40.0, 32.0));
+        let settings = |widths_open| {
+            Some(graphing_view::Popup::Settings {
+                anchor,
+                widths_open,
+            })
+        };
+        app.graphing.popup = settings(true);
+        let nodes = accesskit_nodes(&ctx, &mut app, GRAPH_WINDOW);
+        let degrees = tr("TrigModeDegrees.Content");
+        let (node, _) = nodes
+            .iter()
+            .find(|(_, n)| n.label() == Some(degrees))
+            .unwrap();
+        run(
+            &ctx,
+            &mut app,
+            GRAPH_WINDOW,
+            vec![screen_reader(Action::Click, *node)],
+        );
+        assert!(
+            app.graphing.angle == Angle::Radians,
+            "Degrees under the list"
+        );
+        // A click on Degrees, outside the list, closes only the list.
+        let unit = Id::new("graph-settings-unit").with(1usize);
+        let unit = ctx
+            .read_response(unit)
+            .or_else(|| ctx.read_response(unit.with("covered")));
+        let degrees = unit.unwrap().rect.center();
+        click(&ctx, &mut app, GRAPH_WINDOW, degrees);
+        let angle = app.graphing.angle;
+        assert!(
+            angle == Angle::Radians,
+            "a click on Degrees outside the list"
+        );
+        assert!(
+            app.graphing.popup == settings(false),
+            "the list after a click on the flyout"
+        );
+
+        // The keyboard: Enter on the combo opens the list and keeps the focus there, Tab goes
+        // past the theme, covered by the list, to the list, and Enter picks a thickness and
+        // gives the focus back to the combo, as Esc and a click outside the list do.
+        let combo = Id::new("graph-settings-width");
+        let focused = |id| ctx.memory(|m| m.has_focus(id));
+        let press = |k| vec![key(k, Modifiers::NONE)];
+        ctx.memory_mut(|m| m.request_focus(combo));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Enter));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        assert!(app.graphing.popup == settings(true));
+        assert!(focused(combo), "the combo lost the focus");
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Tab));
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Enter));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        let width = app.graphing.line_width;
+        assert_eq!(width, 1.0, "Tab went to the theme under the list");
+        assert!(app.graphing.popup == settings(false));
+        assert!(focused(combo), "the focus after a thickness");
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Enter));
+        assert!(
+            app.graphing.popup == settings(true),
+            "Enter after a thickness"
+        );
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Escape));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        assert!(
+            app.graphing.popup == settings(false),
+            "Esc closed the flyout"
+        );
+        assert!(focused(combo), "the focus after Esc");
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Enter));
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Tab));
+        click(&ctx, &mut app, GRAPH_WINDOW, degrees);
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        assert!(app.graphing.popup == settings(false));
+        assert!(focused(combo), "the focus after a click outside the list");
+
+        // The line options with their line style list open: no other color under it.
+        let row = app.graphing.rows[0].id;
+        let style = graphing_view::Popup::Style {
+            row,
+            anchor,
+            styles_open: true,
+        };
+        app.graphing.popup = Some(style);
+        let color = app.graphing.rows[0].color;
+        let nodes = accesskit_nodes(&ctx, &mut app, GRAPH_WINDOW);
+        // Another color, of the 13 whose names don't depend on the theme.
+        let other = (color + 1) % 13;
+        let other = tr(&format!("equationColor{}AutomationName", other + 1));
+        let (node, _) = nodes
+            .iter()
+            .find(|(_, n)| n.label() == Some(other))
+            .unwrap();
+        run(
+            &ctx,
+            &mut app,
+            GRAPH_WINDOW,
+            vec![screen_reader(Action::Click, *node)],
+        );
+        assert_eq!(app.graphing.rows[0].color, color, "a color under the list");
+
+        // The keyboard picks a line style in the list, and its combo gets the focus back.
+        let combo = Id::new("graph-style-combo");
+        let style = graphing_view::Popup::Style {
+            row,
+            anchor,
+            styles_open: false,
+        };
+        app.graphing.popup = Some(style);
+        ctx.memory_mut(|m| m.request_focus(combo));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Enter));
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Tab));
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Tab));
+        run(&ctx, &mut app, GRAPH_WINDOW, press(Key::Enter));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        let dash = crate::graphing::plot::LineStyle::Dash;
+        assert!(app.graphing.rows[0].style == dash, "the line style");
+        assert!(app.graphing.popup == Some(style));
+        assert!(focused(combo), "the focus after a line style");
+    }
+
+    #[test]
+    fn a_held_esc_closes_only_the_list() {
+        // The graph options' line thickness list, opened from the keyboard. Held down, the Esc
+        // that closes it repeats before its key-up: the repeat closes nothing more, and the
+        // combo keeps the focus. An Esc after the key-up closes the graph options.
+        let ctx = Context::default();
+        let mut app = graph_options_over(&ctx, &["y=x"]);
+        let anchor = Rect::from_min_size(pos2(20.0, 50.0), vec2(40.0, 32.0));
+        let settings = |widths_open| {
+            Some(graphing_view::Popup::Settings {
+                anchor,
+                widths_open,
+            })
+        };
+        let combo = Id::new("graph-settings-width");
+        ctx.memory_mut(|m| m.request_focus(combo));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        let enter = key(Key::Enter, Modifiers::NONE);
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![enter]);
+        assert!(app.graphing.popup == settings(true));
+        // Esc's key-down, a repeat or not, or its key-up.
+        let esc = |down, repeated| {
+            let mut event = key(Key::Escape, Modifiers::NONE);
+            if let Event::Key {
+                pressed, repeat, ..
+            } = &mut event
+            {
+                (*pressed, *repeat) = (down, repeated);
+            }
+            event
+        };
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![esc(true, false)]);
+        assert!(app.graphing.popup == settings(false), "the first Esc");
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![esc(true, true)]);
+        let popup = app.graphing.popup;
+        assert!(popup == settings(false), "the held Esc's repeat");
+        assert!(
+            ctx.memory(|m| m.has_focus(combo)),
+            "the focus after a repeat"
+        );
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![esc(false, false)]);
+        assert!(app.graphing.popup == settings(false));
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![esc(true, false)]);
+        assert!(app.graphing.popup.is_none(), "an Esc after the key-up");
     }
 }
