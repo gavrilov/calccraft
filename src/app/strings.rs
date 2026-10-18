@@ -260,20 +260,27 @@ pub(super) fn unit_abbreviation(key: &str) -> &'static str {
 }
 
 /// The translation that best matches a language tag, like Windows' resource lookup:
-/// the same tag, or the same language in another region. Chinese goes by script, and
-/// Spanish, Portuguese, French and English pick the regional variant that fits best.
+/// the same tag, or the same language in another region, but not in another script
+/// (Windows scores a script mismatch as no match, so `az-Cyrl-AZ` gets none). Chinese goes
+/// by script, then by region, and Spanish, Portuguese, French and English pick the regional
+/// variant that fits best.
 fn match_language(tag: &str) -> Option<&'static str> {
     let tag = tag.to_ascii_lowercase();
     let mut parts = tag.split(['-', '_']);
     let language = parts.next()?;
     let rest: Vec<&str> = parts.collect();
     let has = |part: &str| rest.contains(&part);
+    let script = script_subtag(&rest);
     let tags = || LOCALES.iter().map(|(tag, _)| *tag);
     let chosen = match language {
-        "zh" if has("hant") || has("tw") || has("hk") || has("mo") => "zh-TW",
-        "zh" => "zh-CN",
-        "sr" if has("cyrl") => return None,
-        "sr" => "sr-Latn-RS",
+        // The script decides before the region: zh-Hans-HK is Simplified Chinese.
+        "zh" => match script {
+            Some("hans") => "zh-CN",
+            Some("hant") => "zh-TW",
+            Some(_) => return None,
+            None if has("tw") || has("hk") || has("mo") => "zh-TW",
+            None => "zh-CN",
+        },
         "no" | "nn" => "nb-NO",
         "es" if rest.is_empty() || has("es") => "es-ES",
         "es" => "es-MX",
@@ -285,9 +292,23 @@ fn match_language(tag: &str) -> Option<&'static str> {
         "en" => "en-GB",
         _ => tags()
             .find(|candidate| candidate.to_ascii_lowercase() == tag)
-            .or_else(|| tags().find(|candidate| candidate.split('-').next() == Some(language)))?,
+            .or_else(|| {
+                tags().find(|candidate| {
+                    let candidate = candidate.to_ascii_lowercase();
+                    let subtags: Vec<&str> = candidate.split('-').collect();
+                    let other = script_subtag(&subtags[1..]);
+                    subtags[0] == language && other.zip(script).is_none_or(|(a, b)| a == b)
+                })
+            })?,
     };
     drawable(chosen).then_some(chosen)
+}
+
+/// The script subtag of a lowercase language tag (`hans` in `zh-hans-hk`), from its subtags
+/// after the language: four letters, right after it.
+fn script_subtag<'a>(subtags: &[&'a str]) -> Option<&'a str> {
+    let first = subtags.first().copied()?;
+    (first.len() == 4 && first.bytes().all(|b| b.is_ascii_alphabetic())).then_some(first)
 }
 
 /// The user's preferred display languages, most preferred first. The environment
@@ -361,9 +382,11 @@ pub(super) fn script_font(tag: &str) -> Option<ScriptFont> {
     let mut parts = tag.split(['-', '_']);
     let language = parts.next()?;
     let rest: Vec<&str> = parts.collect();
-    let traditional = ["hant", "tw", "hk", "mo"]
-        .iter()
-        .any(|part| rest.contains(part));
+    // As in `match_language`, the script decides before the region: zh-Hans-HK is Simplified.
+    let traditional = match script_subtag(&rest) {
+        Some(script) => script == "hant",
+        None => ["tw", "hk", "mo"].iter().any(|part| rest.contains(part)),
+    };
     match language {
         "ja" => Some(JAPANESE),
         "zh" if traditional => Some(TRADITIONAL_CHINESE),
@@ -430,6 +453,32 @@ mod tests {
         assert_eq!(match_language("hi-IN"), None);
         // Not translated.
         assert_eq!(match_language("xx-YY"), None);
+    }
+
+    #[test]
+    fn scripts_match_before_regions() {
+        // Chinese (Simplified, Hong Kong SAR) and (Simplified, Macao SAR) in Windows.
+        assert_eq!(match_language("zh-Hans-HK"), Some("zh-CN"));
+        assert_eq!(match_language("zh-Hans-MO"), Some("zh-CN"));
+        assert_eq!(match_language("zh-Hant"), Some("zh-TW"));
+        assert_eq!(match_language("zh-Hant-SG"), Some("zh-TW"));
+        // Without a script, the region tells it.
+        assert_eq!(match_language("zh-HK"), Some("zh-TW"));
+        assert_eq!(match_language("zh-SG"), Some("zh-CN"));
+        // Windows doesn't fall back to a translation in another script.
+        assert_eq!(match_language("az-Cyrl-AZ"), None);
+        assert_eq!(match_language("sr-Cyrl"), None);
+        assert_eq!(match_language("zh-Latn"), None);
+        // The same script, or none, still matches.
+        assert_eq!(match_language("az-Latn"), Some("az-Latn-AZ"));
+        assert_eq!(match_language("az-AZ"), Some("az-Latn-AZ"));
+        assert_eq!(match_language("sr"), Some("sr-Latn-RS"));
+        assert_eq!(match_language("de-Latn-DE"), Some("de-DE"));
+        // The Chinese fonts go by the script first too: a regional format can be zh-Hans-HK.
+        assert_eq!(script_font("zh-Hans-HK"), Some(SIMPLIFIED_CHINESE));
+        assert_eq!(script_font("zh-Hans-MO"), Some(SIMPLIFIED_CHINESE));
+        assert_eq!(script_font("zh-Hant-SG"), Some(TRADITIONAL_CHINESE));
+        assert_eq!(script_font("zh-HK"), Some(TRADITIONAL_CHINESE));
     }
 
     #[test]
