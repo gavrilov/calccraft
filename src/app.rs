@@ -4679,6 +4679,73 @@ mod tests {
     }
 
     #[test]
+    fn pinching_the_graph_zooms_around_the_fingers() {
+        // Two fingers on the graph's center spread from 100 to 200 px apart: the view halves
+        // around that point. The first finger, which egui also takes for the pointer, would
+        // drag the graph 50 px to the left on top of that.
+        let ctx = Context::default();
+        let mut app = start_in(&ctx);
+        app.set_mode(Mode::Graphing);
+        run(&ctx, &mut app, GRAPH_WINDOW, vec![]);
+        let center = ctx.read_response(Id::new("graph")).unwrap().rect.center();
+        let before = app.graphing.view;
+        let touch = |id, pos, phase| Event::Touch {
+            device_id: egui::TouchDeviceId(1),
+            id: egui::TouchId(id),
+            phase,
+            pos,
+            force: None,
+        };
+        let button = |pos, pressed| Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        let fingers = |apart: f32| {
+            (
+                center - vec2(apart / 2.0, 0.0),
+                center + vec2(apart / 2.0, 0.0),
+            )
+        };
+        let (left, right) = fingers(100.0);
+        let start = vec![
+            Event::PointerMoved(left),
+            button(left, true),
+            touch(0, left, egui::TouchPhase::Start),
+            touch(1, right, egui::TouchPhase::Start),
+        ];
+        run(&ctx, &mut app, GRAPH_WINDOW, start);
+        // egui's gesture starts in the frame after the fingers land, then they spread in steps.
+        for apart in [100.0, 125.0, 150.0, 175.0, 200.0] {
+            let (left, right) = fingers(apart);
+            let spread = vec![
+                Event::PointerMoved(left),
+                touch(0, left, egui::TouchPhase::Move),
+                touch(1, right, egui::TouchPhase::Move),
+            ];
+            run(&ctx, &mut app, GRAPH_WINDOW, spread);
+        }
+        let (left, right) = fingers(200.0);
+        let end = vec![
+            button(left, false),
+            touch(0, left, egui::TouchPhase::End),
+            touch(1, right, egui::TouchPhase::End),
+        ];
+        run(&ctx, &mut app, GRAPH_WINDOW, end);
+
+        let after = app.graphing.view;
+        let (width, height) = (before.x_max - before.x_min, before.y_max - before.y_min);
+        // egui measures the pinch in f32.
+        assert!(((after.x_max - after.x_min) / width - 0.5).abs() < 1e-6);
+        assert!(((after.y_max - after.y_min) / height - 0.5).abs() < 1e-6);
+        let middle = |min: f64, max: f64| (min + max) / 2.0;
+        let moved = middle(after.x_min, after.x_max) - middle(before.x_min, before.x_max);
+        assert!(moved.abs() < 1e-6 * width, "the graph moved by {moved}");
+        assert!(app.graphing.manual, "the view no longer fits itself");
+    }
+
+    #[test]
     fn lists_under_popups_ignore_the_wheel() {
         // A history item's menu over the docked history, 20 entries long.
         let ctx = Context::default();

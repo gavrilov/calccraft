@@ -145,8 +145,8 @@ Open the ☰ menu, or press `Alt+3`.
   An equation is graphed when you press `Enter` or leave its box.
 - The colored fₙ button hides and shows a line. Hover a box for the function analysis, the line
   options (14 colors, solid, dashed or dotted) and remove.
-- **Explore:** pan by dragging, zoom with the wheel, the + and − buttons or `Ctrl` + plus and
-  minus. The view fits the equations by itself until you move it; the graph view button
+- **Explore:** pan by dragging, zoom with the wheel, a pinch on a touch screen, the + and −
+  buttons or `Ctrl` + plus and minus. The view fits the equations by itself until you move it; the graph view button
   (`Ctrl+0`) brings that back. Hover a curve to read a point, or turn on tracing and move its
   pointer with the arrow keys.
 - **Sliders:** free variables get them: `y = mx + b` gets `m` and `b`, each with its minimum,
