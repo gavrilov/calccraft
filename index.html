@@ -18,6 +18,24 @@
     <link rel="apple-touch-icon" href="icon-180.png">
 
     <style>
+        :root {
+            /* The app's background (palette.rs), and around the window on large screens a
+               slightly darker one, like a desktop. */
+            --app: #F3EBF3;
+            --page: #E2D8E2;
+            --text: #1A1A1A;
+            --frame: rgba(0, 0, 0, 0.14);
+            --grip: rgba(0, 0, 0, 0.35);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --app: #291A29;
+                --page: #1A101A;
+                --text: #FFFFFF;
+                --frame: rgba(255, 255, 255, 0.12);
+                --grip: rgba(255, 255, 255, 0.4);
+            }
+        }
         html {
             /* No double-tap zoom on phones. */
             touch-action: manipulation;
@@ -27,29 +45,73 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            background: #F3EBF3;
-            color: #1A1A1A;
+            background: var(--app);
+            color: var(--text);
             font-family: "Segoe UI", system-ui, sans-serif;
         }
-        @media (prefers-color-scheme: dark) {
-            html, body {
-                background: #291A29;
-                color: #FFFFFF;
-            }
-        }
         body {
-            /* Smaller than the calculator's minimum, the page scrolls (see the canvas). */
+            /* Smaller than the calculator's minimum, the page scrolls (see #window). */
             overflow: auto;
         }
-        /* The calculator gets at least Windows' 320 × 500 window, the size its layout is made
-           for: in a smaller browser window or on a small phone, the page scrolls instead. */
-        canvas {
-            display: block;
+        /* On phones, tablets and small windows the calculator fills the page. It gets at least
+           Windows' 320 × 500 window, the size its layout is made for: in a smaller browser
+           window or on a small phone, the page scrolls instead. */
+        #window {
+            position: relative;
+            box-sizing: border-box;
             width: 100%;
             height: 100%;
             min-width: 320px;
             min-height: 500px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
             outline: none;
+        }
+        #grip {
+            display: none;
+        }
+        /* On a large screen with a mouse, a full-screen calculator looks stretched: it becomes
+           a window in the middle of the page instead, about the desktop app's size. Dragging
+           the grip at its corner resizes it (wider than 560 px, history and memory dock on the
+           right, as in Windows), the browser remembers the size, and a double-click on the
+           grip goes back to the default. */
+        @media (min-width: 1024px) and (min-height: 700px) and (pointer: fine) {
+            body {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: var(--page);
+            }
+            #window {
+                width: var(--width, 400px);
+                height: var(--height, 650px);
+                max-width: calc(100vw - 48px);
+                max-height: calc(100vh - 48px);
+                border-radius: 8px;
+                border: 1px solid var(--frame);
+                background: var(--app);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.16);
+            }
+            canvas {
+                border-radius: 7px;
+            }
+            /* Just outside the window's corner, so it never covers the calculator's keys. */
+            #grip {
+                display: block;
+                position: absolute;
+                right: -14px;
+                bottom: -14px;
+                width: 14px;
+                height: 14px;
+                cursor: nwse-resize;
+                touch-action: none;
+                background: linear-gradient(135deg,
+                    transparent 45%, var(--grip) 45%, var(--grip) 52%, transparent 52%,
+                    transparent 68%, var(--grip) 68%, var(--grip) 75%, transparent 75%);
+            }
         }
         #loading {
             position: absolute;
@@ -62,7 +124,62 @@
     </style>
 </head>
 <body>
-    <canvas id="calccraft"></canvas>
+    <div id="window">
+        <canvas id="calccraft"></canvas>
+        <div id="grip" title="Resize (double-click: default size)"></div>
+    </div>
     <div id="loading">Loading CalcCraft…</div>
+
+    <script>
+        // The window's size on large screens: dragged with the grip, kept in the browser.
+        (() => {
+            const window_ = document.getElementById("window");
+            const grip = document.getElementById("grip");
+            const KEY = "calccraft-window-size";
+            const set = (width, height) => {
+                window_.style.setProperty("--width", `${Math.round(width)}px`);
+                window_.style.setProperty("--height", `${Math.round(height)}px`);
+            };
+            try {
+                const [width, height] = JSON.parse(localStorage.getItem(KEY));
+                if (width > 0 && height > 0) set(width, height);
+            } catch {
+                // No saved size, or no storage (a private window): the default size.
+            }
+            grip.addEventListener("pointerdown", (down) => {
+                down.preventDefault();
+                grip.setPointerCapture(down.pointerId);
+                const start = window_.getBoundingClientRect();
+                // The window stays centered, so it grows on both sides: twice the pointer's
+                // movement keeps the corner under the pointer. CSS keeps it between the
+                // calculator's minimum and the page's size.
+                const move = (event) => set(
+                    Math.min(Math.max(start.width + 2 * (event.clientX - down.clientX), 320), innerWidth - 48),
+                    Math.min(Math.max(start.height + 2 * (event.clientY - down.clientY), 500), innerHeight - 48),
+                );
+                const up = () => {
+                    grip.removeEventListener("pointermove", move);
+                    grip.removeEventListener("pointerup", up);
+                    const size = window_.getBoundingClientRect();
+                    try {
+                        localStorage.setItem(KEY, JSON.stringify([Math.round(size.width), Math.round(size.height)]));
+                    } catch {
+                        // Without storage the size lasts until the page is reloaded.
+                    }
+                };
+                grip.addEventListener("pointermove", move);
+                grip.addEventListener("pointerup", up);
+            });
+            grip.addEventListener("dblclick", () => {
+                window_.style.removeProperty("--width");
+                window_.style.removeProperty("--height");
+                try {
+                    localStorage.removeItem(KEY);
+                } catch {
+                    // Nothing was saved.
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

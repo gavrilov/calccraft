@@ -668,7 +668,9 @@ by the tests in `locale.rs`, `region.rs` and `dates.rs`:
   - Browsers keep some keys: eframe never stops F5 or Ctrl+R (the calculator's GRAD and MR), so
     `web::guard_shortcuts` does, with the other browser shortcuts the calculator uses.
   - The canvas has a CSS minimum of 320 × 500 (`MIN_SIZE`): the layout code never sees a smaller
-    window, the page scrolls instead.
+    window, the page scrolls instead. On large screens with a mouse (`index.html`'s media
+    query) the canvas is a centered, resizable window, sized by `index.html`'s own script, not by
+    the app: eframe just follows the canvas's size.
 - `build.rs` includes `src/icon.rs` with `#[path]`, so `icon.rs` must not use egui or any other
   dependency. The build writes a multi-size .ico file to `OUT_DIR` and embeds it with
   `winresource`, which needs `rc.exe` from the Windows SDK. After rebuilding, Explorer may show

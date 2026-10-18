@@ -253,8 +253,12 @@ How the browser version differs:
   `?lang=de-DE&region=de-DE` stands in for `CALCCRAFT_LANGUAGE` and `CALCCRAFT_REGION`. Chinese,
   Japanese, Korean, Thai and Amharic need fonts the page can't read from the system, so they
   aren't offered yet.
-- **Keep on top** is gone: a browser tab can't stay on top or set its size. Smaller than
-  320 × 500, the page scrolls.
+- **Window size:** on phones, tablets and small browser windows the calculator fills the page
+  (smaller than 320 × 500, the page scrolls). On a large screen with a mouse it's a window in
+  the middle of the page instead, 400 × 650 to start: drag the grip at its lower right corner
+  to resize it (wider than 560 px, history and memory dock on the right), and double-click the
+  grip to go back. The browser remembers the size. **Keep on top** is gone: a browser tab
+  can't stay on top.
 - **Share** in the Graphing mode downloads the graph as `graph.png`. **Paste** in an equation
   box's menu asks the browser for the clipboard, which may ask for permission first.
 - **Shortcuts:** the page keeps the browser from acting on the calculator's shortcuts (Ctrl+R
